@@ -21,7 +21,7 @@ export default function CompletarRegistroPage() {
         const checkUser = async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
-                router.push('/')
+                router.push('/registro')
                 return
             }
 
@@ -84,8 +84,8 @@ export default function CompletarRegistroPage() {
             if (localError) throw localError
 
             router.push('/inicio')
-        } catch (err: any) {
-            setError(err.message || 'Error al actualizar el registro.')
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Error al actualizar el registro.')
             setLoading(false)
         }
     }

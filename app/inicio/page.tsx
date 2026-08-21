@@ -4,12 +4,25 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 
+type Perfil = {
+    nombre_completo?: string
+    email?: string
+    telefono?: string
+    dni?: string
+}
+
+type Local = {
+    nombre?: string
+    direccion?: string
+    ruc?: string
+}
+
 export default function InicioPage() {
     const router = useRouter()
     const supabase = createClient()
 
-    const [perfil, setPerfil] = useState<any>(null)
-    const [local, setLocal] = useState<any>(null)
+    const [perfil, setPerfil] = useState<Perfil | null>(null)
+    const [local, setLocal] = useState<Local | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -17,7 +30,7 @@ export default function InicioPage() {
             const { data: { user } } = await supabase.auth.getUser()
 
             if (!user) {
-                router.push('/')
+            router.push('/registro')
                 return
             }
 
