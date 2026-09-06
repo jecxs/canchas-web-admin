@@ -10,11 +10,9 @@ export async function GET(request: Request) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
 
         if (!error) {
-            // Redirige al formulario tras iniciar sesión con éxito
-            return NextResponse.redirect(`${origin}/completar-registro`)
+            return NextResponse.redirect(`${origin}/auth/continue`)
         }
     }
 
-    // Si hubo error, redirige al inicio
-    return NextResponse.redirect(`${origin}?error=AuthFailed`)
+    return NextResponse.redirect(`${origin}/registro?error=AuthFailed`)
 }

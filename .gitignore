@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# Supabase CLI cache (migrations live in app-reservas-canchas)
+/supabase/.temp/
+
 # next.js
 /.next/
 /out/
