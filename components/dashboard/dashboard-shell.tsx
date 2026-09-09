@@ -19,7 +19,7 @@ export async function DashboardShell({
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar role={role} activeLocal={activeLocal} subscription={subscription} />
-      <SidebarInset className="min-h-svh overflow-hidden bg-background md:rounded-2xl">
+      <SidebarInset className="h-svh min-h-0 overflow-hidden bg-background md:h-[calc(100svh-1rem)] md:rounded-2xl">
         <DashboardHeader role={role} user={user} locals={locals} activeLocal={activeLocal} />
         <DashboardContent>{children}</DashboardContent>
       </SidebarInset>

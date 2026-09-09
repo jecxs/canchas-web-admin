@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { courtSchema, courtStatusSchema } from './schema'
+import { getCourtStatusErrorMessage } from './messages'
 import type { CourtActionState } from './types'
 
 const invalid = (fieldErrors?: Record<string, string[] | undefined>): CourtActionState => ({ success: false, message: 'Revisa los campos indicados', fieldErrors })
@@ -66,10 +67,13 @@ export async function changeCourtStatusAction(_state: CourtActionState, formData
     p_activa: validation.data.active,
   })
   if (error) {
-    console.error('[courts:status]', { code: error.code })
-    return error.code === '23514'
-      ? { success: false, message: 'No se puede desactivar una cancha con reservas futuras' }
-      : { success: false, message: 'No se pudo completar la operación' }
+    console.error('[courts:status]', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    return { success: false, message: getCourtStatusErrorMessage(error) }
   }
   return finish()
 }

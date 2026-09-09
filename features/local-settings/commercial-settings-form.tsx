@@ -1,12 +1,16 @@
 'use client'
 
+import Image from 'next/image'
 import { useActionState, useState } from 'react'
+import { BankIcon, Cash01Icon, Wallet02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import { saveCommercialSettingsAction } from './actions'
 import { useSettingsFormFeedback } from './form-feedback'
 import {
@@ -23,6 +27,41 @@ const methods = [
   { type: 'efectivo', label: 'Efectivo', placeholder: 'Indica cuándo se acepta' },
   { type: 'otro', label: 'Otro', placeholder: 'Nombre e instrucciones' },
 ] as const
+
+function PaymentMethodIcon({ type, enabled }: { type: PaymentMethodType; enabled: boolean }) {
+  const className = cn(
+    'grid size-10 shrink-0 place-items-center rounded-xl border bg-background transition-colors',
+    enabled && 'border-primary/50',
+  )
+
+  if (type === 'yape') {
+    return (
+      <span className={className} aria-hidden="true">
+        <Image src="/67c3a4c15f5d7-Yape.svg" alt="" width={30} height={30} unoptimized className="size-7 object-contain" />
+      </span>
+    )
+  }
+
+  if (type === 'plin') {
+    return (
+      <span className={className} aria-hidden="true">
+        <Image src="/Plin%20%20AI.svg" alt="" width={30} height={30} unoptimized className="size-7 object-contain" />
+      </span>
+    )
+  }
+
+  const icon = type === 'transferencia'
+    ? BankIcon
+    : type === 'efectivo'
+      ? Cash01Icon
+      : Wallet02Icon
+
+  return (
+    <span className={className} aria-hidden="true">
+      <HugeiconsIcon icon={icon} strokeWidth={2} className="size-5" />
+    </span>
+  )
+}
 
 export function CommercialSettingsForm({ settings }: { settings: LocalSettings }) {
   const currentMethods = parsePaymentMethods(settings.medios_pago_adelanto)
@@ -48,7 +87,7 @@ export function CommercialSettingsForm({ settings }: { settings: LocalSettings }
         <CardDescription>Reglas que verá el cliente antes de solicitar una reserva.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={action} className="space-y-7">
+        <form action={action} onReset={(event) => event.preventDefault()} className="space-y-7">
           <input type="hidden" name="localId" value={settings.id} />
           <Field data-invalid={Boolean(state.fieldErrors?.advancePercentage)}>
             <FieldLabel htmlFor="advancePercentage">Porcentaje de adelanto</FieldLabel>
@@ -68,7 +107,8 @@ export function CommercialSettingsForm({ settings }: { settings: LocalSettings }
                   <div key={method.type} className="rounded-2xl border bg-muted/15 p-4">
                     <label className="flex cursor-pointer items-center gap-3 font-semibold">
                       <input type="checkbox" name="paymentMethod" value={method.type} checked={enabled} onChange={() => toggle(method.type)} className="size-4 accent-primary" />
-                      {method.label}
+                      <PaymentMethodIcon type={method.type} enabled={enabled} />
+                      <span>{method.label}</span>
                     </label>
                     <Input name={`payment_${method.type}`} defaultValue={current} disabled={!enabled} required={enabled} maxLength={120} placeholder={method.placeholder} className="mt-3" />
                   </div>

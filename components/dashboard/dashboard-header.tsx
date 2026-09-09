@@ -32,7 +32,7 @@ export function DashboardHeader({ role, user, locals, activeLocal }: DashboardHe
   const isHome = pathname === homeHref
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center border-b border-border/80 bg-background/90 px-3 backdrop-blur-xl md:px-5">
+    <header className="relative z-30 flex h-16 shrink-0 items-center border-b border-border/80 bg-background/95 px-3 backdrop-blur-xl md:px-5">
       <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger className="size-9 rounded-lg" aria-label="Alternar menú lateral" />
         <Separator orientation="vertical" className="h-5" />

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CourtEditor } from '@/features/courts/court-editor'
 import { getCourtsConfiguration } from '@/features/courts/queries'
 import { CourtStatusAction } from '@/features/courts/court-status-action'
+import { SportIcon } from '@/features/courts/sport-icon'
 
 export default async function OwnerCourtsPage() {
   const { local, courts, sports } = await getCourtsConfiguration()
@@ -23,16 +24,35 @@ export default async function OwnerCourtsPage() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {courts.map((court) => (
-              <Card key={court.id} className={!court.active ? 'opacity-70' : undefined}>
+              <Card key={court.id} className="transition-[border-color,box-shadow] duration-500 hover:border-foreground/15 hover:shadow-sm">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/18"><HugeiconsIcon icon={Building03Icon} strokeWidth={2} className="size-5" /></span><div className="min-w-0"><CardTitle className="truncate">{court.name}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{court.surface || 'Superficie sin especificar'}</p></div></div>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className={`grid size-11 shrink-0 place-items-center rounded-xl ${court.active ? 'bg-primary/18' : 'bg-muted text-muted-foreground'}`}>
+                        <HugeiconsIcon icon={Building03Icon} strokeWidth={2} className="size-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <CardTitle className="truncate">{court.name}</CardTitle>
+                        <p className="mt-1 text-sm text-muted-foreground">{court.surface || 'Superficie sin especificar'}</p>
+                      </div>
+                    </div>
                     <Badge variant={court.active ? 'success' : 'neutral'}>{court.active ? 'Activa' : 'Inactiva'}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {court.sports.map((sport) => <div key={sport.sportId} className="flex items-center justify-between gap-3 rounded-xl bg-muted/45 px-3 py-2.5 text-sm"><div><p className="font-semibold">{sport.name}</p><p className="text-xs capitalize text-muted-foreground">{sport.support}</p></div><p className="font-extrabold">S/ {sport.hourlyPrice?.toFixed(2) ?? '—'}<span className="font-normal text-muted-foreground"> / h</span></p></div>)}
+                    {court.sports.map((sport) => (
+                      <div key={sport.sportId} className="flex items-center justify-between gap-3 rounded-xl bg-muted/45 px-3 py-2.5 text-sm transition-colors duration-500 hover:bg-muted/60">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <SportIcon name={sport.name} inactive={!court.active} />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold capitalize">{sport.name}</p>
+                            <p className="text-xs capitalize text-muted-foreground">{sport.support}</p>
+                          </div>
+                        </div>
+                        <p className="shrink-0 font-extrabold">S/ {sport.hourlyPrice?.toFixed(2) ?? '—'}<span className="font-normal text-muted-foreground"> / h</span></p>
+                      </div>
+                    ))}
                   </div>
                   <div className="mt-5 flex flex-wrap gap-2 border-t pt-5"><CourtEditor localId={local.id} sports={sports} court={court} /><CourtStatusAction localId={local.id} courtId={court.id} active={court.active} courtName={court.name} /></div>
                 </CardContent>

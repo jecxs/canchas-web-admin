@@ -1,17 +1,10 @@
-import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { CommercialSettingsForm } from '@/features/local-settings/commercial-settings-form'
 import { GeneralSettingsForm } from '@/features/local-settings/general-settings-form'
 import { LocalMediaManager } from '@/features/local-settings/local-media-manager'
 import { getLocalSettings } from '@/features/local-settings/queries'
 import { ScheduleSettingsForm } from '@/features/local-settings/schedule-settings-form'
-
-const sections = [
-  ['Datos generales', '#datos-generales'],
-  ['Logo y galería', '#identidad-visual'],
-  ['Horarios', '#horarios'],
-  ['Pagos y políticas', '#pagos-politicas'],
-] as const
+import { SettingsSectionNav } from '@/features/local-settings/settings-section-nav'
 
 export default async function OwnerSettingsPage() {
   const { local, settings, schedules, photos } = await getLocalSettings()
@@ -28,10 +21,7 @@ export default async function OwnerSettingsPage() {
       </div>
 
       <div className="mt-9 grid items-start gap-7 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <nav aria-label="Secciones de configuración" className="rounded-2xl border bg-card p-2 lg:sticky lg:top-24">
-          {sections.map(([label, href]) => <Link key={href} href={href} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground">{label}</Link>)}
-          <Link href="/panel/canchas" className="mt-1 block rounded-xl bg-primary/14 px-3 py-2.5 text-sm font-bold">Canchas y tarifas →</Link>
-        </nav>
+        <SettingsSectionNav />
         <div className="space-y-6">
           <GeneralSettingsForm settings={settings} />
           <LocalMediaManager localId={settings.id} logo={settings.logo} photos={photos} />
