@@ -8,6 +8,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
     <DashboardShell
       role="admin"
       user={{
+        id: context.userId,
         name: context.profile.nombre_completo,
         email: context.profile.email,
         avatarUrl: context.avatarUrl,

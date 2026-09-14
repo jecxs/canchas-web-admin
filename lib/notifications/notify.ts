@@ -15,9 +15,7 @@ export const notificationMessages = {
 export type NotificationMessage =
   (typeof notificationMessages)[keyof typeof notificationMessages]
 
-type NotifyOptions = Omit<SileoOptions, 'title' | 'type'> & {
-  title?: NotificationMessage
-}
+type NotifyOptions = Omit<SileoOptions, 'type'>
 
 type PromiseOptions = {
   loading?: NotificationMessage

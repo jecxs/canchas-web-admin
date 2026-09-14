@@ -3,6 +3,7 @@ import type { LocalSummary, SubscriptionSummary } from '@/lib/auth/access'
 export type DashboardRole = 'owner' | 'admin'
 
 export type DashboardUser = {
+  id: string
   name: string
   email: string | null
   avatarUrl: string | null

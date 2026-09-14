@@ -142,24 +142,33 @@ export type Database = {
       canchas: {
         Row: {
           activa: boolean
+          ancho_metros: number | null
           created_at: string
+          descripcion: string | null
           id: string
+          largo_metros: number | null
           local_id: string
           nombre: string
           superficie: string | null
         }
         Insert: {
           activa?: boolean
+          ancho_metros?: number | null
           created_at?: string
+          descripcion?: string | null
           id?: string
+          largo_metros?: number | null
           local_id: string
           nombre: string
           superficie?: string | null
         }
         Update: {
           activa?: boolean
+          ancho_metros?: number | null
           created_at?: string
+          descripcion?: string | null
           id?: string
+          largo_metros?: number | null
           local_id?: string
           nombre?: string
           superficie?: string | null
@@ -676,6 +685,8 @@ export type Database = {
       reservas: {
         Row: {
           canal_origen: Database["public"]["Enums"]["canal_origen_reserva"]
+          cancelada_at: string | null
+          cancelada_por: string | null
           cancha_id: string
           cliente_id: string | null
           cliente_sin_cuenta_nombre: string | null
@@ -691,6 +702,7 @@ export type Database = {
           id: string
           monto_adelanto_requerido: number
           monto_total: number
+          motivo_cancelacion: string | null
           motivo_rechazo_pago:
             | Database["public"]["Enums"]["motivo_rechazo_pago"]
             | null
@@ -705,6 +717,8 @@ export type Database = {
         }
         Insert: {
           canal_origen?: Database["public"]["Enums"]["canal_origen_reserva"]
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           cancha_id: string
           cliente_id?: string | null
           cliente_sin_cuenta_nombre?: string | null
@@ -720,6 +734,7 @@ export type Database = {
           id?: string
           monto_adelanto_requerido: number
           monto_total: number
+          motivo_cancelacion?: string | null
           motivo_rechazo_pago?:
             | Database["public"]["Enums"]["motivo_rechazo_pago"]
             | null
@@ -734,6 +749,8 @@ export type Database = {
         }
         Update: {
           canal_origen?: Database["public"]["Enums"]["canal_origen_reserva"]
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           cancha_id?: string
           cliente_id?: string | null
           cliente_sin_cuenta_nombre?: string | null
@@ -749,6 +766,7 @@ export type Database = {
           id?: string
           monto_adelanto_requerido?: number
           monto_total?: number
+          motivo_cancelacion?: string | null
           motivo_rechazo_pago?:
             | Database["public"]["Enums"]["motivo_rechazo_pago"]
             | null
@@ -795,6 +813,70 @@ export type Database = {
             columns: ["rechazada_por"]
             isOneToOne: false
             referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notificaciones: {
+        Row: {
+          created_at: string
+          datos: Json
+          destinatario_id: string
+          href: string | null
+          id: string
+          leida_at: string | null
+          local_id: string | null
+          mensaje: string
+          reserva_id: string | null
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          datos?: Json
+          destinatario_id: string
+          href?: string | null
+          id?: string
+          leida_at?: string | null
+          local_id?: string | null
+          mensaje: string
+          reserva_id?: string | null
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          datos?: Json
+          destinatario_id?: string
+          href?: string | null
+          id?: string
+          leida_at?: string | null
+          local_id?: string | null
+          mensaje?: string
+          reserva_id?: string | null
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificaciones_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificaciones_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificaciones_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "reservas"
             referencedColumns: ["id"]
           },
         ]
@@ -921,6 +1003,19 @@ export type Database = {
         Args: { p_local_id: string; p_publicado: boolean }
         Returns: boolean
       }
+      cancelar_reserva_cliente: {
+        Args: { p_reserva_id: string }
+        Returns: undefined
+      }
+      cancelar_reserva_dueno: {
+        Args: {
+          p_estado: Database["public"]["Enums"]["estado_reserva"]
+          p_motivo?: string
+          p_reembolso?: Database["public"]["Enums"]["resultado_reembolso"]
+          p_reserva_id: string
+        }
+        Returns: undefined
+      }
       confirmar_reserva: { Args: { p_reserva_id: string }; Returns: undefined }
       crear_reserva: {
         Args: {
@@ -931,6 +1026,24 @@ export type Database = {
           p_notas?: string
         }
         Returns: string
+      }
+      crear_reserva_en_cancha: {
+        Args: {
+          p_bloques: number
+          p_cancha_id: string
+          p_deporte_id: string
+          p_inicio: string
+          p_notas?: string
+        }
+        Returns: {
+          cancha_id: string
+          cancha_nombre: string
+          fin: string
+          inicio: string
+          monto_adelanto_requerido: number
+          monto_total: number
+          reserva_id: string
+        }[]
       }
       crear_reserva_en_local: {
         Args: {
@@ -1004,6 +1117,32 @@ export type Database = {
         Args: { p_foto_id: string; p_local_id: string }
         Returns: string
       }
+      explorar_locales_publicos: {
+        Args: {
+          p_busqueda?: string
+          p_calificacion_minima?: number
+          p_deporte_id?: string
+          p_fecha?: string
+          p_hora_fin?: string
+          p_hora_inicio?: string
+          p_latitud?: number
+          p_limite?: number
+          p_longitud?: number
+          p_orden?: string
+        }
+        Returns: {
+          direccion: string
+          distancia_metros: number
+          id: string
+          latitud: number
+          logo: string
+          longitud: number
+          nombre: string
+          portada_storage_path: string
+          promedio: number
+          total_resenas: number
+        }[]
+      }
       extender_reserva_30_min: {
         Args: {
           p_estado_cobro?: string
@@ -1058,6 +1197,7 @@ export type Database = {
           tipo: string
         }[]
       }
+      fn_primer_nombre_visible: { Args: { p_nombre: string }; Returns: string }
       fn_reserva_ocupa_horario: {
         Args: {
           p_estado: Database["public"]["Enums"]["estado_reserva"]
@@ -1071,8 +1211,11 @@ export type Database = {
       }
       guardar_cancha_local: {
         Args: {
+          p_ancho_metros?: number
           p_cancha_id: string
           p_deportes: Json
+          p_descripcion?: string
+          p_largo_metros?: number
           p_local_id: string
           p_nombre: string
           p_superficie: string
@@ -1082,11 +1225,14 @@ export type Database = {
       obtener_canchas_local: {
         Args: { p_local_id: string }
         Returns: {
+          ancho_metros: number
           cancha_id: string
           cancha_nombre: string
           deporte_icono: string
           deporte_id: string
           deporte_nombre: string
+          descripcion: string
+          largo_metros: number
           precio_por_hora: number
           superficie: string
           tipo_soporte: Database["public"]["Enums"]["tipo_soporte_deporte"]
@@ -1125,6 +1271,22 @@ export type Database = {
           total_resenas: number
         }[]
       }
+      obtener_disponibilidad_cancha_publica: {
+        Args: { p_cancha_id: string; p_deporte_id: string; p_fecha: string }
+        Returns: {
+          cancha_id: string
+          cancha_nombre: string
+          deporte_id: string
+          es_excepcion_horaria: boolean
+          estado: string
+          fin: string
+          inicio: string
+          ocupacion_fin: string
+          ocupacion_inicio: string
+          primer_nombre_reservante: string
+          reservable: boolean
+        }[]
+      }
       obtener_horarios_local: {
         Args: { p_local_id: string }
         Returns: {
@@ -1159,6 +1321,13 @@ export type Database = {
           total_reservas: number
         }[]
       }
+      obtener_medios_pago_local: {
+        Args: { p_local_id: string }
+        Returns: {
+          detalle: string
+          tipo: string
+        }[]
+      }
       obtener_reservas_local: {
         Args: {
           p_deporte_id?: string
@@ -1176,6 +1345,29 @@ export type Database = {
           inicio: string
           reserver_nombre: string
           tipo: string
+        }[]
+      }
+      obtener_reservas_agenda_dueno: {
+        Args: { p_fecha: string; p_local_id: string }
+        Returns: {
+          cancha_id: string
+          canal_origen: Database["public"]["Enums"]["canal_origen_reserva"]
+          cliente_nombre: string
+          cliente_telefono: string
+          comprobante_subido_at: string
+          comprobante_url: string
+          deporte_id: string
+          es_excepcion_horaria: boolean
+          estado: Database["public"]["Enums"]["estado_reserva"]
+          fin: string
+          inicio: string
+          monto_adelanto_requerido: number
+          monto_cobrado: number
+          monto_reembolsado: number
+          monto_total: number
+          notas: string
+          reserva_id: string
+          saldo_pendiente: number
         }[]
       }
       obtener_tarjetas_locales: {
@@ -1215,6 +1407,28 @@ export type Database = {
           p_motivo: Database["public"]["Enums"]["motivo_rechazo_pago"]
           p_reserva_id: string
         }
+        Returns: undefined
+      }
+      marcar_reserva_no_show_dueno: {
+        Args: { p_motivo?: string; p_reserva_id: string }
+        Returns: undefined
+      }
+      marcar_notificaciones_leidas_dueno: {
+        Args: { p_notificacion_id?: string }
+        Returns: number
+      }
+      registrar_movimiento_pago_reserva_dueno: {
+        Args: {
+          p_medio?: string
+          p_monto: number
+          p_notas?: string
+          p_reserva_id: string
+          p_tipo: string
+        }
+        Returns: undefined
+      }
+      reprogramar_reserva_dueno: {
+        Args: { p_cancha_id: string; p_inicio: string; p_reserva_id: string }
         Returns: undefined
       }
       rechazar_solicitud_local: {
