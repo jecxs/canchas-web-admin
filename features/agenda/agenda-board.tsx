@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition, type DragEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type MouseEvent } from 'react'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -12,6 +12,7 @@ import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverTitl
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { notify } from '@/lib/notifications/notify'
+import { createClient } from '@/utils/supabase/client'
 import { formatAgendaDate, getLocalMinutes, getTodayInLima, getWeekStart, isoToLocalTime, localDateTimeToIso, minutesToTime, shiftAgendaDate, timeToMinutes } from './date-utils'
 import { CancelReservationForm, ConfirmReservationForm, EncasedBookingForm, ExtendReservationForm, MaintenanceForm, ManualBookingForm, NoShowReservationForm, PaymentMovementForm, RejectReservationForm, RescheduleReservationForm } from './operation-forms'
 import type { AgendaCourt, AgendaData, AgendaOccupation } from './types'
@@ -20,6 +21,18 @@ type Slot = { start: number; end: number; label: string }
 type SelectedCell = { date: string; courtId: string; courtName: string; slot: Slot; occupation?: AgendaOccupation; blocks?: number }
 type ContextMenuState = { x: number; y: number; cell: SelectedCell }
 type Operation = 'summary' | 'manual' | 'maintenance' | 'encajada' | 'extend' | 'confirm' | 'reject' | 'move' | 'cancel' | 'no-show' | 'payment'
+type ReservationRealtimeRecord = { id?: unknown; cancha_id?: unknown; estado?: unknown }
+type DragPreview = { date: string; courtId: string; start: number; end: number; allowed: boolean }
+
+function asReservationRealtimeRecord(value: unknown): ReservationRealtimeRecord {
+  return value && typeof value === 'object' ? value as ReservationRealtimeRecord : {}
+}
+
+function isWithinSelectedRange(selection: SelectedCell | null, day: AgendaData, court: AgendaCourt, slot: Slot) {
+  if (!selection || selection.date !== day.date || selection.courtId !== court.id) return false
+  const blocks = selection.blocks ?? 1
+  return slot.start >= selection.slot.start && slot.start < selection.slot.start + blocks * 60
+}
 
 function buildSlots(openingTime: string | null, closingTime: string | null) {
   if (!openingTime || !closingTime) return []
@@ -47,8 +60,14 @@ function getOccupationSegment(occupations: AgendaOccupation[], courtId: string, 
   let occupationEnd = getLocalMinutes(match.end)
   if (occupationEnd <= occupationStart) occupationEnd += 24 * 60
   const overlapStart = Math.max(slot.start, occupationStart)
-  const overlapEnd = Math.min(slot.end, occupationEnd)
-  return { occupation: match, top: ((overlapStart - slot.start) / 60) * 100, height: ((overlapEnd - overlapStart) / 60) * 100 }
+  return {
+    occupation: match,
+    top: ((overlapStart - slot.start) / 60) * 100,
+    // Solo la celda donde empieza la ocupación dibuja la tarjeta. Su altura
+    // cruza las siguientes filas para comunicar una única reserva continua.
+    isAnchor: occupationStart >= slot.start && occupationStart < slot.end,
+    durationMinutes: occupationEnd - occupationStart,
+  }
 }
 
 function occupationLabel(occupation?: AgendaOccupation) {
@@ -128,9 +147,11 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   const [operation, setOperation] = useState<Operation>('summary')
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const openingLightbox = useRef(false)
   const [draggedReservation, setDraggedReservation] = useState<AgendaOccupation | null>(null)
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null)
   const [nowMs, setNowMs] = useState(0)
+  const announcedPaymentHolds = useRef(new Set<string>())
   const isWeek = view === 'week' && Boolean(weekData?.length)
   const days = useMemo(() => isWeek ? weekData! : [data], [isWeek, weekData, data])
   const selectedCourt = data.courts.find((court) => court.id === selectedCourtId) ?? data.courts[0]
@@ -161,6 +182,62 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
     return () => window.cancelAnimationFrame(frame)
   }, [highlightReservationId, data.date, view])
 
+  useEffect(() => {
+    const courtsById = new Map(data.courts.map((court) => [court.id, court.name]))
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`owner-agenda-reservations:${data.localId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, (payload) => {
+        const current = asReservationRealtimeRecord(payload.new)
+        const previous = asReservationRealtimeRecord(payload.old)
+        const courtId = typeof current.cancha_id === 'string' ? current.cancha_id : previous.cancha_id
+        if (typeof courtId !== 'string' || !courtsById.has(courtId)) return
+
+        // Un apartado es útil en la Agenda, pero no merece una fila persistente
+        // en la campana: normalmente desaparecerá si el cliente no paga.
+        if (payload.eventType === 'INSERT' && current.estado === 'pendiente_pago' && typeof current.id === 'string' && !announcedPaymentHolds.current.has(current.id)) {
+          announcedPaymentHolds.current.add(current.id)
+          notify.info({
+            title: 'Horario apartado temporalmente',
+            description: `${courtsById.get(courtId)} está en proceso de pago. El bloque se liberará si no se envía comprobante.`,
+            icon: <HugeiconsIcon icon={Calendar03Icon} strokeWidth={2.25} className="size-4 text-primary" />,
+            duration: 8_000,
+            roundness: 18,
+            autopilot: { expand: 0, collapse: 6_000 },
+            styles: {
+              title: 'font-sans font-extrabold text-sidebar-foreground!',
+              description: 'font-sans text-sidebar-foreground/80!',
+            },
+          })
+        }
+
+        // Insert, comprobante enviado, expiración o liberación: todos cambian la
+        // ocupación que el dueño ve en la Agenda.
+        router.refresh()
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') router.refresh()
+      })
+
+    return () => { void supabase.removeChannel(channel) }
+  }, [data.courts, data.localId, router])
+
+  useEffect(() => {
+    // Respaldo para una pestaña suspendida o una reconexión silenciosa. El canal
+    // Realtime es inmediato; esta consulta solo corrige una posible pérdida.
+    const reconcile = () => {
+      if (document.visibilityState === 'visible') router.refresh()
+    }
+    const interval = window.setInterval(reconcile, 30_000)
+    window.addEventListener('online', reconcile)
+    document.addEventListener('visibilitychange', reconcile)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('online', reconcile)
+      document.removeEventListener('visibilitychange', reconcile)
+    }
+  }, [router])
+
   function navigate(date: string) {
     startTransition(() => router.push(buildAgendaUrl(pathname, date, selectedSportId, view, selectedCourt?.id)))
   }
@@ -169,7 +246,20 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
     setSelectedCell(null)
     setSelectedCells([])
     setOperation('summary')
+    openingLightbox.current = false
     setLightboxOpen(false)
+  }
+
+  function openProofLightbox() {
+    // The proof viewer is portalled above the non-modal Sheet. Keep the Sheet
+    // from interpreting that new focus target as an outside interaction.
+    openingLightbox.current = true
+    setLightboxOpen(true)
+  }
+
+  function onProofLightboxChange(open: boolean) {
+    setLightboxOpen(open)
+    if (!open) openingLightbox.current = false
   }
 
   function openCell(day: AgendaData, court: AgendaCourt, slot: Slot, event: MouseEvent<HTMLButtonElement>) {
@@ -256,7 +346,10 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   function canDropReservation(reservation: AgendaOccupation, day: AgendaData, court: AgendaCourt, slot: Slot) {
     if (!canMove(reservation) || isPastSlot(day, slot) || !reservation.sportId || !court.sports.some((sport) => sport.id === reservation.sportId)) return false
     const durationMinutes = Math.round((new Date(reservation.end).getTime() - new Date(reservation.start).getTime()) / 60000)
-    if (durationMinutes < 60 || durationMinutes % 60 !== 0) return false
+    // Una reserva normal ocupa horas completas. La única duración que puede
+    // terminar en :30 es una reserva existente con extensión autorizada; el
+    // RPC vuelve a comprobar la auditoría antes de guardar el movimiento.
+    if (durationMinutes < 60 || (durationMinutes % 60 !== 0 && durationMinutes % 60 !== 30)) return false
     const targetEnd = slot.start + durationMinutes
     const openingSlots = buildSlots(day.openingTime, day.closingTime)
     if (!openingSlots.some((candidate) => candidate.start === slot.start) || targetEnd > (openingSlots.at(-1)?.end ?? 0)) return false
@@ -279,7 +372,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   function onReservationDrop(event: DragEvent<HTMLButtonElement>, day: AgendaData, court: AgendaCourt, slot: Slot) {
     event.preventDefault()
     const reservation = draggedReservation
-    setDragOverKey(null)
+    setDragPreview(null)
     setDraggedReservation(null)
     if (!reservation) return
     if (!canDropReservation(reservation, day, court, slot)) {
@@ -292,13 +385,22 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
 
   function renderCell(day: AgendaData, court: AgendaCourt, slot: Slot) {
     const segment = getOccupationSegment(day.occupations, court.id, slot)
-    const selected = selectedCell?.date === day.date && selectedCell.courtId === court.id && selectedCell.slot.start === slot.start
+    // selectedCell conserva blocks al abrir el formulario; así el rango sigue
+    // visible y no aparenta reducirse al primer bloque seleccionado.
+    const selected = isWithinSelectedRange(selectedCell, day, court, slot)
     const selectedByCtrl = selectedCells.some((item) => item.date === day.date && item.courtId === court.id && item.slot.start === slot.start)
     const past = !segment && isPastSlot(day, slot)
     const dragKey = `${day.date}-${court.id}-${slot.start}`
     const dropAllowed = Boolean(draggedReservation && canDropReservation(draggedReservation, day, court, slot))
+    const isDragPreview = Boolean(dragPreview && dragPreview.date === day.date && dragPreview.courtId === court.id && slot.start >= dragPreview.start && slot.start < dragPreview.end)
+    const dragPreviewAllowed = dragPreview?.allowed ?? false
     const isHighlighted = segment?.occupation.reservationId === highlightReservationId
-    return <button key={dragKey} type="button" disabled={past} draggable={Boolean(segment?.occupation && canMove(segment.occupation))} className={`group relative min-h-16 border-r border-b p-1.5 text-left outline-none transition-colors duration-300 last:border-r-0 ${past ? 'cursor-not-allowed bg-muted/55 text-muted-foreground' : 'hover:bg-primary/8 focus-visible:bg-primary/10'} ${selected || selectedByCtrl ? 'bg-primary/12' : 'bg-background'} ${dragOverKey === dragKey ? (dropAllowed ? 'bg-primary/15' : 'bg-destructive/10') : ''}`} onDragStart={(event) => segment?.occupation && onReservationDragStart(event, segment.occupation)} onDragEnd={() => { setDraggedReservation(null); setDragOverKey(null) }} onDragOver={(event) => { if (!draggedReservation) return; event.preventDefault(); setDragOverKey(dragKey); event.dataTransfer.dropEffect = dropAllowed ? 'move' : 'none' }} onDragLeave={() => setDragOverKey((current) => current === dragKey ? null : current)} onDrop={(event) => onReservationDrop(event, day, court, slot)} onClick={(event) => openCell(day, court, slot, event)} onContextMenu={(event) => { if (past) return; event.preventDefault(); setSelectedCells([]); setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 240), y: Math.min(event.clientY, window.innerHeight - 220), cell: { date: day.date, courtId: court.id, courtName: court.name, slot, occupation: segment?.occupation } }) }}><span className={`pointer-events-none absolute inset-1 rounded-lg border transition-colors duration-300 ${dragOverKey === dragKey ? (dropAllowed ? 'border-primary' : 'border-destructive') : selected || selectedByCtrl ? 'border-primary/55' : 'border-transparent group-hover:border-primary/30'}`} />{segment ? <span data-reservation-id={segment.occupation.reservationId} className={`absolute inset-x-1 overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] font-bold leading-tight shadow-sm transition-colors duration-300 ${isHighlighted ? 'z-10 animate-[pulse_1.1s_ease-in-out_5] ring-4 ring-primary/50 ring-offset-2 ring-offset-background' : ''} ${canMove(segment.occupation) ? 'cursor-grab active:cursor-grabbing' : ''} ${segment.occupation.type === 'mantenimiento' ? 'border-secondary bg-secondary text-secondary-foreground' : reservationTone(segment.occupation.reservationStatus)}`} style={{ top: `calc(${segment.top}% + 0.375rem)`, height: `calc(${segment.height}% - 0.75rem)` }}><span className="block truncate">{segment.occupation.type === 'mantenimiento' ? occupationLabel(segment.occupation) : reservationStatusLabel(segment.occupation.reservationStatus)}</span>{segment.occupation.type === 'reserva' && isHighlighted && <span className="mt-0.5 block truncate text-[10px] font-semibold">Revisar esta reserva</span>}{segment.occupation.type === 'reserva' && canMove(segment.occupation) && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">Arrastra para mover</span>}{segment.occupation.type === 'reserva' && segment.occupation.isException && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">+30 min</span>}</span> : past ? <span className="pointer-events-none absolute inset-0 grid place-items-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">Hora pasada</span> : <span className="pointer-events-none absolute inset-0 grid place-items-center text-sm font-bold text-primary opacity-0 transition-opacity duration-300 group-hover:opacity-100">+</span>}<span className="sr-only">{court.name}, {day.date}, {slot.label}, {past ? 'hora pasada' : occupationLabel(segment?.occupation)}</span></button>
+    const isDraggable = Boolean(segment?.occupation && canMove(segment.occupation))
+    // El botón de la celda vuelve a ser la fuente del arrastre: los navegadores
+    // no inician un drag HTML5 desde un hijo de <button>. La tarjeta unida es
+    // pointer-events-none para que dragover/drop resuelvan la celda real bajo
+    // el cursor, aunque la tarjeta visualmente cubra las filas siguientes.
+    return <button key={dragKey} type="button" disabled={past} draggable={isDraggable} onDragStart={(event) => { if (segment?.occupation) onReservationDragStart(event, segment.occupation) }} onDragEnd={() => { setDraggedReservation(null); setDragPreview(null) }} className={`group relative min-h-16 overflow-visible border-r border-b p-1.5 text-left outline-none transition-colors duration-300 last:border-r-0 ${isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${past ? 'cursor-not-allowed bg-muted/55 text-muted-foreground' : 'hover:bg-primary/8 focus-visible:bg-primary/10'} ${selected || selectedByCtrl ? 'bg-primary/18' : 'bg-background'} ${isDragPreview ? (dragPreviewAllowed ? 'bg-primary/15' : 'bg-destructive/10') : ''}`} onDragOver={(event) => { if (!draggedReservation) return; event.preventDefault(); const durationMinutes = Math.round((new Date(draggedReservation.end).getTime() - new Date(draggedReservation.start).getTime()) / 60000); setDragPreview({ date: day.date, courtId: court.id, start: slot.start, end: slot.start + durationMinutes, allowed: dropAllowed }); event.dataTransfer.dropEffect = dropAllowed ? 'move' : 'none' }} onDrop={(event) => onReservationDrop(event, day, court, slot)} onClick={(event) => openCell(day, court, slot, event)} onContextMenu={(event) => { if (past) return; event.preventDefault(); setSelectedCells([]); setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 240), y: Math.min(event.clientY, window.innerHeight - 220), cell: { date: day.date, courtId: court.id, courtName: court.name, slot, occupation: segment?.occupation } }) }}><span className={`pointer-events-none absolute inset-1 rounded-lg border transition-colors duration-300 ${isDragPreview ? (dragPreviewAllowed ? 'border-primary' : 'border-destructive') : selected || selectedByCtrl ? 'border-primary/75 bg-primary/8' : 'border-transparent group-hover:border-primary/30'}`} />{segment?.isAnchor ? <span data-reservation-id={segment.occupation.reservationId} className={`pointer-events-none absolute z-10 inset-x-1 overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] font-bold leading-tight shadow-sm transition-colors duration-300 ${isHighlighted ? 'animate-[pulse_1.1s_ease-in-out_5] ring-4 ring-primary/50 ring-offset-2 ring-offset-background' : ''} ${segment.occupation.type === 'mantenimiento' ? 'border-secondary bg-secondary text-secondary-foreground' : reservationTone(segment.occupation.reservationStatus)}`} style={{ top: `calc(${segment.top}% + 0.375rem)`, height: `calc(${segment.durationMinutes / 15}rem - 0.75rem)` }}><span className="block truncate">{segment.occupation.type === 'mantenimiento' ? occupationLabel(segment.occupation) : reservationStatusLabel(segment.occupation.reservationStatus)}</span>{segment.durationMinutes > 60 && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">{isoToLocalTime(segment.occupation.start)} – {isoToLocalTime(segment.occupation.end)}</span>}{segment.occupation.type === 'reserva' && isHighlighted && <span className="mt-0.5 block truncate text-[10px] font-semibold">Revisar esta reserva</span>}{segment.occupation.type === 'reserva' && canMove(segment.occupation) && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">Arrastra para mover</span>}{segment.occupation.type === 'reserva' && segment.occupation.isException && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">+30 min</span>}</span> : segment ? null : past ? <span className="pointer-events-none absolute inset-0 grid place-items-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">Hora pasada</span> : <span className="pointer-events-none absolute inset-0 grid place-items-center text-sm font-bold text-primary opacity-0 transition-opacity duration-300 group-hover:opacity-100">+</span>}<span className="sr-only">{court.name}, {day.date}, {slot.label}, {past ? 'hora pasada' : occupationLabel(segment?.occupation)}</span></button>
   }
 
   function renderDailyGrid() {
@@ -342,7 +444,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
         </div>
         {reservation?.customerName && <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-bold">{reservation.customerName}</p>{reservation.customerPhone && <p className="text-xs text-muted-foreground">{reservation.customerPhone}</p>}</div>{phone && <div className="flex gap-2 text-xs font-bold"><a href={`https://wa.me/${phone}`} target="_blank" rel="noreferrer" className="rounded-lg border px-2.5 py-1.5 transition-colors hover:bg-accent">WhatsApp</a><a href={`tel:${reservation.customerPhone}`} className="rounded-lg border px-2.5 py-1.5 transition-colors hover:bg-accent">Llamar</a></div>}</div>}
         {reservation && <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2"><span>Deporte: <strong className="text-foreground">{reservation.sportName ?? 'Sin especificar'}</strong></span>{amount && <span>Total: <strong className="text-foreground">{amount}</strong></span>}{advance && <span>Adelanto requerido: <strong className="text-foreground">{advance}</strong></span>}{paid && <span>Cobrado: <strong className="text-foreground">{paid}</strong></span>}{outstanding && <span>Falta cobrar: <strong className="text-foreground">{outstanding}</strong></span>}<span>Canal: <strong className="capitalize text-foreground">{reservation.reservationChannel ?? 'app'}</strong></span></div>}
-        {reservation?.proofPath && <div className="rounded-lg border border-warning/35 bg-warning/10 p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-xs font-extrabold uppercase tracking-[.1em]">Comprobante de pago</p><p className="mt-1 text-xs text-muted-foreground">{reservation.proofUploadedAt ? `Subido ${new Date(reservation.proofUploadedAt).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}` : 'Evidencia adjunta'}</p></div>{reservation.proofUrl && isImageProof(reservation.proofPath) ? <button type="button" onClick={() => setLightboxOpen(true)} className="shrink-0 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-accent">Ampliar</button> : reservation.proofUrl && <a href={reservation.proofUrl} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-accent">Abrir archivo</a>}</div>{reservation.proofUrl && isImageProof(reservation.proofPath) && <button type="button" onClick={() => setLightboxOpen(true)} className="mt-3 block w-full overflow-hidden rounded-lg border bg-background text-left"><Image src={reservation.proofUrl} alt="Comprobante de pago de la reserva" width={800} height={520} unoptimized className="max-h-52 w-full object-contain" /></button>}</div>}
+        {reservation?.proofPath && <div className="rounded-lg border border-warning/35 bg-warning/10 p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-xs font-extrabold uppercase tracking-[.1em]">Comprobante de pago</p><p className="mt-1 text-xs text-muted-foreground">{reservation.proofUploadedAt ? `Subido ${new Date(reservation.proofUploadedAt).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}` : 'Evidencia adjunta'}</p></div>{reservation.proofUrl && isImageProof(reservation.proofPath) ? <button type="button" onClick={openProofLightbox} className="shrink-0 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-accent">Ampliar</button> : reservation.proofUrl && <a href={reservation.proofUrl} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-accent">Abrir archivo</a>}</div>{reservation.proofUrl && isImageProof(reservation.proofPath) && <button type="button" onClick={openProofLightbox} className="mt-3 block w-full overflow-hidden rounded-lg border bg-background text-left"><Image src={reservation.proofUrl} alt="Comprobante de pago de la reserva" width={800} height={520} unoptimized className="max-h-52 w-full object-contain" /></button>}</div>}
         {selectedOccupation?.type === 'mantenimiento' && <p className="text-sm text-muted-foreground">Este horario está bloqueado para mantenimiento o cierre operativo.</p>}
         {reservation && <p className="text-sm text-muted-foreground">{reservation.isException ? 'La reserva tiene una extensión autorizada de 30 minutos.' : status === 'pendiente_validacion' && hasStarted ? 'El horario ya comenzó: no se puede validar ni rechazar el comprobante. Registra una cancelación del local para dejar la incidencia auditada.' : status === 'pendiente_validacion' ? 'Revisa el comprobante y decide si el pago es válido.' : 'Reserva activa en esta cancha.'}</p>}
         {reservation?.reservationNotes && <p className="border-t pt-3 text-xs text-muted-foreground">Nota: {reservation.reservationNotes}</p>}
@@ -375,11 +477,11 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
       </PopoverContent>
     </Popover>
     <Sheet modal={false} open={Boolean(selectedCell)} onOpenChange={(open) => { if (!open) closeDialog() }}>
-      <SheetContent side="right" floating showOverlay={false} className="overflow-y-auto border-border bg-card p-0">
+      <SheetContent side="right" floating showOverlay={false} className="overflow-y-auto border-border bg-card p-0" onInteractOutside={(event) => { if (lightboxOpen || openingLightbox.current) event.preventDefault() }} onFocusOutside={(event) => { if (lightboxOpen || openingLightbox.current) event.preventDefault() }}>
         <div className="flex flex-col gap-5 p-5 sm:p-6 [&_[data-slot=sheet-header]]:p-0 [&_[data-slot=sheet-header]]:pr-8">{renderDialog()}</div>
       </SheetContent>
     </Sheet>
-    {selectedOccupation?.proofUrl && isImageProof(selectedOccupation.proofPath) && <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+    {selectedOccupation?.proofUrl && isImageProof(selectedOccupation.proofPath) && <Dialog open={lightboxOpen} onOpenChange={onProofLightboxChange}>
       <DialogContent className="max-w-5xl border-border bg-background/95 p-3">
         <DialogHeader className="sr-only"><DialogTitle>Comprobante de pago ampliado</DialogTitle><DialogDescription>Vista ampliada del comprobante de pago de la reserva.</DialogDescription></DialogHeader>
         <Image src={selectedOccupation.proofUrl} alt="Comprobante de pago ampliado" width={1600} height={1100} unoptimized className="max-h-[82vh] w-full object-contain" />

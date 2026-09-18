@@ -22,6 +22,10 @@ function operationError(scope: string, error: { code?: string; message?: string;
     return { success: false, message: 'El horario acaba de cambiar. Actualiza la agenda e inténtalo nuevamente.' }
   }
   if (error.code === '42P01') return { success: false, message: 'La configuración de reservas necesita actualizarse. Inténtalo nuevamente en unos minutos.' }
+  // Las RPC operativas usan excepciones P0001 para reglas comprensibles del
+  // negocio (cruce, horario, extensión previa, etc.). No las ocultes detrás de
+  // un aviso genérico: el dueño necesita saber qué decisión tomar.
+  if (error.code === 'P0001' && error.message) return { success: false, message: error.message }
   return { success: false, message: error.message?.toLowerCase().includes('horario') ? error.message : 'No se pudo completar la operación' }
 }
 

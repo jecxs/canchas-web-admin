@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -54,6 +54,8 @@ export function NotificationsBell({ recipientId, initialNotifications }: Notific
   const [view, setView] = useState<'all' | 'unread'>('all')
   const [hasMore, setHasMore] = useState(initialNotifications.length === 20)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  // Evita repetir un aviso si Realtime y la reconciliación detectan la misma fila.
+  const knownNotificationIds = useRef(new Set(initialNotifications.map((item) => item.id)))
   const unreadCount = useMemo(() => items.filter((item) => !item.readAt).length, [items])
   const visibleItems = useMemo(() => view === 'unread' ? items.filter((item) => !item.readAt) : items, [items, view])
 
@@ -85,6 +87,39 @@ export function NotificationsBell({ recipientId, initialNotifications }: Notific
     })
   }, [openNotification])
 
+  const receiveIncomingNotification = useCallback((item: OwnerNotification) => {
+    if (knownNotificationIds.current.has(item.id)) return false
+
+    knownNotificationIds.current.add(item.id)
+    setItems((current) => [item, ...current])
+    showIncomingReservationToast(item)
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const native = new Notification(item.title, { body: item.message, tag: item.id })
+      native.onclick = () => {
+        window.focus()
+        window.location.assign(agendaHref(item))
+      }
+    }
+
+    // La cabecera recibe el evento y refresca los Server Components de la ruta
+    // actual. Así, si el dueño está en Agenda, el bloque aparece sin recargar.
+    router.refresh()
+    return true
+  }, [router, showIncomingReservationToast])
+
+  const reconcileNotifications = useCallback(async () => {
+    try {
+      const latest = await loadOwnerNotificationsAction()
+      // La consulta viene de más reciente a más antigua; se muestran en orden real
+      // cuando hubo más de una llegada mientras el canal estaba reconectando.
+      latest.toReversed().forEach(receiveIncomingNotification)
+    } catch {
+      // La siguiente ejecución vuelve a intentarlo. No interrumpimos al dueño con
+      // un aviso técnico por una recuperación en segundo plano.
+    }
+  }, [receiveIncomingNotification])
+
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
@@ -94,19 +129,32 @@ export function NotificationsBell({ recipientId, initialNotifications }: Notific
       }, (payload) => {
         const item = fromRealtime(payload.new as Record<string, unknown>)
         if (!item) return
-        setItems((current) => current.some((existing) => existing.id === item.id) ? current : [item, ...current])
-        showIncomingReservationToast(item)
-        if ('Notification' in window && Notification.permission === 'granted') {
-          const native = new Notification(item.title, { body: item.message, tag: item.id })
-          native.onclick = () => {
-            window.focus()
-            window.location.assign(agendaHref(item))
-          }
-        }
+        receiveIncomingNotification(item)
       })
-      .subscribe()
+      .subscribe((status) => {
+        // Supabase intenta reconectar por sí solo. Al detectar que el socket no
+        // llegó a suscribirse, conciliamos de inmediato con la fuente de verdad.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') void reconcileNotifications()
+      })
     return () => { void supabase.removeChannel(channel) }
-  }, [recipientId, showIncomingReservationToast])
+  }, [recipientId, receiveIncomingNotification, reconcileNotifications])
+
+  useEffect(() => {
+    // Respaldo ante pestañas suspendidas, cambios de red o una reconexión que el
+    // navegador no llegó a notificar. Realtime sigue siendo la vía inmediata.
+    const interval = window.setInterval(() => { void reconcileNotifications() }, 20_000)
+    const onOnline = () => { void reconcileNotifications() }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void reconcileNotifications()
+    }
+    window.addEventListener('online', onOnline)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('online', onOnline)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [reconcileNotifications])
 
   async function requestBrowserPermission() {
     if (!('Notification' in window)) {
