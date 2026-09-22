@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge'
+import { BenefitsSettingsForm } from '@/features/local-settings/benefits-settings-form'
 import { CommercialSettingsForm } from '@/features/local-settings/commercial-settings-form'
 import { GeneralSettingsForm } from '@/features/local-settings/general-settings-form'
 import { LocalMediaManager } from '@/features/local-settings/local-media-manager'
@@ -7,7 +8,7 @@ import { ScheduleSettingsForm } from '@/features/local-settings/schedule-setting
 import { SettingsSectionNav } from '@/features/local-settings/settings-section-nav'
 
 export default async function OwnerSettingsPage() {
-  const { local, settings, schedules, photos } = await getLocalSettings()
+  const { local, settings, schedules, photos, benefitCatalog, benefits } = await getLocalSettings()
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -26,6 +27,7 @@ export default async function OwnerSettingsPage() {
           <GeneralSettingsForm settings={settings} />
           <LocalMediaManager localId={settings.id} logo={settings.logo} photos={photos} />
           <ScheduleSettingsForm localId={settings.id} schedules={schedules} />
+          <BenefitsSettingsForm localId={settings.id} catalog={benefitCatalog} benefits={benefits} />
           <CommercialSettingsForm settings={settings} />
         </div>
       </div>

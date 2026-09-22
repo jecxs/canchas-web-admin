@@ -71,6 +71,39 @@ export type Database = {
           },
         ]
       }
+      beneficios_catalogo: {
+        Row: {
+          activo: boolean
+          categoria: string
+          created_at: string
+          icon_key: string
+          id: string
+          nombre: string
+          orden: number
+          slug: string
+        }
+        Insert: {
+          activo?: boolean
+          categoria: string
+          created_at?: string
+          icon_key: string
+          id?: string
+          nombre: string
+          orden: number
+          slug: string
+        }
+        Update: {
+          activo?: boolean
+          categoria?: string
+          created_at?: string
+          icon_key?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          slug?: string
+        }
+        Relationships: []
+      }
       bloqueos_mantenimiento: {
         Row: {
           cancha_id: string
@@ -314,6 +347,45 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "horarios_atencion_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      local_beneficios: {
+        Row: {
+          beneficio_catalogo_id: string | null
+          created_at: string
+          id: string
+          local_id: string
+          nombre_personalizado: string | null
+        }
+        Insert: {
+          beneficio_catalogo_id?: string | null
+          created_at?: string
+          id?: string
+          local_id: string
+          nombre_personalizado?: string | null
+        }
+        Update: {
+          beneficio_catalogo_id?: string | null
+          created_at?: string
+          id?: string
+          local_id?: string
+          nombre_personalizado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "local_beneficios_beneficio_catalogo_id_fkey"
+            columns: ["beneficio_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "beneficios_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "local_beneficios_local_id_fkey"
             columns: ["local_id"]
             isOneToOne: false
             referencedRelation: "locales"
@@ -1295,6 +1367,19 @@ export type Database = {
           hora_cierre: string
         }[]
       }
+      obtener_beneficios_publicos_local: {
+        Args: { p_local_id: string }
+        Returns: {
+          beneficio_catalogo_id: string | null
+          categoria: string
+          es_personalizado: boolean
+          icon_key: string
+          id: string
+          nombre: string
+          orden: number
+          slug: string
+        }[]
+      }
       obtener_locales_cercanos: {
         Args: { p_latitud: number; p_limite?: number; p_longitud: number }
         Returns: {
@@ -1437,6 +1522,14 @@ export type Database = {
       }
       reemplazar_horarios_local: {
         Args: { p_horarios: Json; p_local_id: string }
+        Returns: undefined
+      }
+      reemplazar_beneficios_local: {
+        Args: {
+          p_beneficio_catalogo_ids: string[]
+          p_beneficios_personalizados: string[]
+          p_local_id: string
+        }
         Returns: undefined
       }
       registrar_comprobante_reserva: {

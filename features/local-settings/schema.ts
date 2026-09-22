@@ -40,3 +40,24 @@ export const scheduleSettingsSchema = z.object({
     message: 'La hora de cierre debe ser posterior a la apertura.',
   })).min(1, 'Selecciona al menos un día de atención.').max(7),
 })
+
+const customBenefitSchema = z.string()
+  .trim()
+  .min(3, 'Cada beneficio personalizado debe tener al menos 3 caracteres.')
+  .max(60, 'Cada beneficio personalizado puede tener hasta 60 caracteres.')
+  .refine((value) => !/[\x00-\x1F\x7F]/.test(value), 'El beneficio contiene caracteres no permitidos.')
+
+export const benefitsSettingsSchema = z.object({
+  localId: z.uuid(),
+  catalogIds: z.array(z.uuid()).max(12, 'Puedes seleccionar hasta 12 beneficios estándar.'),
+  customBenefits: z.array(customBenefitSchema).max(5, 'Puedes agregar hasta 5 beneficios personalizados.'),
+}).superRefine((value, context) => {
+  const seen = new Set<string>()
+  value.customBenefits.forEach((benefit, index) => {
+    const normalized = benefit.toLocaleLowerCase('es-PE')
+    if (seen.has(normalized)) {
+      context.addIssue({ code: 'custom', path: ['customBenefits', index], message: 'No repitas un beneficio personalizado.' })
+    }
+    seen.add(normalized)
+  })
+})

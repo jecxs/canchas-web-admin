@@ -25,6 +25,16 @@ export type ScheduleRow = Pick<
 
 export type LocalPhoto = Pick<Tables<'fotos'>, 'id' | 'storage_path' | 'orden'>
 
+export type BenefitCatalogItem = Pick<
+  Tables<'beneficios_catalogo'>,
+  'id' | 'slug' | 'nombre' | 'categoria' | 'icon_key' | 'orden'
+>
+
+export type LocalBenefit = Pick<
+  Tables<'local_beneficios'>,
+  'beneficio_catalogo_id' | 'nombre_personalizado'
+>
+
 export type PaymentMethodType = 'yape' | 'plin' | 'transferencia' | 'efectivo' | 'otro'
 
 export type PaymentMethod = {

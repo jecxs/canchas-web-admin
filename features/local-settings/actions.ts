@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import {
+  benefitsSettingsSchema,
   commercialSettingsSchema,
   generalSettingsSchema,
   paymentTypeSchema,
@@ -132,4 +133,25 @@ export async function saveScheduleSettingsAction(
     p_horarios: validation.data.schedules,
   })
   return error ? databaseFailure(error, 'schedule') : saved()
+}
+
+export async function saveBenefitsSettingsAction(
+  _state: SettingsActionState,
+  formData: FormData,
+): Promise<SettingsActionState> {
+  const validation = benefitsSettingsSchema.safeParse({
+    localId: formData.get('localId'),
+    catalogIds: formData.getAll('benefitCatalogId'),
+    customBenefits: formData.getAll('customBenefit'),
+  })
+  if (!validation.success) return validationFailure(validation.error)
+  if (!await activeLocalMatches(validation.data.localId)) return { success: false, message: messages.denied }
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('reemplazar_beneficios_local', {
+    p_local_id: validation.data.localId,
+    p_beneficio_catalogo_ids: validation.data.catalogIds,
+    p_beneficios_personalizados: validation.data.customBenefits,
+  })
+  return error ? databaseFailure(error, 'benefits') : saved()
 }

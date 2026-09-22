@@ -8,6 +8,7 @@ const sections = [
   { id: 'datos-generales', label: 'Datos generales' },
   { id: 'identidad-visual', label: 'Logo y galería' },
   { id: 'horarios', label: 'Horarios' },
+  { id: 'beneficios', label: 'Beneficios' },
   { id: 'pagos-politicas', label: 'Pagos y políticas' },
 ] as const
 
