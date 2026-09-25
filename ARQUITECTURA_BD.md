@@ -2,7 +2,7 @@
 
 ## Reservas deportivas · Grassly / Cancha App
 
-**Estado documentado:** migraciones hasta `20260903000200`
+**Estado documentado:** migraciones hasta `20260923000200`
 
 **Backend:** Supabase + PostgreSQL 17
 
@@ -29,6 +29,11 @@ Un local puede tener varias canchas físicas. Una cancha puede ofrecer uno o má
 La regla comercial principal es:
 
 > Los clientes reservan bloques completos de una hora, en horas punto. Las excepciones de 30 minutos solo las puede autorizar el dueño y nunca se ofrecen como una opción pública libre.
+
+La unidad reservable pública es una **cancha física**, no el local ni un horario
+unificado. Antes de elegir horas, el cliente elige deporte y cancha. Esto evita
+combinar bloques libres de canchas distintas y permite preferir una cancha
+dedicada frente a una adaptada para el mismo deporte.
 
 La base de datos es la autoridad para:
 
@@ -131,8 +136,18 @@ Orden actual:
 | `20260902000500_reservas_locales_publico.sql` | Expone la ocupación del calendario público con cancha, deporte y nombre visible del reservador. |
 | `20260903000100_add_payment_rejection_enums.sql` | Agrega `rechazada_pago` y los motivos estructurados de rechazo. |
 | `20260903000200_reject_pending_payment_validation.sql` | Añade la auditoría de rechazo y la RPC atómica para liberar el horario. |
+| `20260905000100_phase2_publication_contract.sql` | Separa acceso al panel de publicación pública y protege reservas `app` de locales no publicados. |
+| `20260905000200_fix_publication_rpc_lint.sql` | Corrección de lint de la RPC de publicación. |
+| `20260905000300_restrict_local_update_columns.sql` | Restringe cambios directos de configuración administrativa de locales. |
+| `20260906000100_phase3_owner_configuration_contract.sql` | Añade RPCs transaccionales para datos generales, reglas, horarios y canchas del dueño. |
+| `20260906000200_phase3_local_media_contract.sql` | Añade RPCs seguras para logo, galería y eliminación de fotos. |
+| `20260906000300_require_local_configuration_rpcs.sql` | Retira escrituras directas de horarios, canchas y deportes. |
+| `20260906000400_fix_court_deactivation_trigger_search_path.sql` | Corrige el trigger de desactivación de canchas usado por RPCs seguras. |
+| `20260907000100_public_map_exploration.sql` | Crea el contrato público de exploración de locales para Mapbox. |
+| `20260908000100_tolerant_public_local_search.sql` | Hace tolerante a acentos y espacios la búsqueda pública de locales. |
+| `20260909000100_court_specific_public_booking.sql` | Reserva pública por cancha explícita, tablero por cancha, privacidad del primer nombre y atributos físicos de cancha. |
 
-El historial remoto fue sincronizado hasta `20260903000200`. Los datos de ejemplo
+El historial remoto fue sincronizado hasta `20260909000100`. Los datos de ejemplo
 viven en `supabase/seed.sql` y sus recursos en `supabase/seed-assets/`; no forman
 parte del historial productivo.
 
@@ -151,11 +166,12 @@ No se deben editar migraciones ya aplicadas. Cualquier cambio nuevo debe ser otr
 
 | Área | Ya es responsabilidad de la BD | Pendiente deliberado |
 |---|---|---|
-| Home público | Ranking, popularidad, cercanía, búsqueda, filtros por deporte/calificación/hora y portada única. | Ajustes de producto o nuevos filtros, no recalcular disponibilidad en el cliente. |
+| Home y mapa público | Ranking, popularidad, cercanía, búsqueda tolerante, filtros por deporte/calificación/hora, portada única y marcadores con coordenadas válidas. | Ajustes de producto o nuevos filtros, no recalcular disponibilidad en el cliente. |
 | Favoritos | Tabla, unicidad, RLS por cliente y consumo actual desde Expo. | Historial o recomendaciones basadas en favoritos, si el producto lo requiere. |
 | Galería | Orden cero-basado, portada derivada, inserción al final y reordenamiento autorizado. | Panel web con drag-and-drop que invoque la RPC. |
-| Detalle de local | RPC de detalle, canchas y horarios; galería visible ordenada por `orden`. | Tablero y flujo completo de reserva en la UI. |
-| Pago manual | Reserva provisional, carga privada de comprobante, validación positiva, rechazo con motivo y expiración sin comprobante. | UI de validación/rechazo en el panel y presentación del resultado en el app. |
+| Detalle de local | RPC de detalle, canchas con atributos físicos, horarios y disponibilidad pública por cancha; galería visible ordenada por `orden`. | UI de tablero por deporte/cancha. |
+| Reserva pública | Validación atómica de cancha explícita, bloques de una hora, precio, adelanto, conflicto y ciclo de pago. | Pantalla Expo de selección de cancha, bloques y comprobante. |
+| Pago manual | Apartado provisional de checkout, carga privada de comprobante, validación positiva y rechazo con motivo. Un apartado abandonado o vencido se elimina. | UI de validación/rechazo en el panel y presentación del resultado en el app. |
 | Historial de reservas | Estados, RLS de lectura y datos base. | Pantallas de “Mis reservas”, notificaciones y cancelación/reembolso. |
 
 ---
@@ -167,7 +183,7 @@ El rol se guarda en `perfiles.rol` y pertenece al enum `rol_usuario`:
 | Rol | Qué puede hacer |
 |---|---|
 | `cliente` | Explorar, crear sus reservas mediante RPC, subir comprobantes y ver su historial. |
-| `dueno` | Gestionar sus locales, canchas, horarios, precios y mantenimiento; leer reservas propias, crear reservas manuales y confirmar comprobantes mediante RPC. El rechazo/cancelación aún no está implementado. |
+| `dueno` | Gestionar sus locales, canchas, horarios, precios y mantenimiento; leer reservas propias, crear reservas manuales y confirmar o rechazar comprobantes mediante RPC. La cancelación/reembolso sigue siendo una fase independiente. |
 | `super_admin` | Moderar locales, gestionar estados administrativos y operar sobre todos los locales. |
 
 Un usuario no puede cambiar su propio rol. El trigger `trg_perfiles_proteger_rol` impide que un cliente se eleve a dueño o superadministrador.
@@ -267,9 +283,15 @@ Representa la cancha física reservable.
 | `local_id` | Local propietario. |
 | `nombre` | Ejemplo: `Cancha 1`, `Grass Principal`. |
 | `superficie` | Información descriptiva. |
+| `descripcion` | Opcional; explica características relevantes de esa cancha, entre 20 y 500 caracteres si se registra. |
+| `largo_metros`, `ancho_metros` | Dimensiones útiles aproximadas; se registran juntas y cada valor debe estar entre 5 y 200 metros. |
 | `activa` | Si aparece como cancha operativa. |
 
 Una cancha desactivada no aparece en disponibilidad pública. El trigger `trg_bloquear_desactivacion` evita desactivaciones peligrosas cuando existen reservas que lo impiden.
+
+Las dimensiones y la descripción se configuran mediante `guardar_cancha_local()`;
+no son una segunda fuente de disponibilidad ni sustituyen la relación
+`cancha_deportes`.
 
 ### 5.5 `deportes`
 
@@ -291,7 +313,7 @@ Tabla puente N:M entre cancha y deporte.
 | `cancha_id` | Cancha física. |
 | `deporte_id` | Deporte ofrecido. |
 | `tipo_soporte` | `dedicada` o `adaptada`. |
-| `precio_por_hora` | Precio por bloque de 60 minutos para esa combinación. |
+| `precio_por_hora` | Tarifa base por bloque de 60 minutos para esa combinación. Las reglas dinámicas la sustituyen o descuentan solo cuando coinciden. |
 
 Ejemplo:
 
@@ -320,7 +342,7 @@ Campos importantes:
 | `canal_origen` | `app`, `whatsapp` o `presencial`. |
 | `monto_total` | Total calculado. |
 | `monto_adelanto_requerido` | Adelanto calculado. |
-| `precio_por_hora_aplicado` | Foto histórica del precio usado. |
+| `precio_por_hora_aplicado` | Promedio ponderado histórico, conservado por compatibilidad. El desglose autoritativo está en `reserva_detalles_tarifa`. |
 | `comprobante_url` | Ruta del comprobante en Storage. |
 | `pago_expira_en` | Límite de la ventana provisional sin comprobante. |
 | `comprobante_subido_at` | Momento en que pasó a validación del dueño. |
@@ -337,7 +359,7 @@ Reglas importantes:
 - El rango no puede estar vacío.
 - La cancha debe soportar el deporte.
 - No puede solaparse con una reserva que ocupe horario.
-- El precio queda congelado en `precio_por_hora_aplicado`; cambiar la tarifa futura no modifica reservas antiguas.
+- El precio queda congelado mediante `reserva_detalles_tarifa`; cambiar una tarifa futura no modifica reservas antiguas.
 
 La escritura directa está revocada para clientes y dueños. Se usan RPCs.
 
@@ -350,6 +372,29 @@ Los bloqueos se consideran ocupación en disponibilidad y tablero. Un dueño sol
 ### 5.9 `reserva_extensiones`
 
 Audita extensiones excepcionales de 30 minutos.
+
+### 5.10 Tarifas dinámicas por cancha y deporte
+
+`cancha_deportes.precio_por_hora` es siempre la tarifa base. Sobre ella se
+pueden crear reglas con objetivos explícitos `(cancha_id, deporte_id)`:
+
+| Tabla | Propósito |
+|---|---|
+| `reglas_tarifarias` | Una tarifa `recurrente` por días y franja, o una `promocion` acotada por fechas. |
+| `regla_tarifa_objetivos` | Relación N:M que permite aplicar una regla a varias combinaciones cancha–deporte. |
+| `reserva_detalles_tarifa` | Instantánea de cada tramo cotizado de una reserva. Conserva precio, subtotal y nombres de reglas aun si luego se editan o eliminan. |
+
+Precedencia: **promoción fechada → tarifa recurrente → tarifa base**. Una
+promoción puede fijar un precio o aplicar un porcentaje al precio que ya
+resultó de la franja recurrente/base. Dos recurrentes no pueden superponerse
+para el mismo objetivo; tampoco dos promociones. Una reserva que cruza una
+franja se divide y suma por segmentos, incluido el caso excepcional de 30 min.
+
+La fuente única de cálculo es `fn_calcular_lineas_tarifa()`. El app consulta
+`obtener_cotizacion_publica_cancha()` antes de pagar y el tablero usa
+`obtener_disponibilidad_cancha_publica()` con el precio efectivo de cada hora.
+Las mutaciones de reserva, la extensión y una reprogramación vuelven a cotizar
+en la base de datos; no aceptan importes calculados en clientes.
 
 | Campo | Uso |
 |---|---|
@@ -527,16 +572,22 @@ expirada
 ### Flujo público de reserva
 
 ```text
-Cliente selecciona bloques
+Cliente elige deporte y cancha física
           │
           ▼
-crear_reserva_en_local()
+Consulta disponibilidad de esa cancha
+          │
+          ▼
+Cliente selecciona bloques consecutivos
+          │
+          ▼
+crear_reserva_en_cancha()
           │
           ▼
 pendiente_pago
           │  ventana corta, por defecto 10 min
           │
-          ├── sin comprobante ──► expirada
+          ├── sin comprobante ──► se elimina el apartado
           │
           └── comprobante ─────► pendiente_validacion
                                       │
@@ -557,8 +608,9 @@ Reglas:
 - Una reserva con comprobante no puede permanecer en `pendiente_pago`.
 - Rechazar conserva `comprobante_url` y `comprobante_subido_at` como evidencia privada.
 - El motivo estructurado, el actor y la fecha son obligatorios; el comentario es opcional y admite hasta 500 caracteres.
-- El cron expira las reservas sin comprobante.
+- Al cancelar o vencer sin comprobante, se elimina el apartado; no se crea un historial de reserva ni se usa `cancelada_cliente`.
 - El cron completa reservas confirmadas cuyo fin ya pasó.
+- `cancelada_cliente` y `cancelada_local` se reservan para la cancelación de una reserva de negocio ya aceptada; el flujo de cancelación/reembolso se implementa por separado.
 - `cancelada_local` no sustituye a `rechazada_pago`: la primera corresponde a una reserva ya aceptada; la segunda indica que el pago nunca fue validado.
 
 ### Canales
@@ -586,7 +638,8 @@ solamente el identificador y campos de tarjeta del local.
 | `obtener_top_locales()` | Promedio de reseñas aprobadas, mínimo 3 reseñas; desempata por cantidad de reseñas. Devuelve `portada_storage_path`. |
 | `obtener_locales_populares(p_dias = 30, p_limite = 10)` | Reservas creadas en la ventana solicitada en estados `pendiente_validacion`, `confirmada`, `completada` y `no_show`. Excluye pendientes de comprobante, canceladas y expiradas. Devuelve `portada_storage_path`. |
 | `obtener_locales_cercanos(p_latitud, p_longitud, p_limite = 10)` | Distancia Haversine en metros desde una ubicación puntual; no guarda la ubicación del cliente y devuelve `portada_storage_path`. |
-| `buscar_locales_publicos(...)` | Búsqueda por nombre y filtros de deporte, fecha, rango horario, calificación, ubicación y orden. Cuando recibe horas, solo devuelve locales con una cancha compatible libre durante todo el rango. |
+| `buscar_locales_publicos(...)` | Búsqueda por nombre y filtros de deporte, fecha, rango horario, calificación, ubicación y orden. Cuando recibe horas, solo devuelve locales con al menos una cancha compatible libre durante todo el rango; no asigna ni identifica la cancha. |
+| `explorar_locales_publicos(...)` | Reutiliza la búsqueda pública y añade coordenadas válidas para renderizar marcadores de Mapbox. |
 | `obtener_tarjetas_locales(p_local_ids)` | Datos de card para IDs públicos, conserva el orden solicitado; se usa para favoritas sin consultar una foto por cada card. |
 
 Todos los RPC de catálogo muestran exclusivamente locales con estado `trial`,
@@ -604,7 +657,7 @@ solo como argumento de la consulta de cercanía/filtros; no se persiste.
 | RPC | Contrato actual |
 |---|---|
 | `obtener_detalle_publico_local(p_local_id)` | Información pública del local: descripción, coordenadas, ambos teléfonos de contacto, logo opcional, portada, promedio y total de reseñas. |
-| `obtener_canchas_local(p_local_id)` | Canchas activas, deportes habilitados, tipo de soporte y precio por hora. |
+| `obtener_canchas_local(p_local_id)` | Canchas activas de un local publicado, deportes habilitados, tipo de soporte, precio, superficie, descripción y dimensiones. |
 | `obtener_horarios_local(p_local_id)` | Horarios de atención por día en formato `HH24:MI`. |
 
 Para la galería completa, la app consulta `fotos` visibles del local ordenadas por
@@ -612,47 +665,62 @@ Para la galería completa, la app consulta `fotos` visibles del local ordenadas 
 `portada_storage_path` del RPC de detalle; no debe descargar toda la galería
 solo para mostrar una imagen.
 
-`obtener_detalle_publico_local()` sí exige que el local sea público y operativo.
-Por decisión actual, `obtener_canchas_local()` y `obtener_horarios_local()` no
-repiten esa condición; la UI debe invocarlos como complemento de un detalle
-público que ya fue encontrado. No exponen pagos, dueño ni datos personales.
+Los tres RPC de detalle exigen un local público y operativo. No exponen pagos,
+dueño ni datos personales.
 
-#### `fn_bloques_disponibles_local(p_local_id, p_fecha, p_deporte_id, p_bloques)`
+#### `obtener_disponibilidad_cancha_publica(p_cancha_id, p_deporte_id, p_fecha)`
 
-Devuelve bloques completos de una hora y cuántas canchas compatibles están libres.
+Es el contrato de disponibilidad para cualquier tablero público nuevo. Devuelve
+un bloque de una hora por cada hora de atención de **una cancha física**:
 
-Usar en la pantalla de reserva. No leer todas las reservas desde Expo para calcular disponibilidad.
+```text
+cancha_id, cancha_nombre, deporte_id
+inicio, fin
+estado                         // libre | reservada | mantenimiento
+reservable                     // false si existe cualquier ocupación
+primer_nombre_reservante       // solo para una celda reservada
+ocupacion_inicio, ocupacion_fin
+es_excepcion_horaria
+```
+
+El primer nombre se limita a 24 caracteres. No se exponen apellidos, teléfono,
+ID de reserva, estado de pago, comprobantes ni otros datos personales. Una
+extensión de 30 minutos sigue haciendo que la celda sea no reservable.
+
+El detalle de local debe mostrar `deporte → cancha → tablero`; no debe mezclar
+en una misma cuadrícula las reservas de varias canchas.
+
+#### Funciones agregadas que no son el flujo nuevo
+
+`fn_bloques_disponibles_local(...)` devuelve un resumen agregado de cuántas
+canchas son compatibles y libres. Puede servir para descubrimiento o capacidad,
+pero **no** debe usarse para elegir bloques ni crear una reserva pública.
+
+`fn_ocupacion_tablero_local(...)` devuelve ocupación por cancha sin datos
+personales y es útil para operación interna. Tampoco sustituye el tablero público
+por cancha.
+
+`obtener_reservas_local(...)` permanece temporalmente para la UI de detalle que
+ya existía, pero solo devuelve el primer nombre visible y un estado genérico de
+ocupación. Las nuevas pantallas deben usar
+`obtener_disponibilidad_cancha_publica(...)`.
+
+No leer todas las reservas desde Expo para calcular disponibilidad.
 
 ```ts
 const { data, error } = await supabase.rpc(
-  "fn_bloques_disponibles_local",
+  "obtener_disponibilidad_cancha_publica",
   {
-    p_local_id: localId,
+    p_cancha_id: canchaId,
     p_fecha: "2026-08-25",
     p_deporte_id: deporteId,
-    p_bloques: 1,
   }
 );
 ```
 
-#### `fn_ocupacion_tablero_local(p_local_id, p_fecha, p_deporte_id)`
-
-Devuelve rangos ocupados sin datos personales:
-
-```text
-cancha_id
-cancha_nombre
-inicio
-fin
-tipo                 // reserva | mantenimiento
-es_excepcion_horaria
-```
-
-El frontend pinta la celda completa o media celda según el rango. La base entrega ocupación; Expo/Next decide colores, etiquetas y animaciones.
-
 ### 8.2 Cliente autenticado
 
-#### `crear_reserva_en_local(p_local_id, p_deporte_id, p_inicio, p_bloques, p_notas)`
+#### `crear_reserva_en_cancha(p_cancha_id, p_deporte_id, p_inicio, p_bloques, p_notas)`
 
 Es el único camino público para crear una reserva desde la app.
 
@@ -661,13 +729,19 @@ La función:
 1. Comprueba sesión.
 2. Exige hora futura y hora punto.
 3. Convierte usando `America/Lima`.
-4. Verifica local, horario, deporte, cancha, precio y mantenimiento.
-5. Elige una cancha física compatible.
+4. Verifica cancha elegida, local publicado, horario, deporte, precio y mantenimiento.
+5. Conserva exactamente la cancha física elegida; nunca busca un reemplazo.
 6. Calcula total y adelanto.
 7. Inserta en `pendiente_pago`.
 8. Aplica el bloqueo de concurrencia.
 
-El cliente no envía `monto_total`, `monto_adelanto_requerido`, `cancha_id` ni `estado` como autoridad de negocio.
+El cliente sí envía `cancha_id` como su elección, pero la base verifica que sea
+activa, compatible y libre. No envía `monto_total`,
+`monto_adelanto_requerido` ni `estado` como autoridad de negocio.
+
+`crear_reserva_en_local(...)` queda deprecada para clientes porque asignaba una
+cancha automáticamente. Solo puede usarse desde procesos controlados de
+`service_role`; ninguna pantalla nueva debe invocarla.
 
 #### `registrar_comprobante_reserva(p_reserva_id, p_storage_path)`
 
@@ -679,6 +753,14 @@ Se llama después de subir el archivo a Storage. Verifica que:
 - La reserva siga dentro de la ventana provisional.
 
 Después cambia a `pendiente_validacion`.
+
+#### `cancelar_reserva_cliente(p_reserva_id)`
+
+Permite al propio cliente eliminar antes de tiempo el apartado provisional
+(`pendiente_pago` sin comprobante) que bloquea la cancha durante la ventana de
+tolerancia. No cancela una reserva de negocio ni una reserva ya pagada. Se usa
+cuando el cliente decide no continuar con el pago o cuando la app se cerró por
+completo.
 
 #### `confirmar_reserva(p_reserva_id)`
 
@@ -754,7 +836,7 @@ Comportamiento:
 - El teléfono se normaliza con `fn_normalizar_telefono`.
 - El estado por defecto es `confirmada`, porque el dueño registra una reserva externa ya aceptada.
 - Se puede usar `pendiente_pago`, pero heredará la ventana provisional de 10 minutos.
-- El dueño puede indicar una cancha concreta o dejar que la base elija una disponible.
+- El panel debe indicar una cancha concreta; aunque el parámetro aún admite compatibilidad heredada, la interfaz no debe depender de asignación automática.
 - No permite crear huecos arbitrarios de 30 o 45 minutos.
 
 #### `extender_reserva_30_min(...)`
@@ -780,10 +862,11 @@ foto en la primera posición visible.
 
 | Función | Uso |
 |---|---|
-| `fn_expirar_reservas_pendientes()` | Marca como `expirada` la reserva sin comprobante cuyo plazo terminó. |
+| `fn_expirar_reservas_pendientes()` | Elimina el apartado sin comprobante cuyo plazo terminó. |
 | `fn_completar_reservas_finalizadas()` | Marca como `completada` la reserva confirmada cuyo fin pasó. |
 | `fn_finalizar_trials_vencidos()` | Pasa locales trial vencidos a `activo` o `en_gracia`. |
 | `fn_reserva_ocupa_horario(estado, pago_expira_en)` | Define una única regla de ocupación. |
+| `fn_primer_nombre_visible(text)` | Normaliza y limita el primer nombre permitido en una celda pública ocupada. No es un endpoint del cliente. |
 | `fn_rol_actual()` | Obtiene el rol de la sesión actual de forma segura. |
 | `fn_normalizar_telefono(text)` | Convierte teléfonos peruanos al formato canónico. |
 | `fn_asignar_orden_foto()` | Asigna el siguiente orden libre de forma serializada al insertar una foto. |
@@ -867,7 +950,7 @@ La app pública puede leer información operacional de:
 - Relaciones cancha/deporte de canchas operativas.
 - Fotos visibles y logos de locales operativos, publicados desde buckets de catálogo.
 - Disponibilidad mediante RPC.
-- Ocupación de tablero mediante RPC sin datos personales.
+- Disponibilidad de tablero mediante RPC; únicamente puede mostrar el primer nombre limitado que entrega el contrato público por cancha.
 
 ### Lectura privada
 
@@ -881,7 +964,10 @@ La app pública puede leer información operacional de:
 
 Las escrituras de reservas no se realizan directamente aunque el usuario tenga sesión. Se revocaron los grants y las políticas antiguas.
 
-El dueño sí puede gestionar mediante RLS sus locales, canchas, horarios, precios, fotos y bloqueos de mantenimiento, pero las operaciones de alto riesgo deben preferir RPCs transaccionales.
+El dueño gestiona datos operativos mediante RPCs transaccionales; no debe hacer
+`INSERT`, `UPDATE` o `DELETE` directo sobre canchas, sus deportes u horarios.
+Las políticas RLS conservan el aislamiento de lectura y los RPCs verifican la
+propiedad antes de escribir.
 
 En particular, el dueño no puede modificar directamente `fotos.orden`; debe usar
 `reordenar_fotos_local()`. Esto evita que una actualización parcial deje dos
@@ -910,7 +996,7 @@ Trabajos actuales:
 
 | Job | Frecuencia | Responsabilidad |
 |---|---|---|
-| `expirar-reservas-sin-comprobante-v1` | Cada minuto | Expira reservas provisionales sin comprobante. |
+| `expirar-reservas-sin-comprobante-v1` | Cada minuto | Elimina apartados provisionales vencidos y sin comprobante. |
 | `completar-reservas-finalizadas-v1` | Cada 10 minutos | Completa reservas confirmadas terminadas. |
 | `finalizar-trials-vencidos-v1` | 05:10 UTC | Procesa trials vencidos; equivale a 00:10 en Lima. |
 
@@ -959,7 +1045,7 @@ portada no se guarda como otra imagen: se deriva de la foto visible con menor
 | Convertir `storage_path` a URL pública | Storage público | `getPublicUrl()` | `getPublicUrl()` |
 | Ordenar galería | Restricciones + RPC | Mostrar orden público | Drag-and-drop e invocar RPC |
 | Calcular disponibilidad | RPC | Renderizar | Renderizar |
-| Elegir cancha compatible | RPC | Mostrar resultado | Mostrar/permitir elegir cancha |
+| Elegir cancha física | Validar compatibilidad y disponibilidad | Mostrar y enviar la elección explícita | Mostrar y enviar la elección explícita |
 | Calcular precio | RPC | Mostrar total devuelto | Mostrar total devuelto |
 | Crear reserva pública | RPC | Invocar | No aplica o supervisión |
 | Crear reserva externa | RPC | No aplica | Invocar RPC manual |
@@ -981,9 +1067,9 @@ portada no se guarda como otra imagen: se deriva de la foto visible con menor
 2. No aceptar una reserva pública que empiece a `19:30`.
 3. No ofrecer 30 o 45 minutos como duración pública.
 4. No calcular el precio final en JavaScript como fuente de verdad.
-5. No asumir que una cancha de fútbol y una de voley son físicamente distintas.
-6. No leer reservas ajenas para calcular disponibilidad.
-7. No mostrar datos personales dentro del tablero público.
+5. No asumir que una cancha de fútbol y una de voley son físicamente distintas; tampoco combinar bloques de canchas físicas diferentes.
+6. No leer reservas ajenas ni calcular disponibilidad en cliente: usar el RPC de tablero por cancha.
+7. En el tablero público solo se permite el primer nombre devuelto por el RPC; nunca apellidos, teléfono, pago, comprobante ni identificadores de reserva.
 8. No cambiar estados administrativos desde el frontend mediante `update` libre.
 9. No dejar que un cliente modifique `rol`, `confirmada_por`, montos o cancha.
 10. No asociar automáticamente reservas antiguas al completar el perfil.
@@ -1003,6 +1089,7 @@ Los RPCs lanzan errores de negocio en texto claro. La interfaz debe traducirlos 
 | Precio no configurado | `Este local todavía no configuró el precio para ese deporte.` |
 | Adelanto no configurado | `El local aún no configuró su porcentaje de adelanto.` |
 | Bloque ocupado | `Ese horario acaba de ser reservado. Elige otro bloque.` |
+| Cancha elegida ocupada durante el checkout | `La cancha seleccionada acaba de ocuparse. Actualiza los horarios e inténtalo otra vez.` |
 | Fuera de horario | `El bloque está fuera del horario de atención.` |
 | Comprobante vencido | `El tiempo para subir el comprobante terminó.` |
 | Comprobante aún en revisión | `Tu pago está pendiente de validación por el local.` |
@@ -1022,16 +1109,17 @@ La app puede reconsultar disponibilidad después de un error de concurrencia.
 ```text
 1. Usuario explora locales sin sesión.
 2. Expo consulta locales, canchas, horarios y deportes públicos.
-3. Expo llama fn_bloques_disponibles_local().
-4. Usuario selecciona uno o varios bloques.
-5. Si no hay sesión, Expo abre Google Auth.
-6. Expo llama crear_reserva_en_local().
-7. La base devuelve cancha, total, adelanto y reserva_id.
-8. Expo sube comprobante a Storage.
-9. Expo llama registrar_comprobante_reserva().
-10. La reserva queda pendiente_validacion.
-11. El panel del dueño valida el pago.
-12. El cliente ve confirmada y luego completada.
+3. Expo obtiene canchas; el usuario elige deporte y cancha física.
+4. Expo llama obtener_disponibilidad_cancha_publica().
+5. Usuario selecciona uno o varios bloques consecutivos de esa cancha.
+6. Si no hay sesión, Expo abre Google Auth.
+7. Expo llama crear_reserva_en_cancha().
+8. La base devuelve cancha, total, adelanto y reserva_id.
+9. Expo sube comprobante a Storage.
+10. Expo llama registrar_comprobante_reserva().
+11. La reserva queda pendiente_validacion.
+12. El panel del dueño valida el pago.
+13. El cliente ve confirmada y luego completada.
 ```
 
 En el paso 11 el dueño puede confirmar o invocar
@@ -1093,7 +1181,7 @@ La configuración posterior a la aprobación se realiza mediante RPCs autenticad
 - `actualizar_datos_generales_local()`: identidad comercial, teléfonos, dirección y coordenadas.
 - `actualizar_reglas_comerciales_local()`: porcentaje de adelanto, medios de pago y política de reembolso.
 - `reemplazar_horarios_local()`: reemplaza atómicamente el horario semanal y exige horas punto.
-- `guardar_cancha_local()`: crea o edita el espacio físico junto con deportes, tipo de soporte y tarifa.
+- `guardar_cancha_local()`: crea o edita el espacio físico junto con deportes, tipo de soporte, tarifa, descripción y dimensiones opcionales.
 - `cambiar_estado_cancha_local()`: impide desactivar una cancha con reservas futuras vigentes.
 - `actualizar_logo_local()`, `registrar_foto_local()` y `eliminar_foto_local()`: validan propiedad, bucket y ruta antes de asociar archivos públicos.
 
@@ -1115,9 +1203,10 @@ La base está lista para continuar con el app público y la operación del panel
 incluida la configuración de locales, horarios, medios y canchas. Quedan temas
 deliberadamente fuera de esta fase:
 
-1. Crear UI de rechazo de comprobante en el panel y estado/motivo en Expo.
-2. Crear flujo de cancelación y reembolso, separado del rechazo de pago.
-3. Crear RPC de reseñas que exija una reserva completada válida.
-4. Crear integración segura con Mercado Pago para suscripciones.
+1. Crear UI de tablero por deporte/cancha en detalle y la pantalla Expo de reserva con selección de bloques consecutivos.
+2. Crear UI de rechazo de comprobante en el panel y estado/motivo en Expo.
+3. Crear flujo de cancelación y reembolso, separado del rechazo de pago.
+4. Crear RPC de reseñas que exija una reserva completada válida.
+5. Crear integración segura con Mercado Pago para suscripciones.
 
 Estos pendientes no deben resolverse ampliando permisos directos en las tablas. La dirección recomendada sigue siendo: RLS para el aislamiento básico y RPCs transaccionales para reglas de negocio.

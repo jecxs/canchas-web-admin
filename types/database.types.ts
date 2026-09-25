@@ -1294,6 +1294,29 @@ export type Database = {
         }
         Returns: string
       }
+      guardar_regla_tarifaria: {
+        Args: {
+          p_activo?: boolean
+          p_descuento_porcentaje?: number
+          p_dias_semana?: number[]
+          p_fecha_fin?: string
+          p_fecha_inicio?: string
+          p_hora_fin?: string
+          p_hora_inicio?: string
+          p_local_id?: string
+          p_nombre?: string
+          p_objetivos?: Json
+          p_precio_por_hora?: number
+          p_regla_id?: string
+          p_tipo?: Database["public"]["Enums"]["tipo_regla_tarifa"]
+          p_tipo_ajuste?: Database["public"]["Enums"]["tipo_ajuste_tarifa"]
+        }
+        Returns: string
+      }
+      eliminar_regla_tarifaria: {
+        Args: { p_regla_id: string }
+        Returns: undefined
+      }
       obtener_canchas_local: {
         Args: { p_local_id: string }
         Returns: {
@@ -1430,6 +1453,26 @@ export type Database = {
           inicio: string
           reserver_nombre: string
           tipo: string
+        }[]
+      }
+      obtener_reglas_tarifarias_dueno: {
+        Args: { p_local_id: string }
+        Returns: {
+          activo: boolean
+          created_at: string
+          descuento_porcentaje: number | null
+          dias_semana: number[]
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          nombre: string
+          objetivos: Json
+          precio_por_hora: number | null
+          tipo: Database["public"]["Enums"]["tipo_regla_tarifa"]
+          tipo_ajuste: Database["public"]["Enums"]["tipo_ajuste_tarifa"]
+          updated_at: string
         }[]
       }
       obtener_reservas_agenda_dueno: {
@@ -1596,6 +1639,8 @@ export type Database = {
       rol_usuario: "cliente" | "dueno" | "super_admin"
       tipo_entidad_reporte: "resena" | "foto"
       tipo_soporte_deporte: "dedicada" | "adaptada"
+      tipo_ajuste_tarifa: "precio_fijo" | "descuento_porcentaje"
+      tipo_regla_tarifa: "recurrente" | "promocion"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1762,6 +1807,8 @@ export const Constants = {
       rol_usuario: ["cliente", "dueno", "super_admin"],
       tipo_entidad_reporte: ["resena", "foto"],
       tipo_soporte_deporte: ["dedicada", "adaptada"],
+      tipo_ajuste_tarifa: ["precio_fijo", "descuento_porcentaje"],
+      tipo_regla_tarifa: ["recurrente", "promocion"],
     },
   },
 } as const

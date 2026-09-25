@@ -1,6 +1,8 @@
 type SportIconProps = {
   name: string
   inactive?: boolean
+  size?: 'xs' | 'sm' | 'default'
+  contrast?: boolean
 }
 
 type SportKind = 'football' | 'volleyball' | 'basketball' | 'generic'
@@ -17,13 +19,15 @@ function kindFor(name: string): SportKind {
   return 'generic'
 }
 
-export function SportIcon({ name, inactive = false }: SportIconProps) {
+export function SportIcon({ name, inactive = false, size = 'default', contrast = false }: SportIconProps) {
   const kind = kindFor(name)
-  const color = inactive ? 'text-muted-foreground' : 'text-success-foreground'
+  const color = inactive ? 'text-muted-foreground' : contrast ? 'text-primary' : 'text-success-foreground'
+  const containerSize = size === 'xs' ? 'size-6 rounded-lg' : size === 'sm' ? 'size-7' : 'size-9'
+  const iconSize = size === 'xs' ? 'size-3.5' : size === 'sm' ? 'size-[1.05rem]' : 'size-[1.35rem]'
 
   return (
-    <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${inactive ? 'bg-muted' : 'bg-primary/18'} ${color}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24" className="size-[1.35rem]" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round">
+    <span className={`grid shrink-0 place-items-center rounded-xl ${containerSize} ${inactive ? 'bg-muted' : contrast ? 'bg-primary/12' : 'bg-primary/18'} ${color}`} aria-hidden="true">
+      <svg viewBox="0 0 24 24" className={iconSize} fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round">
         {kind === 'football' && (
           <>
             <rect x="3" y="5" width="18" height="14" rx="1.5" />
