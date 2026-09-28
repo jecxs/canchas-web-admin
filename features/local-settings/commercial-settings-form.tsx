@@ -12,6 +12,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { saveCommercialSettingsAction } from './actions'
+import { getMinimumAdvanceDescription } from './advance-policy'
 import { useSettingsFormFeedback } from './form-feedback'
 import {
   initialSettingsActionState,
@@ -63,7 +64,7 @@ function PaymentMethodIcon({ type, enabled }: { type: PaymentMethodType; enabled
   )
 }
 
-export function CommercialSettingsForm({ settings }: { settings: LocalSettings }) {
+export function CommercialSettingsForm({ settings, minimumAdvancePercentage }: { settings: LocalSettings; minimumAdvancePercentage: number }) {
   const currentMethods = parsePaymentMethods(settings.medios_pago_adelanto)
   const [selected, setSelected] = useState<Set<PaymentMethodType>>(
     () => new Set(currentMethods.map((method) => method.tipo)),
@@ -92,7 +93,7 @@ export function CommercialSettingsForm({ settings }: { settings: LocalSettings }
           <Field data-invalid={Boolean(state.fieldErrors?.advancePercentage)}>
             <FieldLabel htmlFor="advancePercentage">Porcentaje de adelanto</FieldLabel>
             <div className="relative max-w-48"><Input id="advancePercentage" name="advancePercentage" type="number" min={1} max={100} step="0.01" defaultValue={settings.porcentaje_adelanto ?? ''} required className="pr-10" /><span className="pointer-events-none absolute inset-y-0 right-3 grid place-items-center text-sm text-muted-foreground">%</span></div>
-            <FieldDescription>La base también comprobará el mínimo global configurado por Grassly.</FieldDescription>
+            <FieldDescription>{getMinimumAdvanceDescription(minimumAdvancePercentage)}</FieldDescription>
             <FieldError errors={state.fieldErrors?.advancePercentage?.map((message) => ({ message }))} />
           </Field>
 

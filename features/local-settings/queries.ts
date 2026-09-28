@@ -4,10 +4,15 @@ import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import type { BenefitCatalogItem, LocalBenefit, LocalPhoto, LocalSettings, ScheduleRow } from './types'
 
+function parseMinimumAdvancePercentage(value: unknown) {
+  const percentage = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(percentage) && percentage >= 1 && percentage <= 100 ? percentage : null
+}
+
 export async function getLocalSettings() {
   const { context, local } = await requireOperationalOwnerLocal()
   const supabase = await createClient()
-  const [{ data: settings, error: settingsError }, { data: schedules, error: schedulesError }, { data: photos, error: photosError }, { data: benefitCatalog, error: benefitCatalogError }, { data: benefits, error: benefitsError }] = await Promise.all([
+  const [{ data: settings, error: settingsError }, { data: schedules, error: schedulesError }, { data: photos, error: photosError }, { data: benefitCatalog, error: benefitCatalogError }, { data: benefits, error: benefitsError }, { data: minimumAdvancePercentage, error: minimumAdvancePercentageError }] = await Promise.all([
     supabase
       .from('locales')
       .select('id,nombre,descripcion,ruc,telefono_contacto_principal,telefono_contacto_secundario,direccion,latitud,longitud,porcentaje_adelanto,medios_pago_adelanto,politica_reembolso,logo,publicado')
@@ -33,10 +38,12 @@ export async function getLocalSettings() {
       .select('beneficio_catalogo_id,nombre_personalizado')
       .eq('local_id', local.id)
       .order('created_at'),
+    supabase.rpc('obtener_minimo_adelanto_global'),
   ])
 
-  if (settingsError || schedulesError || photosError || benefitCatalogError || benefitsError || !settings) {
-    console.error('[local-settings:read]', { code: settingsError?.code ?? schedulesError?.code ?? photosError?.code ?? benefitCatalogError?.code ?? benefitsError?.code })
+  const parsedMinimumAdvancePercentage = parseMinimumAdvancePercentage(minimumAdvancePercentage)
+  if (settingsError || schedulesError || photosError || benefitCatalogError || benefitsError || minimumAdvancePercentageError || !settings || parsedMinimumAdvancePercentage === null) {
+    console.error('[local-settings:read]', { code: settingsError?.code ?? schedulesError?.code ?? photosError?.code ?? benefitCatalogError?.code ?? benefitsError?.code ?? minimumAdvancePercentageError?.code })
     throw new Error('No se pudo cargar la configuración del local.')
   }
 
@@ -48,5 +55,6 @@ export async function getLocalSettings() {
     photos: (photos ?? []) as LocalPhoto[],
     benefitCatalog: (benefitCatalog ?? []) as BenefitCatalogItem[],
     benefits: (benefits ?? []) as LocalBenefit[],
+    minimumAdvancePercentage: parsedMinimumAdvancePercentage,
   }
 }

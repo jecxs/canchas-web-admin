@@ -3,6 +3,7 @@ import 'server-only'
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { getDayOfWeek, formatAgendaDate, shiftAgendaDate } from './date-utils'
+import { getLocalAgendaSports, normalizeAgendaSportId } from './sport-filter'
 import type { AgendaData } from './types'
 
 export async function getAgendaData(date: string, sportId?: string): Promise<AgendaData> {
@@ -10,7 +11,7 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
   const supabase = await createClient()
   const dayOfWeek = getDayOfWeek(date)
 
-  const [{ data: courts, error: courtsError }, { data: schedule, error: scheduleError }, { data: occupations, error: occupationsError }, { data: sports, error: sportsError }] = await Promise.all([
+  const [{ data: courts, error: courtsError }, { data: schedule, error: scheduleError }] = await Promise.all([
     supabase
       .from('canchas')
       .select('id,nombre,activa,superficie,descripcion,largo_metros,ancho_metros,cancha_deportes(deporte_id,deportes(id,nombre))')
@@ -23,49 +24,13 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
       .eq('local_id', local.id)
       .eq('dia_semana', dayOfWeek)
       .maybeSingle(),
-    supabase.rpc('fn_ocupacion_tablero_local', {
-      p_local_id: local.id,
-      p_fecha: date,
-      p_deporte_id: sportId || undefined,
-    }),
-    supabase.from('deportes').select('id,nombre').order('nombre'),
   ])
 
-  const error = courtsError ?? scheduleError ?? occupationsError ?? sportsError
+  const error = courtsError ?? scheduleError
   if (error) {
     console.error('[agenda:read]', { code: error.code, message: error.message })
     throw new Error('No se pudo cargar la agenda.')
   }
-
-  // The visual board RPC deliberately omits customer and reservation ids.
-  // This owner-only RPC supplies the private details needed by operational
-  // actions such as extending a confirmed reservation.
-  const { data: reservationRows, error: reservationsError } = await supabase.rpc('obtener_reservas_agenda_dueno', {
-    p_local_id: local.id,
-    p_fecha: date,
-  })
-
-  if (reservationsError) {
-    // Never fall back to the anonymous visual occupation for reservations.
-    // Doing so leaves the cell occupied but without its business state,
-    // customer, sport or id, which used to render as a misleading generic
-    // "Reserva". The owner-only contract is the source of truth for a
-    // reservation in this operational board.
-    console.error('[agenda:reservations]', JSON.stringify({ code: reservationsError.code, message: reservationsError.message }))
-    throw new Error('No se pudieron cargar los detalles de las reservas.')
-  }
-
-  const sportNames = new Map((sports ?? []).map((sport) => [sport.id, sport.nombre]))
-  const reservations = await Promise.all((reservationRows ?? []).map(async (reservation) => {
-    if (!reservation.comprobante_url) return { ...reservation, proofUrl: null }
-    const { data: signedProof, error: proofError } = await supabase.storage
-      .from('comprobantes-pago')
-      .createSignedUrl(reservation.comprobante_url, 10 * 60)
-    if (proofError) {
-      console.warn('[agenda:proof]', JSON.stringify({ code: proofError.name, message: proofError.message }))
-    }
-    return { ...reservation, proofUrl: signedProof?.signedUrl ?? null }
-  }))
 
   const agendaCourts = (courts ?? []).map((court) => ({
     id: court.id,
@@ -79,9 +44,54 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
       name: relation.deportes.nombre,
     })),
   }))
+  const sports = getLocalAgendaSports(agendaCourts)
+  const selectedSportId = normalizeAgendaSportId(sportId, sports)
+
+  const [{ data: occupations, error: occupationsError }, { data: reservationRows, error: reservationsError }] = await Promise.all([
+    supabase.rpc('fn_ocupacion_tablero_local', {
+      p_local_id: local.id,
+      p_fecha: date,
+      p_deporte_id: selectedSportId || undefined,
+    }),
+    supabase.rpc('obtener_reservas_agenda_dueno', {
+      p_local_id: local.id,
+      p_fecha: date,
+    }),
+  ])
+
+  if (occupationsError) {
+    console.error('[agenda:read]', { code: occupationsError.code, message: occupationsError.message })
+    throw new Error('No se pudo cargar la agenda.')
+  }
+
+  // The visual board RPC deliberately omits customer and reservation ids.
+  // This owner-only RPC supplies the private details needed by operational
+  // actions such as extending a confirmed reservation.
+  if (reservationsError) {
+    // Never fall back to the anonymous visual occupation for reservations.
+    // Doing so leaves the cell occupied but without its business state,
+    // customer, sport or id, which used to render as a misleading generic
+    // "Reserva". The owner-only contract is the source of truth for a
+    // reservation in this operational board.
+    console.error('[agenda:reservations]', JSON.stringify({ code: reservationsError.code, message: reservationsError.message }))
+    throw new Error('No se pudieron cargar los detalles de las reservas.')
+  }
+
+  const sportNames = new Map(sports.map((sport) => [sport.id, sport.name]))
+  const reservations = await Promise.all((reservationRows ?? []).map(async (reservation) => {
+    if (!reservation.comprobante_url) return { ...reservation, proofUrl: null }
+    const { data: signedProof, error: proofError } = await supabase.storage
+      .from('comprobantes-pago')
+      .createSignedUrl(reservation.comprobante_url, 10 * 60)
+    if (proofError) {
+      console.warn('[agenda:proof]', JSON.stringify({ code: proofError.name, message: proofError.message }))
+    }
+    return { ...reservation, proofUrl: signedProof?.signedUrl ?? null }
+  }))
+
   const visibleCourtIds = new Set(
     agendaCourts
-      .filter((court) => !sportId || court.sports.some((sport) => sport.id === sportId))
+      .filter((court) => !selectedSportId || court.sports.some((sport) => sport.id === selectedSportId))
       .map((court) => court.id),
   )
   const courtNames = new Map(agendaCourts.map((court) => [court.id, court.name]))
@@ -136,7 +146,7 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
     closingTime: schedule?.hora_cierre ?? null,
     courts: agendaCourts,
     occupations: [...maintenanceOccupations, ...reservationOccupations],
-    sports: (sports ?? []).map((sport) => ({ id: sport.id, name: sport.nombre })),
+    sports,
   }
 }
 
