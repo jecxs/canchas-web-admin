@@ -1349,6 +1349,33 @@ export type Database = {
           ubicacion: boolean
         }[]
       }
+      obtener_clientes_local_dueno: {
+        Args: {
+          p_local_id: string
+          p_cancha_ids?: string[]
+          p_busqueda?: string
+          p_limite?: number
+          p_offset?: number
+        }
+        Returns: {
+          cliente_id: string | null
+          nombre: string
+          telefono: string | null
+          es_cuenta: boolean
+          total_reservas: number
+          confirmadas: number
+          completadas: number
+          por_validar: number
+          inasistencias: number
+          canceladas: number
+          rechazadas_pago: number
+          monto_total: number
+          primera_reserva: string
+          ultima_reserva: string
+          proxima_reserva: string | null
+          total_count: number
+        }[]
+      }
       obtener_detalle_publico_local: {
         Args: { p_local_id: string }
         Returns: {
@@ -1496,6 +1523,29 @@ export type Database = {
           notas: string
           reserva_id: string
           saldo_pendiente: number
+        }[]
+      }
+      obtener_reservas_cliente_local_dueno: {
+        Args: {
+          p_local_id: string
+          p_cliente_id?: string
+          p_telefono?: string
+          p_limite?: number
+        }
+        Returns: {
+          reserva_id: string
+          cancha_id: string
+          cancha_nombre: string
+          deporte_id: string
+          deporte_nombre: string | null
+          inicio: string
+          fin: string
+          estado: Database["public"]["Enums"]["estado_reserva"]
+          canal_origen: Database["public"]["Enums"]["canal_origen_reserva"]
+          monto_total: number
+          monto_adelanto_requerido: number
+          es_excepcion_horaria: boolean
+          created_at: string
         }[]
       }
       obtener_tarjetas_locales: {
