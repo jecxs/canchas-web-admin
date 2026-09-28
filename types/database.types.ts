@@ -1172,6 +1172,7 @@ export type Database = {
           p_bloques?: number
           p_canal?: Database["public"]["Enums"]["canal_origen_reserva"]
           p_cancha_id: string
+          p_cliente_id?: string
           p_cliente_nombre: string
           p_cliente_telefono: string
           p_deporte_id: string
@@ -1220,6 +1221,7 @@ export type Database = {
         Args: {
           p_canal?: Database["public"]["Enums"]["canal_origen_reserva"]
           p_cancha_id: string
+          p_cliente_id?: string
           p_cliente_nombre: string
           p_cliente_telefono: string
           p_deporte_id: string

@@ -41,10 +41,16 @@ export type ClientReservation = {
   createdAt: string
 }
 
+export type ClientCourt = {
+  id: string
+  name: string
+  sports: Array<{ id: string; name: string }>
+}
+
 export type ClientsData = {
   localId: string
   localName: string
-  courts: Array<{ id: string; name: string }>
+  courts: ClientCourt[]
   clients: ClientSummary[]
   filters: ClientsFilters
   pagination: {

@@ -12,7 +12,7 @@ export async function getClientsData(filters: ClientsFilters): Promise<ClientsDa
 
   const { data: courtRows, error: courtsError } = await supabase
     .from('canchas')
-    .select('id,nombre')
+    .select('id,nombre,cancha_deportes(deporte_id,deportes(id,nombre))')
     .eq('local_id', local.id)
     .order('nombre')
 
@@ -63,7 +63,7 @@ export async function getClientsData(filters: ClientsFilters): Promise<ClientsDa
   return {
     localId: local.id,
     localName: local.nombre,
-    courts: courts.map((court) => ({ id: court.id, name: court.nombre })),
+    courts: courts.map((court) => ({ id: court.id, name: court.nombre, sports: court.cancha_deportes.map((relation) => ({ id: relation.deporte_id, name: relation.deportes.nombre })) })),
     clients,
     filters: { courtIds, query, page },
     pagination: {

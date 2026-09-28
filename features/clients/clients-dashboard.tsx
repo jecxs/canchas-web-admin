@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
 import type { ReservationStatus } from '@/features/reservations/types'
-import type { ClientReservation, ClientsData, ClientsFilters, ClientSummary } from './types'
+import { ClientBookingDialog } from './client-booking-dialog'
+import type { ClientCourt, ClientReservation, ClientsData, ClientsFilters, ClientSummary } from './types'
 
 type Segment = 'all' | 'account' | 'recurring' | 'recent' | 'incidents'
 
@@ -239,7 +240,7 @@ export function ClientsDashboard({ data }: { data: ClientsData }) {
           </div>
 
           <div className="divide-y divide-border/70">
-            {filtered.map((client) => <ClientRow key={client.id} client={client} selected={selected?.id === client.id} onClick={() => selectClient(client)} />)}
+            {filtered.map((client) => <ClientRow key={client.id} client={client} selected={selected?.id === client.id} onClick={() => selectClient(client)} localId={data.localId} courts={data.courts} />)}
             {!filtered.length && <div className="grid min-h-80 place-items-center px-6 text-center"><div><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted"><HugeiconsIcon icon={UserGroupIcon} strokeWidth={2} className="size-5 text-muted-foreground" /></span><h2 className="mt-4 text-lg font-black">No hay clientes con estos filtros</h2><p className="mt-1 text-sm text-muted-foreground">Prueba otra cancha o término de búsqueda.</p>{hasFilters && <Button variant="ghost" size="sm" className="mt-3" onClick={clearFilters}>Limpiar filtros</Button>}</div></div>}
           </div>
           {data.pagination.totalCount > 0 && <div className="flex items-center justify-between border-t border-border/75 p-4"><Button size="sm" variant="outline" disabled={data.pagination.page <= 1 || isRefreshing} onClick={() => applyFilters({ page: data.pagination.page - 1 })}><HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} />Anterior</Button><span className="text-xs font-bold text-muted-foreground">Página {data.pagination.page} / {data.pagination.totalPages}</span><Button size="sm" variant="outline" disabled={data.pagination.page >= data.pagination.totalPages || isRefreshing} onClick={() => applyFilters({ page: data.pagination.page + 1 })}>Siguiente<HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} /></Button></div>}
@@ -251,20 +252,22 @@ export function ClientsDashboard({ data }: { data: ClientsData }) {
   )
 }
 
-function ClientRow({ client, selected, onClick }: { client: ClientSummary; selected: boolean; onClick: () => void }) {
+function ClientRow({ client, selected, onClick, localId, courts }: { client: ClientSummary; selected: boolean; onClick: () => void; localId: string; courts: ClientCourt[] }) {
   const incidents = incidentCount(client)
-  return <button type="button" onClick={onClick} className={cn('group grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-4 text-left transition-colors sm:grid-cols-[minmax(200px,1.4fr)_minmax(120px,.9fr)_minmax(120px,.9fr)_auto] sm:gap-4 sm:px-5', selected ? 'bg-primary/10' : 'hover:bg-muted/55')}>
-    <div className="flex min-w-0 items-center gap-3">
+  return <div className={cn('group flex w-full items-center gap-3 px-4 py-4 transition-colors sm:px-5', selected ? 'bg-primary/10' : 'hover:bg-muted/55')}>
+    <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left">
       <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-muted text-xs font-black text-muted-foreground">{initials(client.name)}</span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-extrabold">{client.name}</p>{client.isAccount ? <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[9px] font-extrabold text-primary-foreground">CUENTA</span> : <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-extrabold text-muted-foreground">EXTERNO</span>}{client.totalReservations >= 2 && <span className="rounded-md bg-success/18 px-1.5 py-0.5 text-[9px] font-extrabold text-success-foreground">RECURRENTE</span>}</div>
         <p className="mt-1 truncate text-xs text-muted-foreground">{client.phone ?? 'Sin teléfono'}</p>
+        <p className="mt-1 text-xs text-muted-foreground sm:hidden">{client.totalReservations} reserva{client.totalReservations === 1 ? '' : 's'} · {formatMoney(client.totalAmount)}</p>
       </div>
-    </div>
-    <div className="hidden min-w-0 sm:block"><p className="text-xs font-bold">{client.totalReservations} reserva{client.totalReservations === 1 ? '' : 's'}</p><p className="mt-1 text-[11px] text-muted-foreground">Última {formatDate(client.lastReservation, { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
-    <div className="hidden min-w-0 sm:block"><p className="text-xs font-bold">{formatMoney(client.totalAmount)}</p><p className={cn('mt-1 text-[11px]', incidents ? 'text-warning-foreground' : 'text-muted-foreground')}>{incidents ? `${incidents} incidencia${incidents === 1 ? '' : 's'}` : 'Sin incidencias'}</p></div>
-    <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className={cn('size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5', selected && 'text-foreground')} />
-  </button>
+      <div className="hidden min-w-0 shrink-0 sm:block"><p className="text-xs font-bold">{client.totalReservations} reserva{client.totalReservations === 1 ? '' : 's'}</p><p className="mt-1 text-[11px] text-muted-foreground">Última {formatDate(client.lastReservation, { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
+      <div className="hidden min-w-0 shrink-0 sm:block"><p className="text-xs font-bold">{formatMoney(client.totalAmount)}</p><p className={cn('mt-1 text-[11px]', incidents ? 'text-warning-foreground' : 'text-muted-foreground')}>{incidents ? `${incidents} incidencia${incidents === 1 ? '' : 's'}` : 'Sin incidencias'}</p></div>
+      <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className={cn('hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block', selected && 'text-foreground')} />
+    </button>
+    <ClientBookingDialog localId={localId} client={client} courts={courts} />
+  </div>
 }
 
 function ClientDetail({ client, history, status, onClose }: { client: ClientSummary; history?: ClientReservation[]; status?: 'loading' | 'error'; onClose: () => void }) {
