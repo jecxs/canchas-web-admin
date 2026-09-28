@@ -1167,6 +1167,33 @@ export type Database = {
           reserva_id: string
         }[]
       }
+      crear_reserva_manual_confirmada_dueno: {
+        Args: {
+          p_bloques?: number
+          p_canal?: Database["public"]["Enums"]["canal_origen_reserva"]
+          p_cancha_id: string
+          p_cliente_nombre: string
+          p_cliente_telefono: string
+          p_deporte_id: string
+          p_inicio: string
+          p_local_id: string
+          p_monto_adelanto: number
+          p_notas?: string
+        }
+        Returns: {
+          cancha_id: string
+          cancha_nombre: string
+          cliente_id: string
+          cliente_sin_cuenta_nombre: string
+          cliente_sin_cuenta_telefono: string
+          estado: Database["public"]["Enums"]["estado_reserva"]
+          fin: string
+          inicio: string
+          monto_adelanto_requerido: number
+          monto_total: number
+          reserva_id: string
+        }[]
+      }
       crear_reserva_manual_encajada: {
         Args: {
           p_canal?: Database["public"]["Enums"]["canal_origen_reserva"]
@@ -1187,6 +1214,55 @@ export type Database = {
           monto_adelanto_requerido: number
           monto_total: number
           reserva_id: string
+        }[]
+      }
+      crear_reserva_manual_encajada_confirmada_dueno: {
+        Args: {
+          p_canal?: Database["public"]["Enums"]["canal_origen_reserva"]
+          p_cancha_id: string
+          p_cliente_nombre: string
+          p_cliente_telefono: string
+          p_deporte_id: string
+          p_inicio: string
+          p_local_id: string
+          p_monto_adelanto: number
+          p_notas?: string
+        }
+        Returns: {
+          cancha_id: string
+          cancha_nombre: string
+          fin: string
+          inicio: string
+          monto_adelanto_requerido: number
+          monto_total: number
+          reserva_id: string
+        }[]
+      }
+      cotizar_reserva_manual_dueno: {
+        Args: {
+          p_cancha_id: string
+          p_deporte_id: string
+          p_duracion_minutos: number
+          p_inicio: string
+          p_local_id: string
+        }
+        Returns: {
+          monto_adelanto_sugerido: number
+          monto_total: number
+        }[]
+      }
+      cotizar_reserva_manual_detallada_dueno: {
+        Args: {
+          p_cancha_id: string
+          p_deporte_id: string
+          p_duracion_minutos: number
+          p_inicio: string
+          p_local_id: string
+        }
+        Returns: {
+          detalle_tarifario: Json
+          monto_adelanto_sugerido: number
+          monto_total: number
         }[]
       }
       eliminar_foto_local: {

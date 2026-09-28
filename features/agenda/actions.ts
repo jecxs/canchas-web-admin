@@ -53,7 +53,7 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
     blocks: formData.get('blocks'),
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
-    status: formData.get('status'),
+    advanceAmount: formData.get('advanceAmount'),
     channel: formData.get('channel'),
     notes: formData.get('notes') ?? '',
   })
@@ -66,7 +66,7 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
   if (local.id !== validation.data.localId) return { success: false, message: 'No tienes permiso para realizar esta acción' }
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('crear_reserva_manual_dueno', {
+  const { error } = await supabase.rpc('crear_reserva_manual_confirmada_dueno', {
     p_local_id: local.id,
     p_cancha_id: validation.data.courtId,
     p_deporte_id: validation.data.sportId,
@@ -74,7 +74,7 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
     p_bloques: validation.data.blocks,
     p_cliente_nombre: validation.data.customerName,
     p_cliente_telefono: validation.data.customerPhone,
-    p_estado: validation.data.status,
+    p_monto_adelanto: validation.data.advanceAmount,
     p_canal: validation.data.channel,
     p_notas: validation.data.notes || undefined,
   })
@@ -85,12 +85,13 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
 export async function createEncasedBookingAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
   const validation = encasedBookingSchema.safeParse({
     localId: formData.get('localId'),
+    courtId: formData.get('courtId'),
     sportId: formData.get('sportId'),
     date: formData.get('date'),
     time: formData.get('time'),
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
-    status: formData.get('status'),
+    advanceAmount: formData.get('advanceAmount'),
     channel: formData.get('channel'),
     notes: formData.get('notes') ?? '',
   })
@@ -103,13 +104,14 @@ export async function createEncasedBookingAction(_state: AgendaActionState, form
   if (local.id !== validation.data.localId) return { success: false, message: 'No tienes permiso para realizar esta acción' }
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('crear_reserva_manual_encajada', {
+  const { error } = await supabase.rpc('crear_reserva_manual_encajada_confirmada_dueno', {
     p_local_id: local.id,
+    p_cancha_id: validation.data.courtId,
     p_deporte_id: validation.data.sportId,
     p_inicio: start,
     p_cliente_nombre: validation.data.customerName,
     p_cliente_telefono: validation.data.customerPhone,
-    p_estado: validation.data.status,
+    p_monto_adelanto: validation.data.advanceAmount,
     p_canal: validation.data.channel,
     p_notas: validation.data.notes || undefined,
   })

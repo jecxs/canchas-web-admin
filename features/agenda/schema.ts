@@ -13,19 +13,20 @@ export const manualBookingSchema = z.object({
   blocks: z.coerce.number().int().min(1).max(4),
   customerName: z.string().trim().min(2, 'Escribe el nombre del cliente.').max(120),
   customerPhone: z.string().trim().min(7, 'Escribe un teléfono válido.').max(30),
-  status: z.enum(['pendiente_pago', 'confirmada']),
+  advanceAmount: z.coerce.number().positive('Registra el adelanto recibido.').max(99999, 'El adelanto es demasiado alto.'),
   channel: z.enum(['whatsapp', 'presencial']),
   notes: z.string().trim().max(500),
 })
 
 export const encasedBookingSchema = z.object({
   localId: z.uuid(),
+  courtId: z.uuid(),
   sportId: z.uuid(),
   date: localDate,
   time: z.string().regex(/^\d{2}:30$/, 'La reserva encajada debe iniciar a los 30 minutos.'),
   customerName: z.string().trim().min(2, 'Escribe el nombre del cliente.').max(120),
   customerPhone: z.string().trim().min(7, 'Escribe un teléfono válido.').max(30),
-  status: z.enum(['pendiente_pago', 'confirmada']),
+  advanceAmount: z.coerce.number().positive('Registra el adelanto recibido.').max(99999, 'El adelanto es demasiado alto.'),
   channel: z.enum(['whatsapp', 'presencial']),
   notes: z.string().trim().max(500),
 })
