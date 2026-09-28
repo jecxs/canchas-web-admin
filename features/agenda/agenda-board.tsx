@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Calendar03Icon, CheckmarkCircle01Icon, Clock01Icon, FilterHorizontalIcon, MoreHorizontalIcon, Cancel01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Calendar03Icon, CheckmarkCircle01Icon, Clock01Icon, FilterHorizontalIcon, MoreHorizontalIcon, Cancel01Icon, Maximize02Icon, Minimize02Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -12,8 +12,9 @@ import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverTitl
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { notify } from '@/lib/notifications/notify'
+import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
-import { formatAgendaDate, getLocalMinutes, getTodayInLima, getWeekStart, isoToLocalTime, localDateTimeToIso, minutesToTime, shiftAgendaDate, timeToMinutes } from './date-utils'
+import { formatAgendaDate, getLocalMinutes, getTodayInLima, getWeekStart, isValidAgendaDate, isoToLocalTime, localDateTimeToIso, minutesToTime, shiftAgendaDate, timeToMinutes } from './date-utils'
 import { CancelReservationForm, ConfirmReservationForm, EncasedBookingForm, ExtendReservationForm, MaintenanceForm, ManualBookingForm, NoShowReservationForm, PaymentMovementForm, RejectReservationForm, RescheduleReservationForm } from './operation-forms'
 import type { AgendaCourt, AgendaData, AgendaOccupation } from './types'
 
@@ -23,6 +24,23 @@ type ContextMenuState = { x: number; y: number; cell: SelectedCell }
 type Operation = 'summary' | 'manual' | 'maintenance' | 'encajada' | 'extend' | 'confirm' | 'reject' | 'move' | 'cancel' | 'no-show' | 'payment'
 type ReservationRealtimeRecord = { id?: unknown; cancha_id?: unknown; estado?: unknown }
 type DragPreview = { date: string; courtId: string; start: number; end: number; allowed: boolean }
+type AgendaSelectionDrag = { anchor: SelectedCell; cells: SelectedCell[]; exceededMaximum: boolean }
+
+function operationTitle(operation: Operation) {
+  switch (operation) {
+    case 'manual': return 'Reserva manual en curso'
+    case 'maintenance': return 'Bloqueo de horario en curso'
+    case 'encajada': return 'Reserva encajada en curso'
+    case 'extend': return 'Extensión de reserva en curso'
+    case 'confirm': return 'Validación de pago en curso'
+    case 'reject': return 'Rechazo de comprobante en curso'
+    case 'move': return 'Reprogramación en curso'
+    case 'cancel': return 'Cancelación en curso'
+    case 'no-show': return 'Inasistencia en curso'
+    case 'payment': return 'Registro de cobro en curso'
+    default: return 'Detalle del horario'
+  }
+}
 
 function asReservationRealtimeRecord(value: unknown): ReservationRealtimeRecord {
   return value && typeof value === 'object' ? value as ReservationRealtimeRecord : {}
@@ -143,8 +161,10 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   const [isPending, startTransition] = useTransition()
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null)
   const [selectedCells, setSelectedCells] = useState<SelectedCell[]>([])
+  const [selectionReady, setSelectionReady] = useState(false)
   const [selectionPopoverPosition, setSelectionPopoverPosition] = useState({ x: 0, y: 0 })
   const [operation, setOperation] = useState<Operation>('summary')
+  const [panelMinimized, setPanelMinimized] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const openingLightbox = useRef(false)
@@ -152,6 +172,9 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null)
   const [nowMs, setNowMs] = useState(0)
   const announcedPaymentHolds = useRef(new Set<string>())
+  const selectionDragRef = useRef<AgendaSelectionDrag | null>(null)
+  const selectionPointerRef = useRef({ x: 0, y: 0 })
+  const suppressCellClickRef = useRef(false)
   const isWeek = view === 'week' && Boolean(weekData?.length)
   const days = useMemo(() => isWeek ? weekData! : [data], [isWeek, weekData, data])
   const selectedCourt = data.courts.find((court) => court.id === selectedCourtId) ?? data.courts[0]
@@ -166,6 +189,15 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   const selectedBlocks = selectedCell?.blocks ?? 1
   const selectedEndTime = selectedCell ? minutesToTime(selectedCell.slot.start + selectedBlocks * 60) : '01:00'
   const encasedStartTime = selectedOccupation ? isoToLocalTime(selectedOccupation.end) : '00:30'
+  const periodLabel = isWeek
+    ? data.date === getTodayInLima() ? 'Próximos 7 días' : `7 días desde ${formatAgendaDate(days[0].date)}`
+    : data.dayLabel
+  const manualTimeOptions = useMemo(() => {
+    const selectedDay = selectedCell ? days.find((day) => day.date === selectedCell.date) : undefined
+    const slots = selectedDay ? buildSlots(selectedDay.openingTime, selectedDay.closingTime) : []
+    const values = slots.length ? slots.map((slot) => slot.start) : Array.from({ length: 24 }, (_, hour) => hour * 60)
+    return values.map((value) => ({ value: minutesToTime(value), label: minutesToTime(value) }))
+  }, [days, selectedCell])
 
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
@@ -238,6 +270,26 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
     }
   }, [router])
 
+  useEffect(() => {
+    function finishSelectionDrag() {
+      const drag = selectionDragRef.current
+      if (!drag) return
+      selectionDragRef.current = null
+      suppressCellClickRef.current = true
+      setSelectedCells(drag.cells)
+      setSelectionPopoverPosition(selectionPointerRef.current)
+      setSelectionReady(drag.cells.length > 0)
+      if (drag.exceededMaximum) notify.warning({ description: 'Puedes seleccionar hasta 4 horas consecutivas para una reserva manual.' })
+    }
+
+    window.addEventListener('pointerup', finishSelectionDrag)
+    window.addEventListener('pointercancel', finishSelectionDrag)
+    return () => {
+      window.removeEventListener('pointerup', finishSelectionDrag)
+      window.removeEventListener('pointercancel', finishSelectionDrag)
+    }
+  }, [])
+
   function navigate(date: string) {
     startTransition(() => router.push(buildAgendaUrl(pathname, date, selectedSportId, view, selectedCourt?.id)))
   }
@@ -245,9 +297,17 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   function closeDialog() {
     setSelectedCell(null)
     setSelectedCells([])
+    setSelectionReady(false)
     setOperation('summary')
+    setPanelMinimized(false)
     openingLightbox.current = false
     setLightboxOpen(false)
+  }
+
+  function openPanel(cell: SelectedCell, nextOperation: Operation = 'summary') {
+    setPanelMinimized(false)
+    setSelectedCell(cell)
+    setOperation(nextOperation)
   }
 
   function openProofLightbox() {
@@ -263,6 +323,10 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   }
 
   function openCell(day: AgendaData, court: AgendaCourt, slot: Slot, event: MouseEvent<HTMLButtonElement>) {
+    if (suppressCellClickRef.current) {
+      suppressCellClickRef.current = false
+      return
+    }
     const segment = getOccupationSegment(day.occupations, court.id, slot)
     const cell = { date: day.date, courtId: court.id, courtName: court.name, slot, occupation: segment?.occupation }
     if (event.ctrlKey || event.metaKey) {
@@ -273,6 +337,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
         const next = current.filter((item) => !(item.date === cell.date && item.courtId === cell.courtId && item.slot.start === cell.slot.start))
         const remainsContiguous = next.every((item, index) => index === 0 || item.slot.start - next[index - 1].slot.start === 60)
         setSelectedCells(remainsContiguous ? next : [])
+        setSelectionReady(remainsContiguous && next.length > 0)
         return
       }
       const next = [...current, cell].sort((a, b) => a.slot.start - b.slot.start)
@@ -288,6 +353,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
       }
       setSelectedCells(next)
       setSelectionPopoverPosition({ x: event.clientX, y: event.clientY })
+      setSelectionReady(true)
       setContextMenu(null)
       return
     }
@@ -298,20 +364,107 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
     if (!segment) {
       setSelectedCells([cell])
       setSelectionPopoverPosition({ x: event.clientX, y: event.clientY })
+      setSelectionReady(true)
       setContextMenu(null)
       return
     }
-    setSelectedCell(cell)
+    openPanel(cell)
     setSelectedCells([])
-    setOperation('summary')
+    setSelectionReady(false)
     setContextMenu(null)
+  }
+
+  function buildDraggedSelection(anchor: SelectedCell, target: SelectedCell) {
+    if (anchor.date !== target.date || anchor.courtId !== target.courtId) return [anchor]
+    const day = days.find((item) => item.date === anchor.date)
+    const court = data.courts.find((item) => item.id === anchor.courtId)
+    if (!day || !court) return [anchor]
+
+    const direction = target.slot.start >= anchor.slot.start ? 1 : -1
+    const slots = buildSlots(day.openingTime, day.closingTime)
+    const startIndex = slots.findIndex((slot) => slot.start === anchor.slot.start)
+    const targetIndex = slots.findIndex((slot) => slot.start === target.slot.start)
+    if (startIndex < 0 || targetIndex < 0) return [anchor]
+
+    const cells: SelectedCell[] = []
+    for (let index = startIndex; index >= 0 && index < slots.length; index += direction) {
+      const slot = slots[index]
+      if (getOccupationSegment(day.occupations, court.id, slot) || isPastSlot(day, slot)) break
+      cells.push({ date: day.date, courtId: court.id, courtName: court.name, slot })
+      if (cells.length === 4 || index === targetIndex) break
+    }
+    return cells.sort((first, second) => first.slot.start - second.slot.start)
+  }
+
+  function startSelectionDrag(event: ReactPointerEvent<HTMLButtonElement>, day: AgendaData, court: AgendaCourt, slot: Slot, occupation?: AgendaOccupation) {
+    if (event.pointerType !== 'mouse' || event.button !== 0 || event.ctrlKey || event.metaKey || occupation || isPastSlot(day, slot)) return
+    event.preventDefault()
+    const anchor = { date: day.date, courtId: court.id, courtName: court.name, slot }
+    selectionDragRef.current = { anchor, cells: [anchor], exceededMaximum: false }
+    selectionPointerRef.current = { x: event.clientX, y: event.clientY }
+    setSelectedCell(null)
+    setSelectedCells([anchor])
+    setSelectionReady(false)
+    setContextMenu(null)
+  }
+
+  function paintSelectionDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = selectionDragRef.current
+    if (!drag) return
+    const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-agenda-cell]')
+    if (!cell || cell.dataset.date !== drag.anchor.date || cell.dataset.courtId !== drag.anchor.courtId) return
+    const targetStart = Number(cell.dataset.slotStart)
+    if (!Number.isInteger(targetStart)) return
+    const target: SelectedCell = { ...drag.anchor, slot: { start: targetStart, end: targetStart + 60, label: minutesToTime(targetStart) } }
+    const nextCells = buildDraggedSelection(drag.anchor, target)
+    const currentKeys = drag.cells.map((item) => item.slot.start).join(',')
+    const nextKeys = nextCells.map((item) => item.slot.start).join(',')
+    selectionPointerRef.current = { x: event.clientX, y: event.clientY }
+    drag.exceededMaximum ||= Math.abs(targetStart - drag.anchor.slot.start) / 60 + 1 > 4
+    if (currentKeys === nextKeys) return
+    drag.cells = nextCells
+    setSelectedCells(nextCells)
   }
 
   function openSelectionOperation(nextOperation: 'manual' | 'maintenance') {
     if (!selectionStart) return
-    setSelectedCell({ ...selectionStart, blocks: selectionBlocks })
+    openPanel({ ...selectionStart, blocks: selectionBlocks }, nextOperation)
     setSelectedCells([])
-    setOperation(nextOperation)
+    setSelectionReady(false)
+  }
+
+  function updateManualBookingSchedule(next: { date: string; startTime: string; blocks: number }) {
+    if (!selectedCell || !isValidAgendaDate(next.date) || !/^\d{2}:\d{2}$/.test(next.startTime)) return
+
+    const start = timeToMinutes(next.startTime)
+    const blocks = Math.min(Math.max(next.blocks, 1), 4)
+    const targetDay = days.find((day) => day.date === next.date)
+    const court = data.courts.find((item) => item.id === selectedCell.courtId)
+
+    if (targetDay && court) {
+      const targetSlots = buildSlots(targetDay.openingTime, targetDay.closingTime)
+      const requestedSlots = Array.from({ length: blocks }, (_, index) => targetSlots.find((slot) => slot.start === start + index * 60))
+      const unavailable = requestedSlots.some((slot) => !slot || isPastSlot(targetDay, slot) || getOccupationSegment(targetDay.occupations, court.id, slot))
+      if (unavailable) {
+        notify.warning({ description: 'Elige un rango libre dentro del horario de atención.' })
+        return
+      }
+    }
+
+    setSelectedCells([])
+    setSelectionReady(false)
+    setSelectedCell({
+      ...selectedCell,
+      date: next.date,
+      slot: { start, end: start + 60, label: next.startTime },
+      blocks,
+      occupation: undefined,
+    })
+
+    if (!targetDay) {
+      const targetDate = isWeek ? getWeekStart(next.date) : next.date
+      startTransition(() => router.push(buildAgendaUrl(pathname, targetDate, selectedSportId, view, selectedCourt?.id)))
+    }
   }
 
   function openFirstFree(operationToOpen: Operation) {
@@ -320,8 +473,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
       for (const slot of buildSlots(day.openingTime, day.closingTime)) {
         for (const court of courtList) {
           if (!getOccupationSegment(day.occupations, court.id, slot) && !isPastSlot(day, slot)) {
-            setSelectedCell({ date: day.date, courtId: court.id, courtName: court.name, slot })
-            setOperation(operationToOpen)
+            openPanel({ date: day.date, courtId: court.id, courtName: court.name, slot }, operationToOpen)
             return
           }
         }
@@ -330,8 +482,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   }
 
   function changeView(nextView: 'day' | 'week') {
-    const nextDate = nextView === 'week' ? getWeekStart(data.date) : data.date
-    startTransition(() => router.push(buildAgendaUrl(pathname, nextDate, selectedSportId, nextView, selectedCourt?.id)))
+    startTransition(() => router.push(buildAgendaUrl(pathname, getTodayInLima(), selectedSportId, nextView, selectedCourt?.id)))
   }
 
   function isPastSlot(day: AgendaData, slot: Slot) {
@@ -379,8 +530,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
       notify.warning({ description: 'No se puede soltar ahí: revisa cancha, horario, duración o un cruce existente.' })
       return
     }
-    setSelectedCell({ date: day.date, courtId: court.id, courtName: court.name, slot, occupation: reservation })
-    setOperation('move')
+    openPanel({ date: day.date, courtId: court.id, courtName: court.name, slot, occupation: reservation }, 'move')
   }
 
   function renderCell(day: AgendaData, court: AgendaCourt, slot: Slot) {
@@ -388,7 +538,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
     // selectedCell conserva blocks al abrir el formulario; así el rango sigue
     // visible y no aparenta reducirse al primer bloque seleccionado.
     const selected = isWithinSelectedRange(selectedCell, day, court, slot)
-    const selectedByCtrl = selectedCells.some((item) => item.date === day.date && item.courtId === court.id && item.slot.start === slot.start)
+    const selectedByRange = selectedCells.some((item) => item.date === day.date && item.courtId === court.id && item.slot.start === slot.start)
     const past = !segment && isPastSlot(day, slot)
     const dragKey = `${day.date}-${court.id}-${slot.start}`
     const dropAllowed = Boolean(draggedReservation && canDropReservation(draggedReservation, day, court, slot))
@@ -400,7 +550,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
     // no inician un drag HTML5 desde un hijo de <button>. La tarjeta unida es
     // pointer-events-none para que dragover/drop resuelvan la celda real bajo
     // el cursor, aunque la tarjeta visualmente cubra las filas siguientes.
-    return <button key={dragKey} type="button" disabled={past} draggable={isDraggable} onDragStart={(event) => { if (segment?.occupation) onReservationDragStart(event, segment.occupation) }} onDragEnd={() => { setDraggedReservation(null); setDragPreview(null) }} className={`group relative min-h-16 overflow-visible border-r border-b p-1.5 text-left outline-none transition-colors duration-300 last:border-r-0 ${isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${past ? 'cursor-not-allowed bg-muted/55 text-muted-foreground' : 'hover:bg-primary/8 focus-visible:bg-primary/10'} ${selected || selectedByCtrl ? 'bg-primary/18' : 'bg-background'} ${isDragPreview ? (dragPreviewAllowed ? 'bg-primary/15' : 'bg-destructive/10') : ''}`} onDragOver={(event) => { if (!draggedReservation) return; event.preventDefault(); const durationMinutes = Math.round((new Date(draggedReservation.end).getTime() - new Date(draggedReservation.start).getTime()) / 60000); setDragPreview({ date: day.date, courtId: court.id, start: slot.start, end: slot.start + durationMinutes, allowed: dropAllowed }); event.dataTransfer.dropEffect = dropAllowed ? 'move' : 'none' }} onDrop={(event) => onReservationDrop(event, day, court, slot)} onClick={(event) => openCell(day, court, slot, event)} onContextMenu={(event) => { if (past) return; event.preventDefault(); setSelectedCells([]); setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 240), y: Math.min(event.clientY, window.innerHeight - 220), cell: { date: day.date, courtId: court.id, courtName: court.name, slot, occupation: segment?.occupation } }) }}><span className={`pointer-events-none absolute inset-1 rounded-lg border transition-colors duration-300 ${isDragPreview ? (dragPreviewAllowed ? 'border-primary' : 'border-destructive') : selected || selectedByCtrl ? 'border-primary/75 bg-primary/8' : 'border-transparent group-hover:border-primary/30'}`} />{segment?.isAnchor ? <span data-reservation-id={segment.occupation.reservationId} className={`pointer-events-none absolute z-10 inset-x-1 overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] font-bold leading-tight shadow-sm transition-colors duration-300 ${isHighlighted ? 'animate-[pulse_1.1s_ease-in-out_5] ring-4 ring-primary/50 ring-offset-2 ring-offset-background' : ''} ${segment.occupation.type === 'mantenimiento' ? 'border-secondary bg-secondary text-secondary-foreground' : reservationTone(segment.occupation.reservationStatus)}`} style={{ top: `calc(${segment.top}% + 0.375rem)`, height: `calc(${segment.durationMinutes / 15}rem - 0.75rem)` }}><span className="block truncate">{segment.occupation.type === 'mantenimiento' ? occupationLabel(segment.occupation) : reservationStatusLabel(segment.occupation.reservationStatus)}</span>{segment.durationMinutes > 60 && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">{isoToLocalTime(segment.occupation.start)} – {isoToLocalTime(segment.occupation.end)}</span>}{segment.occupation.type === 'reserva' && isHighlighted && <span className="mt-0.5 block truncate text-[10px] font-semibold">Revisar esta reserva</span>}{segment.occupation.type === 'reserva' && canMove(segment.occupation) && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">Arrastra para mover</span>}{segment.occupation.type === 'reserva' && segment.occupation.isException && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">+30 min</span>}</span> : segment ? null : past ? <span className="pointer-events-none absolute inset-0 grid place-items-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">Hora pasada</span> : <span className="pointer-events-none absolute inset-0 grid place-items-center text-sm font-bold text-primary opacity-0 transition-opacity duration-300 group-hover:opacity-100">+</span>}<span className="sr-only">{court.name}, {day.date}, {slot.label}, {past ? 'hora pasada' : occupationLabel(segment?.occupation)}</span></button>
+    return <button key={dragKey} type="button" data-agenda-cell data-date={day.date} data-court-id={court.id} data-slot-start={slot.start} aria-pressed={selected || selectedByRange} disabled={past} draggable={isDraggable} onPointerDown={(event) => startSelectionDrag(event, day, court, slot, segment?.occupation)} onDragStart={(event) => { if (segment?.occupation) onReservationDragStart(event, segment.occupation) }} onDragEnd={() => { setDraggedReservation(null); setDragPreview(null) }} className={`group relative min-h-16 overflow-visible border-r border-b p-1.5 text-left outline-none transition-colors duration-300 last:border-r-0 ${isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${past ? 'cursor-not-allowed bg-muted/55 text-muted-foreground' : 'hover:bg-primary/8 focus-visible:bg-primary/10'} ${selected || selectedByRange ? 'bg-primary/18' : 'bg-background'} ${isDragPreview ? (dragPreviewAllowed ? 'bg-primary/15' : 'bg-destructive/10') : ''}`} onDragOver={(event) => { if (!draggedReservation) return; event.preventDefault(); const durationMinutes = Math.round((new Date(draggedReservation.end).getTime() - new Date(draggedReservation.start).getTime()) / 60000); setDragPreview({ date: day.date, courtId: court.id, start: slot.start, end: slot.start + durationMinutes, allowed: dropAllowed }); event.dataTransfer.dropEffect = dropAllowed ? 'move' : 'none' }} onDrop={(event) => onReservationDrop(event, day, court, slot)} onClick={(event) => openCell(day, court, slot, event)} onContextMenu={(event) => { if (past) return; event.preventDefault(); setSelectedCells([]); setSelectionReady(false); setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 240), y: Math.min(event.clientY, window.innerHeight - 220), cell: { date: day.date, courtId: court.id, courtName: court.name, slot, occupation: segment?.occupation } }) }}><span className={`pointer-events-none absolute inset-1 rounded-lg border transition-colors duration-300 ${isDragPreview ? (dragPreviewAllowed ? 'border-primary' : 'border-destructive') : selected || selectedByRange ? 'border-primary/75 bg-primary/8' : 'border-transparent group-hover:border-primary/30'}`} />{segment?.isAnchor ? <span data-reservation-id={segment.occupation.reservationId} className={`pointer-events-none absolute z-10 inset-x-1 overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] font-bold leading-tight shadow-sm transition-colors duration-300 ${isHighlighted ? 'animate-[pulse_1.1s_ease-in-out_5] ring-4 ring-primary/50 ring-offset-2 ring-offset-background' : ''} ${segment.occupation.type === 'mantenimiento' ? 'border-secondary bg-secondary text-secondary-foreground' : reservationTone(segment.occupation.reservationStatus)}`} style={{ top: `calc(${segment.top}% + 0.375rem)`, height: `calc(${segment.durationMinutes / 15}rem - 0.75rem)` }}><span className="block truncate">{segment.occupation.type === 'mantenimiento' ? occupationLabel(segment.occupation) : reservationStatusLabel(segment.occupation.reservationStatus)}</span>{segment.durationMinutes > 60 && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">{isoToLocalTime(segment.occupation.start)} – {isoToLocalTime(segment.occupation.end)}</span>}{segment.occupation.type === 'reserva' && isHighlighted && <span className="mt-0.5 block truncate text-[10px] font-semibold">Revisar esta reserva</span>}{segment.occupation.type === 'reserva' && canMove(segment.occupation) && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">Arrastra para mover</span>}{segment.occupation.type === 'reserva' && segment.occupation.isException && <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">+30 min</span>}</span> : segment ? null : past ? <span className="pointer-events-none absolute inset-0 grid place-items-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">Hora pasada</span> : <span className="pointer-events-none absolute inset-0 grid place-items-center text-sm font-bold text-primary opacity-0 transition-opacity duration-300 group-hover:opacity-100">+</span>}<span className="sr-only">{court.name}, {day.date}, {slot.label}, {past ? 'hora pasada' : occupationLabel(segment?.occupation)}</span></button>
   }
 
   function renderDailyGrid() {
@@ -415,8 +565,8 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   function renderDialog() {
     if (!selectedCell) return null
     const court = data.courts.find((item) => item.id === selectedCell.courtId)
-    if (operation === 'manual' && court) return <><SheetHeader><SheetTitle>Registrar reserva manual</SheetTitle><SheetDescription>Reserva recibida por WhatsApp o de forma presencial.</SheetDescription></SheetHeader><ManualBookingForm key={`${selectedCell.date}-${selectedCell.courtId}-${selectedStartTime}-${selectedBlocks}`} localId={data.localId} date={selectedCell.date} court={court} startTime={selectedStartTime} initialBlocks={selectedBlocks} defaultSportId={selectedOccupation?.sportId} onCancel={() => setOperation('summary')} onSuccess={closeDialog} /></>
-    if (operation === 'maintenance' && court) return <><SheetHeader><SheetTitle>Bloquear horario</SheetTitle><SheetDescription>El bloqueo evita nuevas reservas en este rango.</SheetDescription></SheetHeader><MaintenanceForm localId={data.localId} date={selectedCell.date} court={court} startTime={selectedStartTime} endTime={selectedEndTime} onCancel={() => setOperation('summary')} onSuccess={closeDialog} /></>
+    if (operation === 'manual' && court) return <><SheetHeader><SheetTitle>Registrar reserva manual</SheetTitle><SheetDescription>Reserva recibida por WhatsApp o de forma presencial.</SheetDescription></SheetHeader><ManualBookingForm localId={data.localId} date={selectedCell.date} court={court} startTime={selectedStartTime} blocks={selectedBlocks} timeOptions={manualTimeOptions} minDate={getTodayInLima()} defaultSportId={selectedOccupation?.sportId} onScheduleChange={updateManualBookingSchedule} onCancel={closeDialog} onSuccess={closeDialog} /></>
+    if (operation === 'maintenance' && court) return <><SheetHeader><SheetTitle>Bloquear horario</SheetTitle><SheetDescription>El bloqueo evita nuevas reservas en este rango.</SheetDescription></SheetHeader><MaintenanceForm localId={data.localId} date={selectedCell.date} court={court} startTime={selectedStartTime} endTime={selectedEndTime} onCancel={closeDialog} onSuccess={closeDialog} /></>
     if (operation === 'encajada' && selectedOccupation) return <><SheetHeader><SheetTitle>Registrar reserva encajada</SheetTitle><SheetDescription>Usa los 30 minutos restantes y la siguiente hora completa.</SheetDescription></SheetHeader><EncasedBookingForm localId={data.localId} date={selectedCell.date} startTime={encasedStartTime} sportOptions={court?.sports ?? data.sports} defaultSportId={selectedOccupation.sportId} onCancel={() => setOperation('summary')} onSuccess={closeDialog} /></>
     if (operation === 'extend' && selectedOccupation?.reservationId) return <><SheetHeader><SheetTitle>Autorizar extensión</SheetTitle><SheetDescription>{selectedCell.courtName} · {selectedCell.date}</SheetDescription></SheetHeader><ExtendReservationForm reservationId={selectedOccupation.reservationId} onCancel={() => setOperation('summary')} onSuccess={closeDialog} /></>
     if (operation === 'confirm' && selectedOccupation?.reservationId) return <><SheetHeader><SheetTitle>Confirmar reserva</SheetTitle><SheetDescription>Verifica el comprobante antes de aprobar el pago.</SheetDescription></SheetHeader><ConfirmReservationForm reservationId={selectedOccupation.reservationId} onCancel={() => setOperation('summary')} onSuccess={closeDialog} /></>
@@ -460,12 +610,12 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
     </>
   }
 
-  return <div className="space-y-6">
-    <div className="flex flex-col gap-4 rounded-2xl border border-border/80 bg-card p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Button type="button" variant="outline" size="icon-sm" aria-label="Periodo anterior" onClick={() => navigate(shiftAgendaDate(data.date, isWeek ? -7 : -1))} disabled={isPending}><HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} /></Button><Button type="button" variant="outline" className="min-w-36 justify-start gap-2" onClick={() => navigate(data.date)} disabled={isPending}><HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} /><span className="capitalize">{isWeek ? 'Semana del ' + formatAgendaDate(days[0].date) : data.dayLabel}</span></Button><Button type="button" variant="outline" size="icon-sm" aria-label="Periodo siguiente" onClick={() => navigate(shiftAgendaDate(data.date, isWeek ? 7 : 1))} disabled={isPending}><HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} /></Button><Button type="button" variant="ghost" size="sm" onClick={() => navigate(getTodayInLima())} disabled={isPending}>Hoy</Button></div><div className="flex flex-wrap items-center gap-2"><Select value={selectedSportId || 'all'} onValueChange={(value) => startTransition(() => router.push(buildAgendaUrl(pathname, data.date, value === 'all' ? '' : value, view, selectedCourt?.id)))}><SelectTrigger aria-label="Filtrar por deporte" size="sm" className="min-w-44"><HugeiconsIcon icon={FilterHorizontalIcon} strokeWidth={2} className="text-primary" /><SelectValue /></SelectTrigger><SelectContent position="popper" align="start"><SelectItem value="all">Todos los deportes</SelectItem>{data.sports.map((sport) => <SelectItem key={sport.id} value={sport.id}>{sport.name}</SelectItem>)}</SelectContent></Select>{isWeek && <Select value={selectedCourt?.id ?? ''} onValueChange={(value) => startTransition(() => router.push(buildAgendaUrl(pathname, data.date, selectedSportId, 'week', value)))}><SelectTrigger aria-label="Cancha semanal" size="sm" className="min-w-40"><SelectValue placeholder="Elige una cancha" /></SelectTrigger><SelectContent position="popper" align="start">{data.courts.map((court) => <SelectItem key={court.id} value={court.id}>{court.name}</SelectItem>)}</SelectContent></Select>}<div className="flex rounded-xl border border-border bg-muted/35 p-0.5"><Button type="button" size="sm" variant={isWeek ? 'ghost' : 'default'} className="h-8 rounded-lg px-3" onClick={() => changeView('day')} aria-pressed={!isWeek}>Día</Button><Button type="button" size="sm" variant={isWeek ? 'default' : 'ghost'} className="h-8 rounded-lg px-3" onClick={() => changeView('week')} aria-pressed={isWeek}>Semana</Button></div></div></div>
+  return <div className="space-y-6" onPointerMove={paintSelectionDrag}>
+    <div className="flex flex-col gap-4 rounded-2xl border border-border/80 bg-card p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Button type="button" variant="outline" size="icon-sm" aria-label="Periodo anterior" onClick={() => navigate(shiftAgendaDate(data.date, isWeek ? -7 : -1))} disabled={isPending}><HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} /></Button><Button type="button" variant="outline" className="min-w-36 justify-start gap-2" onClick={() => navigate(data.date)} disabled={isPending}><HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} /><span className="capitalize">{periodLabel}</span></Button><Button type="button" variant="outline" size="icon-sm" aria-label="Periodo siguiente" onClick={() => navigate(shiftAgendaDate(data.date, isWeek ? 7 : 1))} disabled={isPending}><HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} /></Button><Button type="button" variant="ghost" size="sm" onClick={() => navigate(getTodayInLima())} disabled={isPending}>Hoy</Button></div><div className="flex flex-wrap items-center gap-2"><Select value={selectedSportId || 'all'} onValueChange={(value) => startTransition(() => router.push(buildAgendaUrl(pathname, data.date, value === 'all' ? '' : value, view, selectedCourt?.id)))}><SelectTrigger aria-label="Filtrar por deporte" size="sm" className="min-w-44"><HugeiconsIcon icon={FilterHorizontalIcon} strokeWidth={2} className="text-primary" /><SelectValue /></SelectTrigger><SelectContent position="popper" align="start"><SelectItem value="all">Todos los deportes</SelectItem>{data.sports.map((sport) => <SelectItem key={sport.id} value={sport.id}>{sport.name}</SelectItem>)}</SelectContent></Select>{isWeek && <Select value={selectedCourt?.id ?? ''} onValueChange={(value) => startTransition(() => router.push(buildAgendaUrl(pathname, data.date, selectedSportId, 'week', value)))}><SelectTrigger aria-label="Cancha semanal" size="sm" className="min-w-40"><SelectValue placeholder="Elige una cancha" /></SelectTrigger><SelectContent position="popper" align="start">{data.courts.map((court) => <SelectItem key={court.id} value={court.id}>{court.name}</SelectItem>)}</SelectContent></Select>}<div className="flex rounded-xl border border-border bg-muted/35 p-0.5"><Button type="button" size="sm" variant={isWeek ? 'ghost' : 'default'} className="h-8 rounded-lg px-3" onClick={() => changeView('day')} aria-pressed={!isWeek}>Día</Button><Button type="button" size="sm" variant={isWeek ? 'default' : 'ghost'} className="h-8 rounded-lg px-3" onClick={() => changeView('week')} aria-pressed={isWeek}>Semana</Button></div></div></div>
     <div className="flex flex-wrap justify-end gap-3 text-xs font-semibold text-muted-foreground"><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-warning" /> Por validar</span><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" /> Confirmada</span><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-secondary" /> Mantenimiento</span><span className="flex items-center gap-1.5"><span className="size-2 rounded-full border border-border bg-card" /> Libre</span><span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-muted" /> No disponible</span></div>
     <Card className="overflow-hidden p-0 shadow-sm"><div className="flex items-center justify-between border-b bg-muted/20 px-5 py-4"><div><p className="text-base font-extrabold tracking-[-.02em]">{data.localName}</p><p className="mt-0.5 text-xs text-muted-foreground">{isWeek && selectedCourt ? `${selectedCourt.name} · ` : ''}{data.courts.length} canchas configuradas · {occupiedCourts} con actividad</p>{!isWeek && data.openingTime && data.closingTime && <p className="mt-1 text-[11px] font-semibold text-muted-foreground">Atención: {data.openingTime.slice(0, 5)}–{data.closingTime.slice(0, 5)} · Fuera de ese rango y las horas pasadas no se pueden reservar.</p>}</div><Button type="button" size="sm" variant="outline" onClick={() => openFirstFree('manual')} disabled={!data.courts.length}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Nueva reserva</Button></div>{!data.courts.length ? <div className="px-6 py-16 text-center"><p className="font-bold">No hay canchas activas</p><p className="mt-2 text-sm text-muted-foreground">Activa o configura una cancha para verla en la agenda.</p></div> : isWeek ? renderWeeklyGrid() : !dailySlots.length ? <div className="px-6 py-16 text-center"><p className="font-bold">No hay horario configurado para este día</p><p className="mt-2 text-sm text-muted-foreground">Configura el horario de atención del local para habilitar sus bloques.</p></div> : renderDailyGrid()}</Card>
-    {contextMenu && <div className="fixed z-[60] min-w-56 rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-floating" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}><p className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[.12em] text-muted-foreground">{contextMenu.cell.courtName} · {contextMenu.cell.slot.label}</p>{contextMenu.cell.occupation && <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { setSelectedCell(contextMenu.cell); setOperation('summary'); setContextMenu(null) }}><HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} className="size-4 text-muted-foreground" /> Ver resumen</button>}{!contextMenu.cell.occupation && <><button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { setSelectedCell(contextMenu.cell); setOperation('manual'); setContextMenu(null) }}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4 text-muted-foreground" /> Registrar reserva</button><button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { setSelectedCell(contextMenu.cell); setOperation('maintenance'); setContextMenu(null) }}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4 text-muted-foreground" /> Bloquear horario</button></>}{contextMenu.cell.occupation?.type === 'reserva' && contextMenu.cell.occupation.reservationId && contextMenu.cell.occupation.reservationStatus === 'pendiente_validacion' && <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold text-warning-foreground transition-colors hover:bg-warning/10" onClick={() => { setSelectedCell(contextMenu.cell); setOperation('summary'); setContextMenu(null) }}><HugeiconsIcon icon={CheckmarkCircle01Icon} strokeWidth={2} className="size-4" /> Revisar comprobante</button>}{contextMenu.cell.occupation?.type === 'reserva' && contextMenu.cell.occupation.reservationId && ['confirmada', 'completada'].includes(contextMenu.cell.occupation.reservationStatus ?? '') && <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { setSelectedCell(contextMenu.cell); setOperation('extend'); setContextMenu(null) }}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4 text-muted-foreground" /> Autorizar +30 min</button>}{contextMenu.cell.occupation?.type === 'reserva' && contextMenu.cell.occupation.isException && contextMenu.cell.occupation.reservationId && <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { setSelectedCell(contextMenu.cell); setOperation('encajada'); setContextMenu(null) }}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4" /> Registrar encajada</button>}</div>}
-    <Popover open={selectedCells.length > 0} onOpenChange={(open) => { if (!open) setSelectedCells([]) }}>
+    {contextMenu && <div className="fixed z-[60] min-w-56 rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-floating" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}><p className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[.12em] text-muted-foreground">{contextMenu.cell.courtName} · {contextMenu.cell.slot.label}</p>{contextMenu.cell.occupation && <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { openPanel(contextMenu.cell); setContextMenu(null) }}><HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} className="size-4 text-muted-foreground" /> Ver resumen</button>}{!contextMenu.cell.occupation && <><button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { openPanel(contextMenu.cell, 'manual'); setContextMenu(null) }}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4 text-muted-foreground" /> Registrar reserva</button><button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { openPanel(contextMenu.cell, 'maintenance'); setContextMenu(null) }}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4 text-muted-foreground" /> Bloquear horario</button></>}{contextMenu.cell.occupation?.type === 'reserva' && contextMenu.cell.occupation.reservationId && contextMenu.cell.occupation.reservationStatus === 'pendiente_validacion' && <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold text-warning-foreground transition-colors hover:bg-warning/10" onClick={() => { openPanel(contextMenu.cell); setContextMenu(null) }}><HugeiconsIcon icon={CheckmarkCircle01Icon} strokeWidth={2} className="size-4" /> Revisar comprobante</button>}{contextMenu.cell.occupation?.type === 'reserva' && contextMenu.cell.occupation.reservationId && ['confirmada', 'completada'].includes(contextMenu.cell.occupation.reservationStatus ?? '') && <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { openPanel(contextMenu.cell, 'extend'); setContextMenu(null) }}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4 text-muted-foreground" /> Autorizar +30 min</button>}{contextMenu.cell.occupation?.type === 'reserva' && contextMenu.cell.occupation.isException && contextMenu.cell.occupation.reservationId && <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { openPanel(contextMenu.cell, 'encajada'); setContextMenu(null) }}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4" /> Registrar encajada</button>}</div>}
+    <Popover open={selectionReady && selectedCells.length > 0} onOpenChange={(open) => { if (!open) { setSelectedCells([]); setSelectionReady(false) } }}>
       <PopoverAnchor asChild><span aria-hidden="true" className="fixed z-40 size-px" style={{ left: selectionPopoverPosition.x, top: selectionPopoverPosition.y }} /></PopoverAnchor>
       <PopoverContent align="start" side="bottom" className="w-72 space-y-3 p-3" onPointerDownOutside={(event) => {
         const pointerEvent = event.detail.originalEvent as PointerEvent
@@ -473,12 +623,44 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
       }}>
         <div><PopoverTitle className="text-sm font-extrabold">{selectionBlocks === 1 ? 'Bloque disponible' : `${selectionBlocks} bloques seleccionados`}</PopoverTitle><PopoverDescription className="mt-1 text-xs">{selectionStart ? `${selectionStart.courtName} · ${selectionStart.date} · ${selectionStart.slot.label} – ${selectionEndTime}` : ''}</PopoverDescription></div>
         <div className="grid gap-2"><Button type="button" size="sm" className="w-full justify-start" onClick={() => openSelectionOperation('manual')}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Registrar reserva</Button><Button type="button" size="sm" variant="outline" className="w-full justify-start" onClick={() => openSelectionOperation('maintenance')}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} /> Bloquear horario</Button></div>
-        <p className="text-[11px] text-muted-foreground">Mantén Ctrl y haz clic en bloques contiguos para seleccionar varias horas.</p>
+        <p className="text-[11px] text-muted-foreground">Arrastra sobre bloques contiguos o mantén Ctrl para seleccionarlos uno por uno.</p>
       </PopoverContent>
     </Popover>
     <Sheet modal={false} open={Boolean(selectedCell)} onOpenChange={(open) => { if (!open) closeDialog() }}>
-      <SheetContent side="right" floating showOverlay={false} className="overflow-y-auto border-border bg-card p-0" onInteractOutside={(event) => { if (lightboxOpen || openingLightbox.current) event.preventDefault() }} onFocusOutside={(event) => { if (lightboxOpen || openingLightbox.current) event.preventDefault() }}>
-        <div className="flex flex-col gap-5 p-5 sm:p-6 [&_[data-slot=sheet-header]]:p-0 [&_[data-slot=sheet-header]]:pr-8">{renderDialog()}</div>
+      <SheetContent
+        side="right"
+        floating
+        showOverlay={false}
+        showCloseButton={false}
+        className={cn(
+          'border-border bg-card p-0 transition-[width,max-height,transform] duration-300',
+          panelMinimized
+            ? 'top-auto! right-4! bottom-4! max-h-none! w-[min(22rem,calc(100vw-2rem))]! sm:right-6! sm:bottom-6! sm:w-[22rem]!'
+            : 'overflow-y-auto',
+        )}
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+        onFocusOutside={(event) => { if (lightboxOpen || openingLightbox.current) event.preventDefault() }}
+      >
+        {selectedCell && <>
+          <div className={cn('items-center gap-3 p-3', panelMinimized ? 'flex' : 'hidden')}>
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} className="size-4" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-black">{operationTitle(operation)}</p>
+              <p className="mt-0.5 truncate text-[10px] font-semibold text-muted-foreground">{selectedCell.courtName} · {selectedStartTime}–{selectedEndTime}</p>
+            </div>
+            <Button type="button" size="sm" onClick={() => setPanelMinimized(false)}><HugeiconsIcon icon={Maximize02Icon} strokeWidth={2} />Continuar</Button>
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Cerrar panel" onClick={closeDialog}><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} /></Button>
+          </div>
+
+          <div className={cn('relative flex flex-col gap-5 p-5 sm:p-6 [&_[data-slot=sheet-header]]:p-0 [&_[data-slot=sheet-header]]:pr-20', panelMinimized && 'hidden')}>
+            <div className="absolute right-4 top-4 flex items-center gap-1">
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Minimizar panel" title="Minimizar" onClick={() => setPanelMinimized(true)}><HugeiconsIcon icon={Minimize02Icon} strokeWidth={2} /></Button>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Cerrar panel" title="Cerrar" onClick={closeDialog}><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} /></Button>
+            </div>
+            {renderDialog()}
+          </div>
+        </>}
       </SheetContent>
     </Sheet>
     {selectedOccupation?.proofUrl && isImageProof(selectedOccupation.proofPath) && <Dialog open={lightboxOpen} onOpenChange={onProofLightboxChange}>

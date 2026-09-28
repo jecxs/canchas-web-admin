@@ -1029,6 +1029,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      obtener_minimo_adelanto_global: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       aprobar_solicitud_local: {
         Args: { p_local_id: string }
         Returns: Database["public"]["Enums"]["estado_local"]

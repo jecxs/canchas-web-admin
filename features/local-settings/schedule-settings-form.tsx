@@ -29,6 +29,7 @@ const hourSlots = [
 const hours = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, '0')}:00`)
 type DayRange = [number, number]
 type DragState = { day: number; start: number } | null
+type OpenDays = Record<number, boolean>
 
 function hourFromTime(value: string | undefined, fallback: number) {
   const hour = Number(value?.slice(0, 2))
@@ -50,8 +51,19 @@ function initialRanges(schedules: ScheduleRow[]) {
   }, {})
 }
 
+function initialOpenDays(schedules: ScheduleRow[]): OpenDays {
+  return days.reduce<OpenDays>((openDays, _, day) => {
+    openDays[day] = schedules.some((row) => row.dia_semana === day)
+    return openDays
+  }, {})
+}
+
+function countOpenDays(openDays: OpenDays) {
+  return Object.values(openDays).filter(Boolean).length
+}
+
 export function ScheduleSettingsForm({ localId, schedules }: { localId: string; schedules: ScheduleRow[] }) {
-  const [openDays, setOpenDays] = useState<Set<number>>(() => new Set(schedules.map((row) => row.dia_semana)))
+  const [openDays, setOpenDays] = useState<OpenDays>(() => initialOpenDays(schedules))
   const [activeDay, setActiveDay] = useState(() => schedules[0]?.dia_semana ?? 1)
   const [ranges, setRanges] = useState<Record<number, DayRange>>(() => initialRanges(schedules))
   const [dragging, setDragging] = useState<DragState>(null)
@@ -59,17 +71,12 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
   useSettingsFormFeedback(state)
 
   const activeRange = ranges[activeDay] ?? [7, 23]
-  const activeIsOpen = openDays.has(activeDay)
+  const activeIsOpen = openDays[activeDay] ?? false
   const activeDayLabel = days[activeDay]?.label ?? 'Día'
 
-  function toggle(day: number) {
+  function setDayOpen(day: number, isOpen: boolean) {
     setActiveDay(day)
-    setOpenDays((value) => {
-      const next = new Set(value)
-      if (next.has(day)) next.delete(day)
-      else next.add(day)
-      return next
-    })
+    setOpenDays((current) => ({ ...current, [day]: isOpen }))
   }
 
   function updateOpening(value: string) {
@@ -100,7 +107,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
     const opening = Math.min(dragging.start, hour)
     const closing = Math.max(dragging.start, hour) + 1
     setRanges((current) => ({ ...current, [day]: [opening, closing] }))
-    setOpenDays((value) => new Set(value).add(day))
+    setOpenDays((current) => ({ ...current, [day]: true }))
   }
 
   return (
@@ -116,7 +123,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
             const range = ranges[day]
             return (
               <span key={day}>
-                {openDays.has(day) ? <input type="hidden" name="openDay" value={day} /> : null}
+                {openDays[day] ? <input type="hidden" name="openDay" value={day} /> : null}
                 <input type="hidden" name={`opening_${day}`} value={formatHour(range[0])} />
                 <input type="hidden" name={`closing_${day}`} value={formatHour(range[1])} />
               </span>
@@ -130,7 +137,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                 <p className="mt-0.5 text-xs text-muted-foreground">Haz clic en un día para editarlo. En escritorio, arrastra sobre sus horas para dibujar el rango.</p>
               </div>
               <span className="rounded-full bg-[#e8f4c8] px-3 py-1 text-xs font-bold text-[#35520d]">
-                {openDays.size} {openDays.size === 1 ? 'día abierto' : 'días abiertos'}
+                {countOpenDays(openDays)} {countOpenDays(openDays) === 1 ? 'día abierto' : 'días abiertos'}
               </span>
             </div>
 
@@ -162,7 +169,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
 
                 <div className="space-y-1.5">
                   {days.map((day, dayIndex) => {
-                    const isOpen = openDays.has(dayIndex)
+                    const isOpen = openDays[dayIndex] ?? false
                     const isActive = activeDay === dayIndex
                     const [opening, closing] = ranges[dayIndex]
 
@@ -178,13 +185,19 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                           <button type="button" onClick={() => setActiveDay(dayIndex)} className="min-w-0 flex-1 rounded-md text-left text-xs font-extrabold outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             {day.short}
                           </button>
-                          <label className="shrink-0 cursor-pointer">
-                            <span className="sr-only">{isOpen ? `Cerrar ${day.label}` : `Abrir ${day.label}`}</span>
-                            <input type="checkbox" checked={isOpen} onChange={() => toggle(dayIndex)} className="peer sr-only" />
-                            <span className="block h-4 w-7 rounded-full bg-muted-foreground/25 p-0.5 transition-colors peer-checked:bg-[#86b72b] peer-checked:[&>span]:translate-x-3 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
-                              <span className="block size-3 rounded-full bg-white shadow-sm ring-1 ring-black/10 transition-transform" />
-                            </span>
-                          </label>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={isOpen}
+                            aria-label={isOpen ? `Cerrar ${day.label}` : `Abrir ${day.label}`}
+                            onClick={() => setDayOpen(dayIndex, !isOpen)}
+                            className={cn(
+                              'block h-4 w-7 shrink-0 rounded-full bg-muted-foreground/25 p-0.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                              isOpen && 'bg-[#86b72b]',
+                            )}
+                          >
+                            <span className={cn('block size-3 rounded-full bg-white shadow-sm ring-1 ring-black/10 transition-transform', isOpen && 'translate-x-3')} />
+                          </button>
                         </div>
 
                         {hourSlots.map((hour) => {
@@ -231,7 +244,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                   <p className="font-black">{activeDayLabel}</p>
                 </div>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => toggle(activeDay)}>
+              <Button type="button" variant="outline" size="sm" onClick={() => setDayOpen(activeDay, !activeIsOpen)}>
                 {activeIsOpen ? 'Marcar cerrado' : 'Abrir este día'}
               </Button>
             </div>
@@ -264,6 +277,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
           </div>
 
           <FieldError errors={state.fieldErrors?.schedules?.map((message) => ({ message }))} />
+          <p className="text-xs text-muted-foreground">Los cambios del tablero se aplican al guardar los horarios.</p>
           <Button type="submit" disabled={pending}>{pending && <Spinner />}Guardar horarios</Button>
         </form>
       </CardContent>

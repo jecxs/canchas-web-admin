@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { notify } from '@/lib/notifications/notify'
-import { ArrowDown01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, FootballIcon, Layers01Icon, RulerIcon } from '@hugeicons/core-free-icons'
+import { ArrowDown01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Edit02Icon, FootballIcon, Layers01Icon, RulerIcon } from '@hugeicons/core-free-icons'
 import { minutesToTime, timeToMinutes } from './date-utils'
 import {
   confirmReservationAction,
@@ -56,8 +56,8 @@ const inputClass = 'h-10 rounded-xl bg-background'
 
 type SelectOption = { value: string; label: string }
 
-function FormSelect({ name, options, value, defaultValue, onValueChange, placeholder }: { name: string; options: SelectOption[]; value?: string; defaultValue?: string; onValueChange?: (value: string) => void; placeholder?: string }) {
-  return <Select name={name} value={value} defaultValue={defaultValue} onValueChange={onValueChange}><SelectTrigger className="w-full"><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent position="popper" align="start">{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
+function FormSelect({ name, options, value, defaultValue, onValueChange, placeholder, triggerClassName }: { name?: string; options: SelectOption[]; value?: string; defaultValue?: string; onValueChange?: (value: string) => void; placeholder?: string; triggerClassName?: string }) {
+  return <Select name={name} value={value} defaultValue={defaultValue} onValueChange={onValueChange}><SelectTrigger className={`w-full ${triggerClassName ?? ''}`}><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent position="popper" align="start">{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
 }
 
 function formatReservationDate(date: string) {
@@ -68,13 +68,13 @@ function formatReservationDate(date: string) {
   }).format(new Date(`${date}T12:00:00Z`))
 }
 
-function ReservationSlotSummary({ court, date, startTime, endTime }: { court: AgendaCourt; date: string; startTime: string; endTime: string }) {
+function ReservationSlotSummary({ court, date, startTime, endTime, editingSchedule = false, onToggleScheduleEditing, minDate, timeOptions, onScheduleChange, dateError, timeError }: { court: AgendaCourt; date: string; startTime: string; endTime: string; editingSchedule?: boolean; onToggleScheduleEditing?: () => void; minDate?: string; timeOptions?: SelectOption[]; onScheduleChange?: (selection: { date: string; startTime: string }) => void; dateError?: string; timeError?: string }) {
   const dimensions = court.lengthMeters && court.widthMeters ? `${court.lengthMeters} × ${court.widthMeters} m` : null
 
   return <div className="space-y-2.5">
     <div className="grid gap-2 sm:grid-cols-2">
-      <div className="rounded-xl border bg-muted/45 px-3 py-2.5"><div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.1em] text-muted-foreground"><HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} className="size-3.5 text-primary" /> Fecha</div><p className="mt-1 capitalize text-sm font-extrabold">{formatReservationDate(date)}</p></div>
-      <div className="rounded-xl bg-secondary px-3 py-2.5 text-secondary-foreground"><div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.1em] text-secondary-foreground/65"><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-3.5 text-primary" /> Horario</div><p className="mt-1 text-sm font-extrabold tabular-nums">{startTime} <span className="text-primary">—</span> {endTime}</p></div>
+      <div className="rounded-xl border bg-muted/45 px-3 py-2.5"><div className="flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-[.1em] text-muted-foreground"><span className="flex items-center gap-2"><HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} className="size-3.5 text-primary" /> Fecha</span>{onToggleScheduleEditing && <Button type="button" variant="ghost" size="icon-sm" className="-mr-1 -mt-1 size-7" aria-label={editingSchedule ? 'Terminar edición de fecha y horario' : 'Editar fecha y horario'} title={editingSchedule ? 'Listo' : 'Editar fecha y horario'} onClick={onToggleScheduleEditing}><HugeiconsIcon icon={editingSchedule ? CheckmarkCircle01Icon : Edit02Icon} strokeWidth={2} className="size-3.5" /></Button>}</div>{editingSchedule && onScheduleChange && minDate ? <><Input type="date" value={date} min={minDate} onChange={(event) => onScheduleChange({ date: event.target.value, startTime })} className="mt-1 h-8 bg-background px-2 text-xs" /><FieldError state={{ success: false, fieldErrors: { date: dateError ? [dateError] : undefined } }} field="date" /></> : <p className="mt-1 capitalize text-sm font-extrabold">{formatReservationDate(date)}</p>}</div>
+      <div className="rounded-xl bg-secondary px-3 py-2.5 text-secondary-foreground"><div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.1em] text-secondary-foreground/65"><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-3.5 text-primary" /> Horario</div>{editingSchedule && onScheduleChange && timeOptions ? <><FormSelect value={startTime} onValueChange={(value) => onScheduleChange({ date, startTime: value })} options={timeOptions} triggerClassName="mt-1 h-8 border-secondary-foreground/20 bg-secondary-foreground/10 px-2 text-xs text-secondary-foreground hover:bg-secondary-foreground/15" /><FieldError state={{ success: false, fieldErrors: { time: timeError ? [timeError] : undefined } }} field="time" /></> : <p className="mt-1 text-sm font-extrabold tabular-nums">{startTime} <span className="text-primary">—</span> {endTime}</p>}</div>
     </div>
     <details className="group rounded-xl border bg-background">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5"><span className="flex min-w-0 items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground"><HugeiconsIcon icon={Building03Icon} strokeWidth={2} className="size-4" /></span><span className="min-w-0"><span className="block text-[10px] font-extrabold uppercase tracking-[.1em] text-muted-foreground">Cancha</span><span className="block truncate text-sm font-extrabold">{court.name}</span></span></span><span className="grid size-7 shrink-0 place-items-center rounded-lg border text-muted-foreground transition-transform duration-200 group-open:rotate-180" aria-label="Mostrar información de la cancha"><HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="size-4" /></span></summary>
@@ -93,8 +93,11 @@ export function ManualBookingForm({
   date,
   court,
   startTime,
-  initialBlocks = 1,
+  blocks,
+  timeOptions,
+  minDate,
   defaultSportId,
+  onScheduleChange,
   onCancel,
   onSuccess,
 }: {
@@ -102,22 +105,25 @@ export function ManualBookingForm({
   date: string
   court: AgendaCourt
   startTime: string
-  initialBlocks?: number
+  blocks: number
+  timeOptions: SelectOption[]
+  minDate: string
   defaultSportId?: string
+  onScheduleChange: (selection: { date: string; startTime: string; blocks: number }) => void
   onCancel: () => void
   onSuccess: () => void
 }) {
   const [state, action, pending] = useActionState(createManualBookingAction, initialAgendaActionState)
-  const [blocks, setBlocks] = useState(initialBlocks)
+  const [editingSchedule, setEditingSchedule] = useState(false)
   useAgendaFeedback(state, onSuccess)
   const endTime = minutesToTime(timeToMinutes(startTime) + blocks * 60)
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="localId" value={localId} /><input type="hidden" name="courtId" value={court.id} /><input type="hidden" name="date" value={date} /><input type="hidden" name="time" value={startTime} />
-      <ReservationSlotSummary court={court} date={date} startTime={startTime} endTime={endTime} />
+      <ReservationSlotSummary court={court} date={date} startTime={startTime} endTime={endTime} editingSchedule={editingSchedule} onToggleScheduleEditing={() => setEditingSchedule((value) => !value)} minDate={minDate} timeOptions={timeOptions} onScheduleChange={(selection) => onScheduleChange({ ...selection, blocks })} dateError={state.fieldErrors?.date?.[0]} timeError={state.fieldErrors?.time?.[0]} />
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" defaultValue={defaultSportId ?? court.sports[0]?.id ?? ''} options={court.sports.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
-        <label className="space-y-1.5 text-sm font-semibold">Duración<FormSelect name="blocks" value={String(blocks)} onValueChange={(value) => setBlocks(Number(value))} options={[{ value: '1', label: '1 hora' }, { value: '2', label: '2 horas' }, { value: '3', label: '3 horas' }, { value: '4', label: '4 horas' }]} /><FieldError state={state} field="blocks" /></label>
+        <label className="space-y-1.5 text-sm font-semibold">Duración<FormSelect name="blocks" value={String(blocks)} onValueChange={(value) => onScheduleChange({ date, startTime, blocks: Number(value) })} options={[{ value: '1', label: '1 hora' }, { value: '2', label: '2 horas' }, { value: '3', label: '3 horas' }, { value: '4', label: '4 horas' }]} /><FieldError state={state} field="blocks" /></label>
       </div>
       <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-sm font-semibold">Nombre del cliente<Input name="customerName" placeholder="Ej. Carlos Quispe" className={inputClass} autoComplete="off" /><FieldError state={state} field="customerName" /></label><label className="space-y-1.5 text-sm font-semibold">Teléfono<Input name="customerPhone" placeholder="999 999 999" className={inputClass} inputMode="tel" autoComplete="off" /><FieldError state={state} field="customerPhone" /></label></div>
       <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-sm font-semibold">Canal<FormSelect name="channel" defaultValue="whatsapp" options={[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }]} /></label><label className="space-y-1.5 text-sm font-semibold">Estado<FormSelect name="status" defaultValue="confirmada" options={[{ value: 'confirmada', label: 'Confirmada' }, { value: 'pendiente_pago', label: 'Pendiente de pago' }]} /></label></div>
