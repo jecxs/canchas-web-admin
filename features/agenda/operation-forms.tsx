@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { notify } from '@/lib/notifications/notify'
-import { ClientPicker } from '@/features/clients/client-picker'
+import { ClientPicker, type PickedClient } from '@/features/clients/client-picker'
 import { createClient } from '@/utils/supabase/client'
 import { ArrowDown01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Edit02Icon, FootballIcon, Layers01Icon, RulerIcon } from '@hugeicons/core-free-icons'
 import { localDateTimeToIso, minutesToTime, timeToMinutes } from './date-utils'
@@ -167,6 +167,7 @@ export function ManualBookingForm({
   timeOptions,
   minDate,
   defaultSportId,
+  initialClient,
   onScheduleChange,
   onCancel,
   onSuccess,
@@ -179,6 +180,7 @@ export function ManualBookingForm({
   timeOptions: SelectOption[]
   minDate: string
   defaultSportId?: string
+  initialClient?: PickedClient | null
   onScheduleChange: (selection: { date: string; startTime: string; blocks: number }) => void
   onCancel: () => void
   onSuccess: () => void
@@ -197,7 +199,7 @@ export function ManualBookingForm({
         <label className="space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={court.sports.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
         <label className="space-y-1.5 text-sm font-semibold">Duración<FormSelect name="blocks" value={String(blocks)} onValueChange={(value) => onScheduleChange({ date, startTime, blocks: Number(value) })} options={[{ value: '1', label: '1 hora' }, { value: '2', label: '2 horas' }, { value: '3', label: '3 horas' }, { value: '4', label: '4 horas' }]} /><FieldError state={state} field="blocks" /></label>
       </div>
-      <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} />
+      <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} initial={initialClient} />
       <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-${blocks}`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={blocks * 60} state={state} />
       <label className="block space-y-1.5 text-sm font-semibold">Canal<FormSelect name="channel" defaultValue="whatsapp" options={[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }]} /></label>
       <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-5 text-foreground">Al guardar, la reserva quedará <strong>confirmada</strong> y el adelanto se registrará en su historial de cobros.</p>

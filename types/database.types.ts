@@ -1047,6 +1047,14 @@ export type Database = {
           telefono: string
         }[]
       }
+      buscar_perfil_por_telefono_dueno: {
+        Args: { p_telefono: string }
+        Returns: {
+          nombre_completo: string
+          perfil_id: string
+          telefono: string
+        }[]
+      }
       buscar_locales_publicos: {
         Args: {
           p_busqueda?: string
