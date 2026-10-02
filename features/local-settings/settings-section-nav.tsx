@@ -14,7 +14,7 @@ const sections = [
 
 type SectionId = (typeof sections)[number]['id']
 
-export function SettingsSectionNav() {
+export function SettingsSectionNav({ courtsHref = '/panel/canchas' }: { courtsHref?: string } = {}) {
   const [activeSection, setActiveSection] = useState<SectionId>('datos-generales')
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export function SettingsSectionNav() {
         )
       })}
       <Link
-        href="/panel/canchas"
+        href={courtsHref}
         className="shrink-0 rounded-xl bg-primary/14 px-3 py-2.5 text-sm font-bold transition-colors hover:bg-primary/22 lg:mt-1 lg:block"
       >
         Canchas y tarifas →

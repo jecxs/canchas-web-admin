@@ -5,8 +5,8 @@ import { Clock01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GuardActions } from '@/components/dashboard/edit-guard'
 import { FieldError } from '@/components/ui/field'
-import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { saveScheduleSettingsAction } from './actions'
 import { useSettingsFormFeedback } from './form-feedback'
@@ -278,7 +278,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
 
           <FieldError errors={state.fieldErrors?.schedules?.map((message) => ({ message }))} />
           <p className="text-xs text-muted-foreground">Los cambios del tablero se aplican al guardar los horarios.</p>
-          <Button type="submit" disabled={pending}>{pending && <Spinner />}Guardar horarios</Button>
+          <GuardActions pending={pending} submitLabel="Guardar horarios" />
         </form>
       </CardContent>
     </Card>

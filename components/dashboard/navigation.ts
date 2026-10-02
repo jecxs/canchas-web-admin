@@ -70,3 +70,24 @@ export function getDashboardPageLabel(pathname: string, role: DashboardRole) {
 
   return 'Grassly'
 }
+
+const detailBackLabels: Record<string, string> = {
+  locales: 'Volver a la ficha del local',
+  propietarios: 'Volver a la ficha del propietario',
+  solicitudes: 'Volver a la solicitud',
+}
+
+// Destino de "atrás" para páginas internas (detalle, configuración). En las
+// páginas de primer nivel devuelve null y el header muestra el breadcrumb.
+export function getDashboardBackTarget(pathname: string, role: DashboardRole) {
+  const segments = pathname.split('/').filter(Boolean)
+  if (segments.length <= 2) return null
+
+  const parent = `/${segments.slice(0, -1).join('/')}`
+  const parentNavItem = dashboardNavigation[role].find((item) => item.href === parent)
+  if (parentNavItem) {
+    return { href: parent, label: `Volver a ${parentNavItem.title.toLowerCase()}` }
+  }
+
+  return { href: parent, label: detailBackLabels[segments[1]] ?? 'Volver a la ficha' }
+}

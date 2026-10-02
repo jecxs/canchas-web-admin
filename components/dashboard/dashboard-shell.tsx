@@ -19,7 +19,10 @@ export async function DashboardShell({
   const notifications = role === 'owner' ? await getOwnerNotifications() : []
 
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
+    <SidebarProvider
+      defaultOpen={defaultOpen}
+      className={role === 'admin' ? 'theme-admin' : undefined}
+    >
       <AppSidebar role={role} activeLocal={activeLocal} subscription={subscription} />
       <SidebarInset className="h-svh min-h-0 overflow-hidden bg-background md:h-[calc(100svh-1rem)] md:rounded-2xl">
         <DashboardHeader role={role} user={user} locals={locals} activeLocal={activeLocal} initialNotifications={notifications} />

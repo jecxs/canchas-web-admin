@@ -3,14 +3,15 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Delete02Icon, Image01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Delete02Icon, EyeIcon, Image01Icon, ViewOffIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { LockToggle } from '@/components/dashboard/edit-guard'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { notify } from '@/lib/notifications/notify'
 import { createClient } from '@/utils/supabase/client'
-import { deleteGalleryPhoto, registerGalleryPath, registerLogoPath, reorderGalleryPhotos } from './media-actions'
+import { deleteGalleryPhoto, registerGalleryPath, registerLogoPath, reorderGalleryPhotos, setPhotoVisibilityAction } from './media-actions'
 import type { LocalPhoto } from './types'
 
 const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
@@ -19,7 +20,7 @@ function publicUrl(bucket: string, path: string) {
   return createClient().storage.from(bucket).getPublicUrl(path).data.publicUrl
 }
 
-export function LocalMediaManager({ localId, logo, photos }: { localId: string; logo: string | null; photos: LocalPhoto[] }) {
+export function LocalMediaManager({ localId, logo, photos, allowVisibility = false }: { localId: string; logo: string | null; photos: LocalPhoto[]; allowVisibility?: boolean }) {
   const logoInput = useRef<HTMLInputElement>(null)
   const galleryInput = useRef<HTMLInputElement>(null)
   const [pending, startTransition] = useTransition()
@@ -77,9 +78,25 @@ export function LocalMediaManager({ localId, logo, photos }: { localId: string; 
     })
   }
 
+  function toggleVisibility(photo: LocalPhoto) {
+    startTransition(async () => {
+      const result = await setPhotoVisibilityAction({ localId, photoId: photo.id, hidden: !photo.oculta })
+      if (result.success) { notify.success(); router.refresh() }
+      else notify.error()
+    })
+  }
+
   return (
     <Card id="identidad-visual" className="scroll-mt-24">
-      <CardHeader><CardTitle>Logo y galería</CardTitle><CardDescription>Imágenes públicas del negocio. La primera foto de la galería funciona como portada.</CardDescription></CardHeader>
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle>Logo y galería</CardTitle>
+            <CardDescription>Imágenes públicas del negocio. La primera foto de la galería funciona como portada.</CardDescription>
+          </div>
+          <LockToggle />
+        </div>
+      </CardHeader>
       <CardContent className="space-y-7">
         <section>
           <p className="text-sm font-semibold">Logo</p>
@@ -90,7 +107,24 @@ export function LocalMediaManager({ localId, logo, photos }: { localId: string; 
         </section>
         <section className="border-t pt-6">
           <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold">Galería</p><p className="mt-1 text-xs text-muted-foreground">{photos.length} de 12 fotos</p></div><input ref={galleryInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => chooseFile(event.target.files?.[0], 'fotos-locales', 'gallery')} /><Button type="button" disabled={pending || photos.length >= 12} onClick={() => galleryInput.current?.click()}>{pending ? <Spinner /> : <HugeiconsIcon icon={Add01Icon} strokeWidth={2} />}Añadir foto</Button></div>
-          {photos.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map((photo, index) => <div key={photo.id} className="group relative aspect-[4/3] overflow-hidden rounded-2xl border bg-muted bg-cover bg-center" style={{ backgroundImage: `url("${publicUrl('fotos-locales', photo.storage_path)}")` }}><span className="absolute left-2 top-2 rounded-full bg-background/90 px-2 py-1 text-[10px] font-bold">{index === 0 ? 'Portada' : index + 1}</span><div className="absolute bottom-2 left-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><Button type="button" size="icon-sm" variant="secondary" disabled={pending || index === 0} aria-label="Mover foto a la izquierda" onClick={() => movePhoto(index, -1)}><HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} /></Button><Button type="button" size="icon-sm" variant="secondary" disabled={pending || index === photos.length - 1} aria-label="Mover foto a la derecha" onClick={() => movePhoto(index, 1)}><HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} /></Button></div><Button type="button" size="icon-sm" variant="destructive" className="absolute bottom-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Eliminar foto ${index + 1}`} onClick={() => setDeleteId(photo.id)}><HugeiconsIcon icon={Delete02Icon} strokeWidth={2} /></Button></div>)}</div> : <div className="mt-4 rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Añade al menos una foto real del local para poder publicarlo.</div>}
+          {photos.length ? (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {photos.map((photo, index) => (
+                <div key={photo.id} className={`group relative aspect-[4/3] overflow-hidden rounded-2xl border bg-muted bg-cover bg-center${photo.oculta ? ' opacity-55' : ''}`} style={{ backgroundImage: `url("${publicUrl('fotos-locales', photo.storage_path)}")` }}>
+                  <span className="absolute left-2 top-2 rounded-full bg-background/90 px-2 py-1 text-[10px] font-bold">{index === 0 ? 'Portada' : index + 1}</span>
+                  {photo.oculta ? <span className="absolute right-2 top-2 rounded-full bg-destructive px-2 py-1 text-[10px] font-bold text-white">Oculta</span> : null}
+                  <div className="absolute bottom-2 left-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                    <Button type="button" size="icon-sm" variant="secondary" disabled={pending || index === 0} aria-label="Mover foto a la izquierda" onClick={() => movePhoto(index, -1)}><HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} /></Button>
+                    <Button type="button" size="icon-sm" variant="secondary" disabled={pending || index === photos.length - 1} aria-label="Mover foto a la derecha" onClick={() => movePhoto(index, 1)}><HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} /></Button>
+                    {allowVisibility ? <Button type="button" size="icon-sm" variant="secondary" disabled={pending} aria-label={photo.oculta ? 'Mostrar foto' : 'Ocultar foto'} onClick={() => toggleVisibility(photo)}><HugeiconsIcon icon={photo.oculta ? EyeIcon : ViewOffIcon} strokeWidth={2} /></Button> : null}
+                  </div>
+                  <Button type="button" size="icon-sm" variant="destructive" className="absolute bottom-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Eliminar foto ${index + 1}`} onClick={() => setDeleteId(photo.id)}><HugeiconsIcon icon={Delete02Icon} strokeWidth={2} /></Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Añade al menos una foto real del local para poder publicarlo.</div>
+          )}
         </section>
         <Dialog open={Boolean(deleteId)} onOpenChange={(open) => !open && setDeleteId(null)}><DialogContent><DialogHeader><DialogTitle>Eliminar foto</DialogTitle><DialogDescription>La imagen dejará de aparecer en la galería. Esta acción no se puede deshacer.</DialogDescription></DialogHeader><DialogFooter><DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose><Button variant="destructive" disabled={pending} onClick={confirmDelete}>{pending && <Spinner />}Eliminar</Button></DialogFooter></DialogContent></Dialog>
       </CardContent>

@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import {
   findLocalWithState,
+  isOperationalLocalState,
   OPERATIONAL_LOCAL_STATES,
   resolveActiveLocal,
   resolveLocalDestination,
@@ -120,6 +121,17 @@ export async function requireOwner() {
     redirect(resolvePostLoginDestination(context))
   }
   return context
+}
+
+// Autoriza escrituras operativas de un local: su dueño (con local operativo) o
+// cualquier superadministrador. Las RPC de la base validan la misma regla.
+export async function authorizeLocalWrite(localId: string) {
+  const context = await getAccessContext()
+  if (!context) return false
+  if (context.profile.rol === 'super_admin') return true
+  return context.locals.some(
+    (local) => local.id === localId && isOperationalLocalState(local.estado),
+  )
 }
 
 export async function requireOwnerLocal(states: readonly LocalState[]) {

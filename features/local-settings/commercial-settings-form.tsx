@@ -4,11 +4,10 @@ import Image from 'next/image'
 import { useActionState, useState } from 'react'
 import { BankIcon, Cash01Icon, Wallet02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GuardActions } from '@/components/dashboard/edit-guard'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { saveCommercialSettingsAction } from './actions'
@@ -64,7 +63,7 @@ function PaymentMethodIcon({ type, enabled }: { type: PaymentMethodType; enabled
   )
 }
 
-export function CommercialSettingsForm({ settings, minimumAdvancePercentage }: { settings: LocalSettings; minimumAdvancePercentage: number }) {
+export function CommercialSettingsForm({ settings, minimumAdvancePercentage }: { settings: LocalSettings; minimumAdvancePercentage: number | null }) {
   const currentMethods = parsePaymentMethods(settings.medios_pago_adelanto)
   const [selected, setSelected] = useState<Set<PaymentMethodType>>(
     () => new Set(currentMethods.map((method) => method.tipo)),
@@ -93,7 +92,7 @@ export function CommercialSettingsForm({ settings, minimumAdvancePercentage }: {
           <Field data-invalid={Boolean(state.fieldErrors?.advancePercentage)}>
             <FieldLabel htmlFor="advancePercentage">Porcentaje de adelanto</FieldLabel>
             <div className="relative max-w-48"><Input id="advancePercentage" name="advancePercentage" type="number" min={1} max={100} step="0.01" defaultValue={settings.porcentaje_adelanto ?? ''} required className="pr-10" /><span className="pointer-events-none absolute inset-y-0 right-3 grid place-items-center text-sm text-muted-foreground">%</span></div>
-            <FieldDescription>{getMinimumAdvanceDescription(minimumAdvancePercentage)}</FieldDescription>
+            <FieldDescription>{minimumAdvancePercentage != null ? getMinimumAdvanceDescription(minimumAdvancePercentage) : 'El porcentaje debe cumplir la política vigente de Grassly.'}</FieldDescription>
             <FieldError errors={state.fieldErrors?.advancePercentage?.map((message) => ({ message }))} />
           </Field>
 
@@ -124,7 +123,7 @@ export function CommercialSettingsForm({ settings, minimumAdvancePercentage }: {
             <Textarea id="refundPolicy" name="refundPolicy" defaultValue={settings.politica_reembolso === 'Este local no especificó su política de reembolso.' ? '' : settings.politica_reembolso} minLength={20} maxLength={1500} rows={6} required placeholder="Explica con cuánta anticipación se puede cancelar y en qué casos corresponde una devolución." />
             <FieldError errors={state.fieldErrors?.refundPolicy?.map((message) => ({ message }))} />
           </Field>
-          <Button type="submit" disabled={pending}>{pending && <Spinner />}Guardar reglas comerciales</Button>
+          <GuardActions pending={pending} submitLabel="Guardar reglas comerciales" />
         </form>
       </CardContent>
     </Card>

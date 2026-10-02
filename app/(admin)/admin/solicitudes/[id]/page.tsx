@@ -1,9 +1,7 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowLeft01Icon, Building03Icon, UserIcon } from '@hugeicons/core-free-icons'
+import { Building03Icon, UserIcon } from '@hugeicons/core-free-icons'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { ApplicationDecisionPanel } from '@/features/admin-applications/application-decision-panel'
@@ -41,14 +39,7 @@ export default async function AdminApplicationDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <Button asChild variant="ghost" size="sm" className="-ml-3">
-        <Link href="/admin/solicitudes">
-          <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} />
-          Volver a solicitudes
-        </Link>
-      </Button>
-
-      <div className="mt-7 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="eyebrow">Revisión de solicitud</p>

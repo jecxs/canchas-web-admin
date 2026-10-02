@@ -1,11 +1,10 @@
 'use client'
 
 import { useActionState } from 'react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GuardActions } from '@/components/dashboard/edit-guard'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { saveGeneralSettingsAction } from './actions'
 import { useSettingsFormFeedback } from './form-feedback'
@@ -78,7 +77,7 @@ export function GeneralSettingsForm({ settings }: { settings: LocalSettings }) {
               </Field>
             </div>
           </FieldGroup>
-          <Button type="submit" disabled={pending}>{pending && <Spinner />}Guardar datos generales</Button>
+          <GuardActions pending={pending} submitLabel="Guardar datos generales" />
         </form>
       </CardContent>
     </Card>

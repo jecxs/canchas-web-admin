@@ -5,9 +5,9 @@ import { Add01Icon, Cancel01Icon, CarParking01Icon, Chair01Icon, Coffee01Icon, D
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GuardActions } from '@/components/dashboard/edit-guard'
 import { FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { saveBenefitsSettingsAction } from './actions'
 import { useSettingsFormFeedback } from './form-feedback'
@@ -129,7 +129,7 @@ export function BenefitsSettingsForm({ localId, catalog, benefits }: { localId: 
           </fieldset>
 
           <FieldError errors={state.fieldErrors?.catalogIds?.map((message) => ({ message }))} />
-          <Button type="submit" disabled={pending}>{pending && <Spinner />}Guardar beneficios</Button>
+          <GuardActions pending={pending} submitLabel="Guardar beneficios" />
         </form>
       </CardContent>
     </Card>

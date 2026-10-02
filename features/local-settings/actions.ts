@@ -3,7 +3,7 @@
 import 'server-only'
 
 import { revalidatePath } from 'next/cache'
-import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
+import { authorizeLocalWrite, getAccessContext } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { getMinimumAdvanceValidationMessage } from './advance-policy'
 import {
@@ -31,11 +31,6 @@ function parseMinimumAdvancePercentage(value: unknown) {
   return Number.isFinite(percentage) && percentage >= 1 && percentage <= 100 ? percentage : null
 }
 
-async function activeLocalMatches(localId: unknown) {
-  const { local } = await requireOperationalOwnerLocal()
-  return typeof localId === 'string' && local.id === localId ? local : null
-}
-
 function databaseFailure(error: { code?: string } | null, scope: string): SettingsActionState {
   console.error(`[local-settings:${scope}]`, { code: error?.code })
   if (error?.code === '42501') return { success: false, message: messages.denied }
@@ -45,9 +40,11 @@ function databaseFailure(error: { code?: string } | null, scope: string): Settin
   return { success: false, message: messages.failed }
 }
 
-function saved(): SettingsActionState {
+function saved(localId: string): SettingsActionState {
   revalidatePath('/panel')
   revalidatePath('/panel/configuracion')
+  revalidatePath('/admin/locales')
+  revalidatePath(`/admin/locales/${localId}`)
   return { success: true, message: messages.saved }
 }
 
@@ -68,7 +65,7 @@ export async function saveGeneralSettingsAction(
   }
   const validation = generalSettingsSchema.safeParse(raw)
   if (!validation.success) return validationFailure(validation.error)
-  if (!await activeLocalMatches(validation.data.localId)) return { success: false, message: messages.denied }
+  if (!await authorizeLocalWrite(validation.data.localId)) return { success: false, message: messages.denied }
 
   const supabase = await createClient()
   const { error } = await supabase.rpc('actualizar_datos_generales_local', {
@@ -82,7 +79,7 @@ export async function saveGeneralSettingsAction(
     p_latitud: validation.data.latitude,
     p_longitud: validation.data.longitude,
   })
-  return error ? databaseFailure(error, 'general') : saved()
+  return error ? databaseFailure(error, 'general') : saved(validation.data.localId)
 }
 
 export async function saveCommercialSettingsAction(
@@ -101,31 +98,40 @@ export async function saveCommercialSettingsAction(
     paymentMethods: selected,
   })
   if (!validation.success) return validationFailure(validation.error)
-  if (!await activeLocalMatches(validation.data.localId)) return { success: false, message: messages.denied }
+  if (!await authorizeLocalWrite(validation.data.localId)) return { success: false, message: messages.denied }
 
   const supabase = await createClient()
-  const { data: minimumAdvancePercentage, error: minimumAdvancePercentageError } = await supabase.rpc('obtener_minimo_adelanto_global')
-  const parsedMinimumAdvancePercentage = parseMinimumAdvancePercentage(minimumAdvancePercentage)
-  if (minimumAdvancePercentageError || parsedMinimumAdvancePercentage === null) {
-    console.error('[local-settings:commercial-policy]', { code: minimumAdvancePercentageError?.code })
-    return { success: false, message: messages.failed }
-  }
-  if (validation.data.advancePercentage < parsedMinimumAdvancePercentage) {
-    return {
-      success: false,
-      message: messages.invalid,
-      fieldErrors: {
-        advancePercentage: [getMinimumAdvanceValidationMessage(parsedMinimumAdvancePercentage)],
-      },
+  const context = await getAccessContext()
+  const isAdmin = context?.profile.rol === 'super_admin'
+
+  // `obtener_minimo_adelanto_global` solo responde a dueños con local operativo.
+  // El superadministrador omite la pre-validación: el trigger
+  // `fn_validar_porcentaje_adelanto` sigue garantizando el mínimo real.
+  if (!isAdmin) {
+    const { data: minimumAdvancePercentage, error: minimumAdvancePercentageError } = await supabase.rpc('obtener_minimo_adelanto_global')
+    const parsedMinimumAdvancePercentage = parseMinimumAdvancePercentage(minimumAdvancePercentage)
+    if (minimumAdvancePercentageError || parsedMinimumAdvancePercentage === null) {
+      console.error('[local-settings:commercial-policy]', { code: minimumAdvancePercentageError?.code })
+      return { success: false, message: messages.failed }
+    }
+    if (validation.data.advancePercentage < parsedMinimumAdvancePercentage) {
+      return {
+        success: false,
+        message: messages.invalid,
+        fieldErrors: {
+          advancePercentage: [getMinimumAdvanceValidationMessage(parsedMinimumAdvancePercentage)],
+        },
+      }
     }
   }
+
   const { error } = await supabase.rpc('actualizar_reglas_comerciales_local', {
     p_local_id: validation.data.localId,
     p_porcentaje_adelanto: validation.data.advancePercentage,
     p_medios_pago: validation.data.paymentMethods,
     p_politica_reembolso: validation.data.refundPolicy,
   })
-  return error ? databaseFailure(error, 'commercial') : saved()
+  return error ? databaseFailure(error, 'commercial') : saved(validation.data.localId)
 }
 
 export async function saveScheduleSettingsAction(
@@ -146,14 +152,14 @@ export async function saveScheduleSettingsAction(
     schedules,
   })
   if (!validation.success) return validationFailure(validation.error)
-  if (!await activeLocalMatches(validation.data.localId)) return { success: false, message: messages.denied }
+  if (!await authorizeLocalWrite(validation.data.localId)) return { success: false, message: messages.denied }
 
   const supabase = await createClient()
   const { error } = await supabase.rpc('reemplazar_horarios_local', {
     p_local_id: validation.data.localId,
     p_horarios: validation.data.schedules,
   })
-  return error ? databaseFailure(error, 'schedule') : saved()
+  return error ? databaseFailure(error, 'schedule') : saved(validation.data.localId)
 }
 
 export async function saveBenefitsSettingsAction(
@@ -166,7 +172,7 @@ export async function saveBenefitsSettingsAction(
     customBenefits: formData.getAll('customBenefit'),
   })
   if (!validation.success) return validationFailure(validation.error)
-  if (!await activeLocalMatches(validation.data.localId)) return { success: false, message: messages.denied }
+  if (!await authorizeLocalWrite(validation.data.localId)) return { success: false, message: messages.denied }
 
   const supabase = await createClient()
   const { error } = await supabase.rpc('reemplazar_beneficios_local', {
@@ -174,5 +180,5 @@ export async function saveBenefitsSettingsAction(
     p_beneficio_catalogo_ids: validation.data.catalogIds,
     p_beneficios_personalizados: validation.data.customBenefits,
   })
-  return error ? databaseFailure(error, 'benefits') : saved()
+  return error ? databaseFailure(error, 'benefits') : saved(validation.data.localId)
 }
