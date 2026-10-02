@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { notify } from '@/lib/notifications/notify'
+import { ClientPicker, type PickedClient } from '@/features/clients/client-picker'
 import { createClient } from '@/utils/supabase/client'
 import { ArrowDown01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Edit02Icon, FootballIcon, Layers01Icon, RulerIcon } from '@hugeicons/core-free-icons'
 import { localDateTimeToIso, minutesToTime, timeToMinutes } from './date-utils'
@@ -30,7 +31,7 @@ function Feedback({ state }: { state: AgendaActionState }) {
   return <p role="alert" className="text-xs font-semibold text-destructive">{state.message}</p>
 }
 
-function useAgendaFeedback(state: AgendaActionState, onSuccess: () => void) {
+export function useAgendaFeedback(state: AgendaActionState, onSuccess: () => void) {
   useEffect(() => {
     if (!state.message) return
     if (state.success) {
@@ -49,8 +50,8 @@ function FieldError({ state, field }: { state: AgendaActionState; field: string 
   return message ? <p className="text-xs font-semibold text-destructive">{message}</p> : null
 }
 
-function FormActions({ pending, onCancel, label }: { pending: boolean; onCancel: () => void; label: string }) {
-  return <div className="flex justify-end gap-2 border-t pt-4"><Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>Cancelar</Button><Button type="submit" disabled={pending}>{pending && <Spinner />}{label}</Button></div>
+function FormActions({ pending, onCancel, label, disabled = false }: { pending: boolean; onCancel: () => void; label: string; disabled?: boolean }) {
+  return <div className="flex justify-end gap-2 border-t pt-4"><Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>Cancelar</Button><Button type="submit" disabled={pending || disabled}>{pending && <Spinner />}{label}</Button></div>
 }
 
 const inputClass = 'h-10 rounded-xl bg-background'
@@ -122,7 +123,7 @@ function ManualPriceBreakdown({ quote }: { quote: ManualQuote }) {
   return <details className="group rounded-xl border bg-muted/25"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-xs font-bold"><span>Ver desglose del precio</span><span className="flex items-center gap-2 text-foreground"><span>{formatManualAmount(quote.total)}</span><HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="size-4 text-muted-foreground transition-transform group-open:rotate-180" /></span></summary><div className="space-y-2 border-t px-3 py-3">{quote.lines.map((line) => <div key={`${line.start}-${line.end}`} className="flex items-start justify-between gap-3 text-xs"><div><p className="font-bold text-foreground">{formatManualTime(line.start)}–{formatManualTime(line.end)} · {formatManualAmount(line.hourlyPrice)}/h</p><p className="mt-0.5 text-muted-foreground">{quoteLineLabel(line)}</p></div><span className="shrink-0 font-extrabold text-foreground">{formatManualAmount(line.subtotal)}</span></div>)}<div className="flex justify-between border-t pt-2 text-xs font-extrabold"><span>Total</span><span>{formatManualAmount(quote.total)}</span></div></div></details>
 }
 
-function ManualAdvanceField({ localId, courtId, sportId, date, startTime, durationMinutes, state }: { localId: string; courtId: string; sportId: string; date: string; startTime: string; durationMinutes: number; state: AgendaActionState }) {
+export function ManualAdvanceField({ localId, courtId, sportId, date, startTime, durationMinutes, state }: { localId: string; courtId: string; sportId: string; date: string; startTime: string; durationMinutes: number; state: AgendaActionState }) {
   const [amount, setAmount] = useState('')
   const [quote, setQuote] = useState<ManualQuote | null>(null)
   const [quoteError, setQuoteError] = useState<string | null>(null)
@@ -166,6 +167,7 @@ export function ManualBookingForm({
   timeOptions,
   minDate,
   defaultSportId,
+  initialClient,
   onScheduleChange,
   onCancel,
   onSuccess,
@@ -178,6 +180,7 @@ export function ManualBookingForm({
   timeOptions: SelectOption[]
   minDate: string
   defaultSportId?: string
+  initialClient?: PickedClient | null
   onScheduleChange: (selection: { date: string; startTime: string; blocks: number }) => void
   onCancel: () => void
   onSuccess: () => void
@@ -185,6 +188,7 @@ export function ManualBookingForm({
   const [state, action, pending] = useActionState(createManualBookingAction, initialAgendaActionState)
   const [editingSchedule, setEditingSchedule] = useState(false)
   const [sportId, setSportId] = useState(defaultSportId ?? court.sports[0]?.id ?? '')
+  const [clientBlocked, setClientBlocked] = useState(false)
   useAgendaFeedback(state, onSuccess)
   const endTime = minutesToTime(timeToMinutes(startTime) + blocks * 60)
   return (
@@ -195,12 +199,12 @@ export function ManualBookingForm({
         <label className="space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={court.sports.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
         <label className="space-y-1.5 text-sm font-semibold">Duración<FormSelect name="blocks" value={String(blocks)} onValueChange={(value) => onScheduleChange({ date, startTime, blocks: Number(value) })} options={[{ value: '1', label: '1 hora' }, { value: '2', label: '2 horas' }, { value: '3', label: '3 horas' }, { value: '4', label: '4 horas' }]} /><FieldError state={state} field="blocks" /></label>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-sm font-semibold">Nombre del cliente<Input name="customerName" placeholder="Ej. Carlos Quispe" className={inputClass} autoComplete="off" /><FieldError state={state} field="customerName" /></label><label className="space-y-1.5 text-sm font-semibold">Teléfono<Input name="customerPhone" placeholder="999 999 999" className={inputClass} inputMode="tel" autoComplete="off" /><FieldError state={state} field="customerPhone" /></label></div>
+      <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} initial={initialClient} />
       <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-${blocks}`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={blocks * 60} state={state} />
       <label className="block space-y-1.5 text-sm font-semibold">Canal<FormSelect name="channel" defaultValue="whatsapp" options={[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }]} /></label>
       <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-5 text-foreground">Al guardar, la reserva quedará <strong>confirmada</strong> y el adelanto se registrará en su historial de cobros.</p>
       <label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" placeholder="Detalles de la reserva" className="min-h-20 rounded-xl bg-background" /></label>
-      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar reserva" />
+      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar reserva" disabled={clientBlocked} />
     </form>
   )
 }
@@ -222,18 +226,19 @@ export function MaintenanceForm({ localId, date, court, startTime, endTime, onCa
 export function EncasedBookingForm({ localId, court, date, startTime, sportOptions, defaultSportId, onCancel, onSuccess }: { localId: string; court: AgendaCourt; date: string; startTime: string; sportOptions: Array<{ id: string; name: string }>; defaultSportId?: string; onCancel: () => void; onSuccess: () => void }) {
   const [state, action, pending] = useActionState(createEncasedBookingAction, initialAgendaActionState)
   const [sportId, setSportId] = useState(defaultSportId ?? sportOptions[0]?.id ?? '')
+  const [clientBlocked, setClientBlocked] = useState(false)
   useAgendaFeedback(state, onSuccess)
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="localId" value={localId} /><input type="hidden" name="courtId" value={court.id} /><input type="hidden" name="date" value={date} /><input type="hidden" name="time" value={startTime} />
       <div className="rounded-xl border border-secondary/30 bg-secondary/10 px-3 py-2 text-sm">Inicio excepcional: <span className="font-bold">{startTime}</span> · duración fija de 90 minutos.</div>
       <label className="block space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={sportOptions.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
-      <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-sm font-semibold">Nombre del cliente<Input name="customerName" placeholder="Ej. Carlos Quispe" className={inputClass} autoComplete="off" /><FieldError state={state} field="customerName" /></label><label className="space-y-1.5 text-sm font-semibold">Teléfono<Input name="customerPhone" placeholder="999 999 999" className={inputClass} inputMode="tel" autoComplete="off" /><FieldError state={state} field="customerPhone" /></label></div>
+      <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} />
       <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-90`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={90} state={state} />
       <label className="block space-y-1.5 text-sm font-semibold">Canal<FormSelect name="channel" defaultValue="whatsapp" options={[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }]} /></label>
       <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-5 text-foreground">Al guardar, la reserva quedará <strong>confirmada</strong> y el adelanto se registrará en su historial de cobros.</p>
       <label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" placeholder="Detalles de la reserva" className="min-h-20 rounded-xl bg-background" /></label>
-      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar 90 minutos" />
+      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar 90 minutos" disabled={clientBlocked} />
     </form>
   )
 }

@@ -33,7 +33,13 @@ function finish(message: string): AgendaActionState {
   revalidatePath('/panel')
   revalidatePath('/panel/agenda')
   revalidatePath('/panel/reservas')
+  revalidatePath('/panel/clientes')
   return { success: true, message }
+}
+
+function readClienteId(formData: FormData) {
+  const value = formData.get('clienteId')
+  return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
 function rangeFromLocalTimes(date: string, startTime: string, endTime: string) {
@@ -51,6 +57,7 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
     date: formData.get('date'),
     time: formData.get('time'),
     blocks: formData.get('blocks'),
+    clienteId: readClienteId(formData),
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
     advanceAmount: formData.get('advanceAmount'),
@@ -72,6 +79,7 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
     p_deporte_id: validation.data.sportId,
     p_inicio: start,
     p_bloques: validation.data.blocks,
+    p_cliente_id: validation.data.clienteId,
     p_cliente_nombre: validation.data.customerName,
     p_cliente_telefono: validation.data.customerPhone,
     p_monto_adelanto: validation.data.advanceAmount,
@@ -89,6 +97,7 @@ export async function createEncasedBookingAction(_state: AgendaActionState, form
     sportId: formData.get('sportId'),
     date: formData.get('date'),
     time: formData.get('time'),
+    clienteId: readClienteId(formData),
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
     advanceAmount: formData.get('advanceAmount'),
@@ -109,6 +118,7 @@ export async function createEncasedBookingAction(_state: AgendaActionState, form
     p_cancha_id: validation.data.courtId,
     p_deporte_id: validation.data.sportId,
     p_inicio: start,
+    p_cliente_id: validation.data.clienteId,
     p_cliente_nombre: validation.data.customerName,
     p_cliente_telefono: validation.data.customerPhone,
     p_monto_adelanto: validation.data.advanceAmount,
