@@ -25,8 +25,38 @@ export const commercialSettingsSchema = z.object({
   refundPolicy: z.string().trim().min(20, 'Explica la política con al menos 20 caracteres.').max(1500),
   paymentMethods: z.array(z.object({
     tipo: paymentTypeSchema,
-    detalle: z.string().trim().min(3, 'Completa los datos del medio de pago.').max(120),
-  })).min(1, 'Selecciona al menos un medio de pago.').max(6),
+    nombre_visible: z.string().trim().max(60),
+    titular: z.string().trim().max(100),
+    telefono: z.string().trim(),
+    banco: z.string().trim().max(60),
+    numero_cuenta: z.string().trim().max(40),
+    cci: z.string().trim(),
+  })).min(1, 'Selecciona al menos un medio de pago.').max(5),
+}).superRefine((value, context) => {
+  const seen = new Set<string>()
+  if (!value.paymentMethods.some((method) => ['yape', 'plin', 'transferencia'].includes(method.tipo))) {
+    context.addIssue({ code: 'custom', path: ['paymentMethods'], message: 'Activa al menos un medio digital para las reservas del app.' })
+  }
+  value.paymentMethods.forEach((method, index) => {
+    if (seen.has(method.tipo)) {
+      context.addIssue({ code: 'custom', path: ['paymentMethods', index, 'tipo'], message: 'No repitas un medio de pago.' })
+    }
+    seen.add(method.tipo)
+
+    if (method.tipo === 'yape' || method.tipo === 'plin') {
+      if (!/^9\d{8}$/.test(method.telefono)) context.addIssue({ code: 'custom', path: ['paymentMethods'], message: `Ingresa el celular de ${method.tipo === 'yape' ? 'Yape' : 'Plin'} con 9 dígitos.` })
+      if (method.titular.length < 3) context.addIssue({ code: 'custom', path: ['paymentMethods'], message: `Ingresa el nombre del titular de ${method.tipo === 'yape' ? 'Yape' : 'Plin'}.` })
+    }
+    if (method.tipo === 'transferencia') {
+      if (method.banco.length < 2) context.addIssue({ code: 'custom', path: ['paymentMethods'], message: 'Ingresa el banco de la transferencia.' })
+      if (method.titular.length < 3) context.addIssue({ code: 'custom', path: ['paymentMethods'], message: 'Ingresa el titular de la cuenta bancaria.' })
+      if (method.numero_cuenta.length < 3 && method.cci.length === 0) context.addIssue({ code: 'custom', path: ['paymentMethods'], message: 'Ingresa un número de cuenta o CCI.' })
+      if (method.cci.length > 0 && !/^\d{20}$/.test(method.cci)) context.addIssue({ code: 'custom', path: ['paymentMethods'], message: 'El CCI debe tener 20 dígitos.' })
+    }
+    if (method.tipo === 'otro' && method.nombre_visible.length < 3) {
+      context.addIssue({ code: 'custom', path: ['paymentMethods'], message: 'Escribe el nombre del otro medio de pago.' })
+    }
+  })
 })
 
 export const scheduleSettingsSchema = z.object({

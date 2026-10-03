@@ -2,7 +2,9 @@ import 'server-only'
 
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
-import type { OwnerReservation, ReservationExtension, ReservationsData, ReservationsFilters } from './types'
+import type { OwnerReservation, ReservationExtension, ReservationPaymentMovement, ReservationsData, ReservationsFilters } from './types'
+import type { LocalPaymentMethod, PaymentMethodType } from '@/features/payments/types'
+import type { Json } from '@/types/database.types'
 
 export const RESERVATIONS_PAGE_SIZE = 25
 
@@ -56,21 +58,41 @@ function nextDate(value: string) {
   return date.toISOString().slice(0, 10)
 }
 
+function parsePaymentMovements(value: Json): ReservationPaymentMovement[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+    const amount = Number(item.monto)
+    if (typeof item.id !== 'string' || typeof item.tipo !== 'string' || typeof item.created_at !== 'string' || !Number.isFinite(amount)) return []
+    return [{
+      id: item.id,
+      type: item.tipo,
+      amount,
+      method: typeof item.medio === 'string' ? item.medio : null,
+      methodType: typeof item.medio_tipo === 'string' ? item.medio_tipo : null,
+      holder: typeof item.titular === 'string' ? item.titular : null,
+      reference: typeof item.referencia === 'string' ? item.referencia : null,
+      notes: typeof item.notas === 'string' ? item.notas : null,
+      createdAt: item.created_at,
+    }]
+  })
+}
+
 export async function getReservationsData(filters: ReservationsFilters = {}): Promise<ReservationsData> {
   const { local } = await requireOperationalOwnerLocal()
   const supabase = await createClient()
 
-  const { data: courtRows, error: courtsError } = await supabase
-    .from('canchas')
-    .select('id,nombre')
-    .eq('local_id', local.id)
-    .order('nombre')
+  const [{ data: courtRows, error: courtsError }, { data: paymentMethodRows, error: paymentMethodsError }] = await Promise.all([
+    supabase.from('canchas').select('id,nombre').eq('local_id', local.id).order('nombre'),
+    supabase.from('local_medios_pago').select('id,tipo,nombre_visible,titular,telefono,banco,numero_cuenta,cci,activo').eq('local_id', local.id).eq('activo', true).order('created_at'),
+  ])
 
-  if (courtsError) throw new Error('No se pudieron cargar las canchas del local.')
+  if (courtsError || paymentMethodsError) throw new Error('No se pudieron cargar los datos operativos del local.')
   const courts = courtRows ?? []
+  const paymentMethods = (paymentMethodRows ?? []).map((method): LocalPaymentMethod => ({ id: method.id, type: method.tipo as PaymentMethodType, name: method.nombre_visible, holder: method.titular, phone: method.telefono, bank: method.banco, accountNumber: method.numero_cuenta, cci: method.cci, active: method.activo }))
   const page = Math.max(1, filters.page ?? 1)
   const normalizedFilters = { ...filters, page }
-  if (!courts.length) return { localId: local.id, localName: local.nombre, courts: [], reservations: [], filters: normalizedFilters, pagination: { page, pageSize: RESERVATIONS_PAGE_SIZE, totalCount: 0, totalPages: 1 } }
+  if (!courts.length) return { localId: local.id, localName: local.nombre, courts: [], paymentMethods, reservations: [], filters: normalizedFilters, pagination: { page, pageSize: RESERVATIONS_PAGE_SIZE, totalCount: 0, totalPages: 1 } }
 
   const courtIds = courts.map((court) => court.id)
   let reservationsQuery = supabase
@@ -100,13 +122,14 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
   const reservationIds = rawReservations.map((reservation) => reservation.id)
   const sportIds = [...new Set(rawReservations.map((reservation) => reservation.deporte_id))]
   const customerReader = supabase as unknown as OwnerReservationCustomerReader
-  const [sportsResult, customersResult, extensionsResult] = await Promise.all([
+  const [sportsResult, customersResult, extensionsResult, paymentSummaryResult] = await Promise.all([
     sportIds.length ? supabase.from('deportes').select('id,nombre').in('id', sportIds) : Promise.resolve({ data: [], error: null }),
     reservationIds.length ? customerReader.rpc('obtener_clientes_reservas_dueno', { p_local_id: local.id, p_reserva_ids: reservationIds }) : Promise.resolve({ data: [], error: null }),
     reservationIds.length ? supabase.from('reserva_extensiones').select('id,reserva_id,monto_adicional,estado_cobro,medio_cobro,notas,created_at').in('reserva_id', reservationIds).order('created_at') : Promise.resolve({ data: [], error: null }),
+    reservationIds.length ? supabase.rpc('obtener_resumen_pagos_reservas_dueno', { p_local_id: local.id, p_reserva_ids: reservationIds }) : Promise.resolve({ data: [], error: null }),
   ])
 
-  const secondaryError = sportsResult.error ?? customersResult.error ?? extensionsResult.error
+  const secondaryError = sportsResult.error ?? customersResult.error ?? extensionsResult.error ?? paymentSummaryResult.error
   if (secondaryError) {
     console.error('[reservations:details]', { code: secondaryError.code, message: secondaryError.message })
     throw new Error('No se pudieron cargar los detalles de las reservas.')
@@ -116,6 +139,7 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
   const sportNames = new Map((sportsResult.data ?? []).map((sport) => [sport.id, sport.nombre]))
   const customers = new Map((customersResult.data ?? []).map((customer) => [customer.reserva_id, customer]))
   const extensionsByReservation = new Map<string, ReservationExtension[]>()
+  const paymentSummaryByReservation = new Map((paymentSummaryResult.data ?? []).map((summary) => [summary.reserva_id, summary]))
   for (const extension of extensionsResult.data ?? []) {
     const list = extensionsByReservation.get(extension.reserva_id) ?? []
     list.push({ id: extension.id, amount: Number(extension.monto_adicional), chargeStatus: extension.estado_cobro, method: extension.medio_cobro, notes: extension.notas, createdAt: extension.created_at })
@@ -126,6 +150,7 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
     const customer = customers.get(reservation.id)
     const extensions = extensionsByReservation.get(reservation.id) ?? []
     const { start, end } = parseRange(reservation.rango)
+    const paymentSummary = paymentSummaryByReservation.get(reservation.id)
     return {
       id: reservation.id,
       courtId: reservation.cancha_id,
@@ -139,6 +164,9 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
       channel: reservation.canal_origen as OwnerReservation['channel'],
       totalAmount: Number(reservation.monto_total),
       advanceAmount: Number(reservation.monto_adelanto_requerido),
+      paidAmount: Number(paymentSummary?.monto_cobrado ?? 0),
+      refundedAmount: Number(paymentSummary?.monto_reembolsado ?? 0),
+      outstandingAmount: Number(paymentSummary?.saldo_pendiente ?? reservation.monto_total),
       isTimeException: reservation.es_excepcion_horaria,
       proofPath: reservation.comprobante_url,
       proofUrl: null,
@@ -153,6 +181,7 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
       cancellationReason: reservation.motivo_cancelacion,
       refundResult: reservation.reembolso_resultado,
       extensions,
+      paymentMovements: parsePaymentMovements(paymentSummary?.movimientos ?? []),
     }
   })
 
@@ -171,6 +200,7 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
     localId: local.id,
     localName: local.nombre,
     courts: courts.map((court) => ({ id: court.id, name: court.nombre })),
+    paymentMethods,
     reservations,
     filters: normalizedFilters,
     pagination: { page, pageSize: RESERVATIONS_PAGE_SIZE, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / RESERVATIONS_PAGE_SIZE)) },

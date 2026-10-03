@@ -5,13 +5,14 @@ import { createClient } from '@/utils/supabase/server'
 import { getDayOfWeek, formatAgendaDate, shiftAgendaDate } from './date-utils'
 import { getLocalAgendaSports, normalizeAgendaSportId } from './sport-filter'
 import type { AgendaData } from './types'
+import type { LocalPaymentMethod, PaymentMethodType } from '@/features/payments/types'
 
 export async function getAgendaData(date: string, sportId?: string): Promise<AgendaData> {
   const { local } = await requireOperationalOwnerLocal()
   const supabase = await createClient()
   const dayOfWeek = getDayOfWeek(date)
 
-  const [{ data: courts, error: courtsError }, { data: schedule, error: scheduleError }] = await Promise.all([
+  const [{ data: courts, error: courtsError }, { data: schedule, error: scheduleError }, { data: paymentMethods, error: paymentMethodsError }] = await Promise.all([
     supabase
       .from('canchas')
       .select('id,nombre,activa,superficie,descripcion,largo_metros,ancho_metros,cancha_deportes(deporte_id,deportes(id,nombre))')
@@ -24,9 +25,15 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
       .eq('local_id', local.id)
       .eq('dia_semana', dayOfWeek)
       .maybeSingle(),
+    supabase
+      .from('local_medios_pago')
+      .select('id,tipo,nombre_visible,titular,telefono,banco,numero_cuenta,cci,activo')
+      .eq('local_id', local.id)
+      .eq('activo', true)
+      .order('created_at'),
   ])
 
-  const error = courtsError ?? scheduleError
+  const error = courtsError ?? scheduleError ?? paymentMethodsError
   if (error) {
     console.error('[agenda:read]', { code: error.code, message: error.message })
     throw new Error('No se pudo cargar la agenda.')
@@ -147,6 +154,17 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
     courts: agendaCourts,
     occupations: [...maintenanceOccupations, ...reservationOccupations],
     sports,
+    paymentMethods: (paymentMethods ?? []).map((method): LocalPaymentMethod => ({
+      id: method.id,
+      type: method.tipo as PaymentMethodType,
+      name: method.nombre_visible,
+      holder: method.titular,
+      phone: method.telefono,
+      bank: method.banco,
+      accountNumber: method.numero_cuenta,
+      cci: method.cci,
+      active: method.activo,
+    })),
   }
 }
 

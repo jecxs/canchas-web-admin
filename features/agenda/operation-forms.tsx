@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { notify } from '@/lib/notifications/notify'
 import { ClientPicker, type PickedClient } from '@/features/clients/client-picker'
 import { createClient } from '@/utils/supabase/client'
+import { paymentMethodOptionLabel, type LocalPaymentMethod } from '@/features/payments/types'
 import { ArrowDown01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Edit02Icon, FootballIcon, Layers01Icon, RulerIcon } from '@hugeicons/core-free-icons'
 import { localDateTimeToIso, minutesToTime, timeToMinutes } from './date-utils'
 import {
@@ -60,6 +61,10 @@ type SelectOption = { value: string; label: string }
 
 function FormSelect({ name, options, value, defaultValue, onValueChange, placeholder, triggerClassName }: { name?: string; options: SelectOption[]; value?: string; defaultValue?: string; onValueChange?: (value: string) => void; placeholder?: string; triggerClassName?: string }) {
   return <Select name={name} value={value} defaultValue={defaultValue} onValueChange={onValueChange}><SelectTrigger className={`w-full ${triggerClassName ?? ''}`}><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent position="popper" align="start">{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
+}
+
+function PaymentMethodSelect({ methods, state, label = 'Medio de cobro', required = true }: { methods: LocalPaymentMethod[]; state: AgendaActionState; label?: string; required?: boolean }) {
+  return <label className="block space-y-1.5 text-sm font-semibold">{label}<FormSelect name="paymentMethodId" defaultValue={methods[0]?.id} placeholder="Selecciona un medio" options={methods.map((method) => ({ value: method.id, label: paymentMethodOptionLabel(method) }))} /><FieldError state={state} field="paymentMethodId" />{methods.length === 0 && <p className="text-xs font-normal text-destructive">Activa al menos un medio de cobro en Configuración.</p>} {!required && <span className="sr-only">Opcional</span>}</label>
 }
 
 function formatReservationDate(date: string) {
@@ -168,6 +173,7 @@ export function ManualBookingForm({
   minDate,
   defaultSportId,
   initialClient,
+  paymentMethods,
   onScheduleChange,
   onCancel,
   onSuccess,
@@ -181,6 +187,7 @@ export function ManualBookingForm({
   minDate: string
   defaultSportId?: string
   initialClient?: PickedClient | null
+  paymentMethods: LocalPaymentMethod[]
   onScheduleChange: (selection: { date: string; startTime: string; blocks: number }) => void
   onCancel: () => void
   onSuccess: () => void
@@ -201,10 +208,11 @@ export function ManualBookingForm({
       </div>
       <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} initial={initialClient} />
       <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-${blocks}`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={blocks * 60} state={state} />
+      <PaymentMethodSelect methods={paymentMethods} state={state} label="Medio del adelanto" />
       <label className="block space-y-1.5 text-sm font-semibold">Canal<FormSelect name="channel" defaultValue="whatsapp" options={[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }]} /></label>
       <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-5 text-foreground">Al guardar, la reserva quedará <strong>confirmada</strong> y el adelanto se registrará en su historial de cobros.</p>
       <label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" placeholder="Detalles de la reserva" className="min-h-20 rounded-xl bg-background" /></label>
-      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar reserva" disabled={clientBlocked} />
+      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar reserva" disabled={clientBlocked || paymentMethods.length === 0} />
     </form>
   )
 }
@@ -223,7 +231,7 @@ export function MaintenanceForm({ localId, date, court, startTime, endTime, onCa
   )
 }
 
-export function EncasedBookingForm({ localId, court, date, startTime, sportOptions, defaultSportId, onCancel, onSuccess }: { localId: string; court: AgendaCourt; date: string; startTime: string; sportOptions: Array<{ id: string; name: string }>; defaultSportId?: string; onCancel: () => void; onSuccess: () => void }) {
+export function EncasedBookingForm({ localId, court, date, startTime, sportOptions, defaultSportId, paymentMethods, onCancel, onSuccess }: { localId: string; court: AgendaCourt; date: string; startTime: string; sportOptions: Array<{ id: string; name: string }>; defaultSportId?: string; paymentMethods: LocalPaymentMethod[]; onCancel: () => void; onSuccess: () => void }) {
   const [state, action, pending] = useActionState(createEncasedBookingAction, initialAgendaActionState)
   const [sportId, setSportId] = useState(defaultSportId ?? sportOptions[0]?.id ?? '')
   const [clientBlocked, setClientBlocked] = useState(false)
@@ -235,24 +243,27 @@ export function EncasedBookingForm({ localId, court, date, startTime, sportOptio
       <label className="block space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={sportOptions.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
       <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} />
       <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-90`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={90} state={state} />
+      <PaymentMethodSelect methods={paymentMethods} state={state} label="Medio del adelanto" />
       <label className="block space-y-1.5 text-sm font-semibold">Canal<FormSelect name="channel" defaultValue="whatsapp" options={[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }]} /></label>
       <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-5 text-foreground">Al guardar, la reserva quedará <strong>confirmada</strong> y el adelanto se registrará en su historial de cobros.</p>
       <label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" placeholder="Detalles de la reserva" className="min-h-20 rounded-xl bg-background" /></label>
-      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar 90 minutos" disabled={clientBlocked} />
+      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar 90 minutos" disabled={clientBlocked || paymentMethods.length === 0} />
     </form>
   )
 }
 
-export function ExtendReservationForm({ reservationId, onCancel, onSuccess }: { reservationId: string; onCancel: () => void; onSuccess: () => void }) {
+export function ExtendReservationForm({ reservationId, paymentMethods, onCancel, onSuccess }: { reservationId: string; paymentMethods: LocalPaymentMethod[]; onCancel: () => void; onSuccess: () => void }) {
   const [state, action, pending] = useActionState(extendReservationAction, initialAgendaActionState)
+  const [chargeStatus, setChargeStatus] = useState('pendiente')
   useAgendaFeedback(state, onSuccess)
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="reservationId" value={reservationId} />
       <div className="rounded-xl border border-secondary/30 bg-secondary/10 px-3 py-2 text-sm">Se añadirá exactamente <span className="font-bold">30 minutos</span> al final de la reserva. Solo se autoriza si el siguiente tramo está libre.</div>
-      <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-sm font-semibold">Cobro<FormSelect name="chargeStatus" defaultValue="pendiente" options={[{ value: 'pendiente', label: 'Pendiente' }, { value: 'cobrado', label: 'Cobrado' }]} /></label><label className="space-y-1.5 text-sm font-semibold">Medio <span className="font-normal text-muted-foreground">(opcional)</span><Input name="paymentMethod" placeholder="Yape, efectivo…" className={inputClass} /></label></div>
+      <label className="block space-y-1.5 text-sm font-semibold">Cobro<FormSelect name="chargeStatus" value={chargeStatus} onValueChange={setChargeStatus} options={[{ value: 'pendiente', label: 'Pendiente' }, { value: 'cobrado', label: 'Cobrado ahora' }]} /></label>
+      {chargeStatus === 'cobrado' && <PaymentMethodSelect methods={paymentMethods} state={state} />}
       <label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" placeholder="Acuerdo con el cliente" className="min-h-20 rounded-xl bg-background" /></label>
-      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Autorizar +30 min" />
+      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Autorizar +30 min" disabled={chargeStatus === 'cobrado' && paymentMethods.length === 0} />
     </form>
   )
 }
@@ -309,8 +320,8 @@ export function NoShowReservationForm({ reservationId, onCancel, onSuccess }: { 
   return <form action={action} className="space-y-4"><input type="hidden" name="reservationId" value={reservationId} /><p className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2 text-sm">Solo registra inasistencia si la reserva confirmada ya empezó. Esta acción deja trazabilidad para reportes.</p><label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="reason" maxLength={500} className="min-h-20 rounded-xl bg-background" placeholder="Ej. El equipo no se presentó" /></label><Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar inasistencia" /></form>
 }
 
-export function PaymentMovementForm({ reservationId, outstandingAmount, onCancel, onSuccess }: { reservationId: string; outstandingAmount?: number; onCancel: () => void; onSuccess: () => void }) {
+export function PaymentMovementForm({ reservationId, outstandingAmount, paymentMethods, onCancel, onSuccess }: { reservationId: string; outstandingAmount?: number; paymentMethods: LocalPaymentMethod[]; onCancel: () => void; onSuccess: () => void }) {
   const [state, action, pending] = useActionState(registerPaymentMovementAction, initialAgendaActionState)
   useAgendaFeedback(state, onSuccess)
-  return <form action={action} className="space-y-4"><input type="hidden" name="reservationId" value={reservationId} /><p className="rounded-xl border bg-muted/45 px-3 py-2 text-sm">Registro interno: no envía ni verifica dinero. {typeof outstandingAmount === 'number' && <><br />Falta por cobrar: <strong>S/ {outstandingAmount.toFixed(2)}</strong>.</>}</p><div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-sm font-semibold">Concepto<FormSelect name="type" defaultValue="saldo" options={[{ value: 'adelanto', label: 'Adelanto recibido' }, { value: 'saldo', label: 'Saldo recibido' }]} /></label><label className="space-y-1.5 text-sm font-semibold">Monto<Input name="amount" type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="0.00" className={inputClass} /><FieldError state={state} field="amount" /></label></div><label className="block space-y-1.5 text-sm font-semibold">Medio <span className="font-normal text-muted-foreground">(opcional)</span><Input name="method" maxLength={60} placeholder="Efectivo, Yape…" className={inputClass} /></label><label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" maxLength={300} className="min-h-20 rounded-xl bg-background" /></label><Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Guardar movimiento" /></form>
+  return <form action={action} className="space-y-4"><input type="hidden" name="reservationId" value={reservationId} /><p className="rounded-xl border bg-muted/45 px-3 py-2 text-sm">Este cobro se registrará como parte del <strong>saldo</strong>; el adelanto inicial ya quedó asentado al crear o confirmar la reserva. {typeof outstandingAmount === 'number' && <><br />Falta por cobrar: <strong>S/ {outstandingAmount.toFixed(2)}</strong>.</>}</p><label className="block space-y-1.5 text-sm font-semibold">Monto<Input name="amount" type="number" min="0.01" max={outstandingAmount} step="0.01" inputMode="decimal" defaultValue={typeof outstandingAmount === 'number' && outstandingAmount > 0 ? outstandingAmount.toFixed(2) : undefined} placeholder="0.00" className={inputClass} /><FieldError state={state} field="amount" /></label><PaymentMethodSelect methods={paymentMethods} state={state} /><label className="block space-y-1.5 text-sm font-semibold">N.º de operación o referencia <span className="font-normal text-muted-foreground">(opcional)</span><Input name="reference" maxLength={80} placeholder="Ej. 004812" className={inputClass} /></label><label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" maxLength={300} className="min-h-20 rounded-xl bg-background" /></label><Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar cobro" disabled={paymentMethods.length === 0 || (typeof outstandingAmount === 'number' && outstandingAmount <= 0)} /></form>
 }

@@ -15,6 +15,7 @@ export const manualBookingSchema = z.object({
   customerName: z.string().trim().min(2, 'Escribe el nombre del cliente.').max(120),
   customerPhone: z.string().trim().min(7, 'Escribe un teléfono válido.').max(30),
   advanceAmount: z.coerce.number().positive('Registra el adelanto recibido.').max(99999, 'El adelanto es demasiado alto.'),
+  paymentMethodId: z.uuid('Selecciona cómo recibiste el adelanto.'),
   channel: z.enum(['whatsapp', 'presencial']),
   notes: z.string().trim().max(500),
 })
@@ -29,6 +30,7 @@ export const encasedBookingSchema = z.object({
   customerName: z.string().trim().min(2, 'Escribe el nombre del cliente.').max(120),
   customerPhone: z.string().trim().min(7, 'Escribe un teléfono válido.').max(30),
   advanceAmount: z.coerce.number().positive('Registra el adelanto recibido.').max(99999, 'El adelanto es demasiado alto.'),
+  paymentMethodId: z.uuid('Selecciona cómo recibiste el adelanto.'),
   channel: z.enum(['whatsapp', 'presencial']),
   notes: z.string().trim().max(500),
 })
@@ -48,8 +50,12 @@ export const maintenanceSchema = z.object({
 export const extendReservationSchema = z.object({
   reservationId: z.uuid(),
   chargeStatus: z.enum(['pendiente', 'cobrado']),
-  paymentMethod: z.string().trim().max(60),
+  paymentMethodId: z.string().trim(),
   notes: z.string().trim().max(300),
+}).superRefine((value, context) => {
+  if (value.chargeStatus === 'cobrado' && !z.uuid().safeParse(value.paymentMethodId).success) {
+    context.addIssue({ code: 'custom', path: ['paymentMethodId'], message: 'Selecciona cómo se cobró la extensión.' })
+  }
 })
 
 export const reservationDecisionSchema = z.object({
@@ -83,8 +89,8 @@ export const noShowReservationSchema = z.object({
 
 export const paymentMovementSchema = z.object({
   reservationId: z.uuid(),
-  type: z.enum(['adelanto', 'saldo', 'reembolso']),
   amount: z.coerce.number().positive('El monto debe ser mayor que cero.').max(99999),
-  method: z.string().trim().max(60),
+  paymentMethodId: z.uuid('Selecciona el medio de cobro.'),
+  reference: z.string().trim().max(80),
   notes: z.string().trim().max(300),
 })

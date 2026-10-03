@@ -1,4 +1,5 @@
-import type { Json, Tables } from '@/types/database.types'
+import type { Tables } from '@/types/database.types'
+import type { LocalPaymentMethod } from '@/features/payments/types'
 
 export type LocalSettings = Pick<
   Tables<'locales'>,
@@ -35,13 +36,6 @@ export type LocalBenefit = Pick<
   'beneficio_catalogo_id' | 'nombre_personalizado'
 >
 
-export type PaymentMethodType = 'yape' | 'plin' | 'transferencia' | 'efectivo' | 'otro'
-
-export type PaymentMethod = {
-  tipo: PaymentMethodType
-  detalle: string
-}
-
 export type SettingsActionState = {
   success: boolean
   message?: string
@@ -50,17 +44,5 @@ export type SettingsActionState = {
 
 export const initialSettingsActionState: SettingsActionState = { success: false }
 
-export function parsePaymentMethods(value: Json): PaymentMethod[] {
-  if (!Array.isArray(value)) return []
-  return value.flatMap((item) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
-    const tipo = item.tipo
-    const detalle = item.detalle
-    if (
-      typeof tipo !== 'string'
-      || !['yape', 'plin', 'transferencia', 'efectivo', 'otro'].includes(tipo)
-      || typeof detalle !== 'string'
-    ) return []
-    return [{ tipo: tipo as PaymentMethodType, detalle }]
-  })
-}
+export type { LocalPaymentMethod }
+export type { PaymentMethodType } from '@/features/payments/types'

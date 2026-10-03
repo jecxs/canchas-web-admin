@@ -8,7 +8,7 @@ import { ScheduleSettingsForm } from '@/features/local-settings/schedule-setting
 import { SettingsSectionNav } from '@/features/local-settings/settings-section-nav'
 
 export default async function OwnerSettingsPage() {
-  const { local, settings, schedules, photos, benefitCatalog, benefits, minimumAdvancePercentage } = await getLocalSettings()
+  const { local, settings, schedules, photos, benefitCatalog, benefits, paymentMethods, minimumAdvancePercentage } = await getLocalSettings()
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -28,7 +28,7 @@ export default async function OwnerSettingsPage() {
           <LocalMediaManager localId={settings.id} logo={settings.logo} photos={photos} />
           <ScheduleSettingsForm localId={settings.id} schedules={schedules} />
           <BenefitsSettingsForm localId={settings.id} catalog={benefitCatalog} benefits={benefits} />
-          <CommercialSettingsForm settings={settings} minimumAdvancePercentage={minimumAdvancePercentage} />
+          <CommercialSettingsForm settings={settings} paymentMethods={paymentMethods} minimumAdvancePercentage={minimumAdvancePercentage} />
         </div>
       </div>
     </div>

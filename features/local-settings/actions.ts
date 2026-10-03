@@ -92,7 +92,15 @@ export async function saveCommercialSettingsAction(
   const selected = formData.getAll('paymentMethod').flatMap((value) => {
     const type = paymentTypeSchema.safeParse(value)
     if (!type.success) return []
-    return [{ tipo: type.data, detalle: formData.get(`payment_${type.data}`) }]
+    return [{
+      tipo: type.data,
+      nombre_visible: type.data === 'otro' ? formData.get('payment_otro_name') : '',
+      titular: formData.get(`payment_${type.data}_holder`) ?? '',
+      telefono: formData.get(`payment_${type.data}_phone`) ?? '',
+      banco: formData.get('payment_transferencia_bank') ?? '',
+      numero_cuenta: formData.get('payment_transferencia_account') ?? '',
+      cci: formData.get('payment_transferencia_cci') ?? '',
+    }]
   })
   const validation = commercialSettingsSchema.safeParse({
     localId: formData.get('localId'),
@@ -119,7 +127,7 @@ export async function saveCommercialSettingsAction(
       },
     }
   }
-  const { error } = await supabase.rpc('actualizar_reglas_comerciales_local', {
+  const { error } = await supabase.rpc('actualizar_reglas_comerciales_local_v2', {
     p_local_id: validation.data.localId,
     p_porcentaje_adelanto: validation.data.advancePercentage,
     p_medios_pago: validation.data.paymentMethods,
