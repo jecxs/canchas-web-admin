@@ -5,6 +5,7 @@ import 'server-only'
 import { revalidatePath } from 'next/cache'
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
+import { getMinimumAdvanceValidationMessage } from './advance-policy'
 import {
   benefitsSettingsSchema,
   commercialSettingsSchema,
@@ -23,6 +24,11 @@ const messages = {
 
 function validationFailure(error: { flatten: () => { fieldErrors: Record<string, string[] | undefined> } }): SettingsActionState {
   return { success: false, message: messages.invalid, fieldErrors: error.flatten().fieldErrors }
+}
+
+function parseMinimumAdvancePercentage(value: unknown) {
+  const percentage = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(percentage) && percentage >= 1 && percentage <= 100 ? percentage : null
 }
 
 async function activeLocalMatches(localId: unknown) {
@@ -86,7 +92,15 @@ export async function saveCommercialSettingsAction(
   const selected = formData.getAll('paymentMethod').flatMap((value) => {
     const type = paymentTypeSchema.safeParse(value)
     if (!type.success) return []
-    return [{ tipo: type.data, detalle: formData.get(`payment_${type.data}`) }]
+    return [{
+      tipo: type.data,
+      nombre_visible: type.data === 'otro' ? formData.get('payment_otro_name') : '',
+      titular: formData.get(`payment_${type.data}_holder`) ?? '',
+      telefono: formData.get(`payment_${type.data}_phone`) ?? '',
+      banco: formData.get('payment_transferencia_bank') ?? '',
+      numero_cuenta: formData.get('payment_transferencia_account') ?? '',
+      cci: formData.get('payment_transferencia_cci') ?? '',
+    }]
   })
   const validation = commercialSettingsSchema.safeParse({
     localId: formData.get('localId'),
@@ -98,7 +112,22 @@ export async function saveCommercialSettingsAction(
   if (!await activeLocalMatches(validation.data.localId)) return { success: false, message: messages.denied }
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('actualizar_reglas_comerciales_local', {
+  const { data: minimumAdvancePercentage, error: minimumAdvancePercentageError } = await supabase.rpc('obtener_minimo_adelanto_global')
+  const parsedMinimumAdvancePercentage = parseMinimumAdvancePercentage(minimumAdvancePercentage)
+  if (minimumAdvancePercentageError || parsedMinimumAdvancePercentage === null) {
+    console.error('[local-settings:commercial-policy]', { code: minimumAdvancePercentageError?.code })
+    return { success: false, message: messages.failed }
+  }
+  if (validation.data.advancePercentage < parsedMinimumAdvancePercentage) {
+    return {
+      success: false,
+      message: messages.invalid,
+      fieldErrors: {
+        advancePercentage: [getMinimumAdvanceValidationMessage(parsedMinimumAdvancePercentage)],
+      },
+    }
+  }
+  const { error } = await supabase.rpc('actualizar_reglas_comerciales_local_v2', {
     p_local_id: validation.data.localId,
     p_porcentaje_adelanto: validation.data.advancePercentage,
     p_medios_pago: validation.data.paymentMethods,

@@ -38,6 +38,14 @@ export function getWeekDates(value: string) {
   return Array.from({ length: 7 }, (_, index) => shiftAgendaDate(start, index))
 }
 
+/**
+ * Operational Agenda plans from its selected day forward, rather than from a
+ * calendar-week boundary. This keeps completed days out of the default view.
+ */
+export function getRollingAgendaDates(value: string) {
+  return Array.from({ length: 7 }, (_, index) => shiftAgendaDate(value, index))
+}
+
 export function formatAgendaDate(value: string) {
   return new Intl.DateTimeFormat('es-PE', {
     timeZone: LIMA_TIME_ZONE,

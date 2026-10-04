@@ -29,6 +29,18 @@ export type ReservationExtension = {
   createdAt: string
 }
 
+export type ReservationPaymentMovement = {
+  id: string
+  type: string
+  amount: number
+  method: string | null
+  methodType: string | null
+  holder: string | null
+  reference: string | null
+  notes: string | null
+  createdAt: string
+}
+
 export type OwnerReservation = {
   id: string
   courtId: string
@@ -42,6 +54,9 @@ export type OwnerReservation = {
   channel: ReservationChannel
   totalAmount: number
   advanceAmount: number
+  paidAmount: number
+  refundedAmount: number
+  outstandingAmount: number
   isTimeException: boolean
   proofPath: string | null
   proofUrl: string | null
@@ -56,12 +71,14 @@ export type OwnerReservation = {
   cancellationReason: string | null
   refundResult: string
   extensions: ReservationExtension[]
+  paymentMovements: ReservationPaymentMovement[]
 }
 
 export type ReservationsData = {
   localId: string
   localName: string
   courts: Array<{ id: string; name: string }>
+  paymentMethods: LocalPaymentMethod[]
   reservations: OwnerReservation[]
   filters: Required<Pick<ReservationsFilters, 'page'>> & Omit<ReservationsFilters, 'page'>
   pagination: {
@@ -71,3 +88,4 @@ export type ReservationsData = {
     totalPages: number
   }
 }
+import type { LocalPaymentMethod } from '@/features/payments/types'

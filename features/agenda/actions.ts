@@ -33,7 +33,13 @@ function finish(message: string): AgendaActionState {
   revalidatePath('/panel')
   revalidatePath('/panel/agenda')
   revalidatePath('/panel/reservas')
+  revalidatePath('/panel/clientes')
   return { success: true, message }
+}
+
+function readClienteId(formData: FormData) {
+  const value = formData.get('clienteId')
+  return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
 function rangeFromLocalTimes(date: string, startTime: string, endTime: string) {
@@ -51,9 +57,11 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
     date: formData.get('date'),
     time: formData.get('time'),
     blocks: formData.get('blocks'),
+    clienteId: readClienteId(formData),
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
-    status: formData.get('status'),
+    advanceAmount: formData.get('advanceAmount'),
+    paymentMethodId: formData.get('paymentMethodId'),
     channel: formData.get('channel'),
     notes: formData.get('notes') ?? '',
   })
@@ -66,15 +74,17 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
   if (local.id !== validation.data.localId) return { success: false, message: 'No tienes permiso para realizar esta acción' }
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('crear_reserva_manual_dueno', {
+  const { error } = await supabase.rpc('crear_reserva_manual_confirmada_dueno_v2', {
     p_local_id: local.id,
     p_cancha_id: validation.data.courtId,
     p_deporte_id: validation.data.sportId,
     p_inicio: start,
     p_bloques: validation.data.blocks,
+    p_cliente_id: validation.data.clienteId,
     p_cliente_nombre: validation.data.customerName,
     p_cliente_telefono: validation.data.customerPhone,
-    p_estado: validation.data.status,
+    p_monto_adelanto: validation.data.advanceAmount,
+    p_medio_pago_id: validation.data.paymentMethodId,
     p_canal: validation.data.channel,
     p_notas: validation.data.notes || undefined,
   })
@@ -85,12 +95,15 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
 export async function createEncasedBookingAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
   const validation = encasedBookingSchema.safeParse({
     localId: formData.get('localId'),
+    courtId: formData.get('courtId'),
     sportId: formData.get('sportId'),
     date: formData.get('date'),
     time: formData.get('time'),
+    clienteId: readClienteId(formData),
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
-    status: formData.get('status'),
+    advanceAmount: formData.get('advanceAmount'),
+    paymentMethodId: formData.get('paymentMethodId'),
     channel: formData.get('channel'),
     notes: formData.get('notes') ?? '',
   })
@@ -103,13 +116,16 @@ export async function createEncasedBookingAction(_state: AgendaActionState, form
   if (local.id !== validation.data.localId) return { success: false, message: 'No tienes permiso para realizar esta acción' }
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('crear_reserva_manual_encajada', {
+  const { error } = await supabase.rpc('crear_reserva_manual_encajada_confirmada_dueno_v2', {
     p_local_id: local.id,
+    p_cancha_id: validation.data.courtId,
     p_deporte_id: validation.data.sportId,
     p_inicio: start,
+    p_cliente_id: validation.data.clienteId,
     p_cliente_nombre: validation.data.customerName,
     p_cliente_telefono: validation.data.customerPhone,
-    p_estado: validation.data.status,
+    p_monto_adelanto: validation.data.advanceAmount,
+    p_medio_pago_id: validation.data.paymentMethodId,
     p_canal: validation.data.channel,
     p_notas: validation.data.notes || undefined,
   })
@@ -148,17 +164,17 @@ export async function extendReservationAction(_state: AgendaActionState, formDat
   const validation = extendReservationSchema.safeParse({
     reservationId: formData.get('reservationId'),
     chargeStatus: formData.get('chargeStatus'),
-    paymentMethod: formData.get('paymentMethod') ?? '',
+    paymentMethodId: formData.get('paymentMethodId') ?? '',
     notes: formData.get('notes') ?? '',
   })
   if (!validation.success) return invalid(validation.error.flatten().fieldErrors)
 
   await requireOperationalOwnerLocal()
   const supabase = await createClient()
-  const { error } = await supabase.rpc('extender_reserva_30_min', {
+  const { error } = await supabase.rpc('extender_reserva_30_min_v2', {
     p_reserva_id: validation.data.reservationId,
     p_estado_cobro: validation.data.chargeStatus,
-    p_medio_cobro: validation.data.paymentMethod || undefined,
+    p_medio_pago_id: validation.data.paymentMethodId || undefined,
     p_notas: validation.data.notes || undefined,
   })
   if (error) return operationError('extend', error)
@@ -230,11 +246,11 @@ export async function markNoShowReservationAction(_state: AgendaActionState, for
 }
 
 export async function registerPaymentMovementAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
-  const validation = paymentMovementSchema.safeParse({ reservationId: formData.get('reservationId'), type: formData.get('type'), amount: formData.get('amount'), method: formData.get('method') ?? '', notes: formData.get('notes') ?? '' })
+  const validation = paymentMovementSchema.safeParse({ reservationId: formData.get('reservationId'), amount: formData.get('amount'), paymentMethodId: formData.get('paymentMethodId'), reference: formData.get('reference') ?? '', notes: formData.get('notes') ?? '' })
   if (!validation.success) return invalid(validation.error.flatten().fieldErrors)
   await requireOperationalOwnerLocal()
   const supabase = await createClient()
-  const { error } = await supabase.rpc('registrar_movimiento_pago_reserva_dueno', { p_reserva_id: validation.data.reservationId, p_tipo: validation.data.type, p_monto: validation.data.amount, p_medio: validation.data.method || undefined, p_notas: validation.data.notes || undefined })
+  const { error } = await supabase.rpc('registrar_movimiento_pago_reserva_dueno_v2', { p_reserva_id: validation.data.reservationId, p_monto: validation.data.amount, p_medio_pago_id: validation.data.paymentMethodId, p_referencia: validation.data.reference || undefined, p_notas: validation.data.notes || undefined })
   if (error) return operationError('payment-movement', error)
   return finish('Movimiento de caja registrado')
 }

@@ -1,3 +1,5 @@
+import type { LocalPaymentMethod } from '@/features/payments/types'
+
 export type AgendaOccupation = {
   courtId: string
   courtName: string
@@ -23,6 +25,11 @@ export type AgendaOccupation = {
   outstandingAmount?: number
 }
 
+export type AgendaSport = {
+  id: string
+  name: string
+}
+
 export type AgendaCourt = {
   id: string
   name: string
@@ -30,7 +37,7 @@ export type AgendaCourt = {
   description?: string | null
   lengthMeters?: number | null
   widthMeters?: number | null
-  sports: Array<{ id: string; name: string }>
+  sports: AgendaSport[]
 }
 
 export type AgendaData = {
@@ -42,7 +49,8 @@ export type AgendaData = {
   closingTime: string | null
   courts: AgendaCourt[]
   occupations: AgendaOccupation[]
-  sports: Array<{ id: string; name: string }>
+  sports: AgendaSport[]
+  paymentMethods: LocalPaymentMethod[]
 }
 
 export type AgendaActionState = {

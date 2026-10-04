@@ -12,20 +12,20 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { saveCommercialSettingsAction } from './actions'
+import { getMinimumAdvanceDescription } from './advance-policy'
 import { useSettingsFormFeedback } from './form-feedback'
 import {
   initialSettingsActionState,
-  parsePaymentMethods,
   type LocalSettings,
-  type PaymentMethodType,
 } from './types'
+import type { LocalPaymentMethod, PaymentMethodType } from '@/features/payments/types'
 
 const methods = [
-  { type: 'yape', label: 'Yape', placeholder: 'Número y nombre del titular' },
-  { type: 'plin', label: 'Plin', placeholder: 'Número y nombre del titular' },
-  { type: 'transferencia', label: 'Transferencia', placeholder: 'Banco, cuenta o CCI y titular' },
-  { type: 'efectivo', label: 'Efectivo', placeholder: 'Indica cuándo se acepta' },
-  { type: 'otro', label: 'Otro', placeholder: 'Nombre e instrucciones' },
+  { type: 'yape', label: 'Yape', group: 'digital' },
+  { type: 'plin', label: 'Plin', group: 'digital' },
+  { type: 'transferencia', label: 'Transferencia', group: 'digital' },
+  { type: 'efectivo', label: 'Efectivo', group: 'local' },
+  { type: 'otro', label: 'Otro medio', group: 'local' },
 ] as const
 
 function PaymentMethodIcon({ type, enabled }: { type: PaymentMethodType; enabled: boolean }) {
@@ -63,10 +63,23 @@ function PaymentMethodIcon({ type, enabled }: { type: PaymentMethodType; enabled
   )
 }
 
-export function CommercialSettingsForm({ settings }: { settings: LocalSettings }) {
-  const currentMethods = parsePaymentMethods(settings.medios_pago_adelanto)
+function MethodFields({ type, current }: { type: PaymentMethodType; current?: LocalPaymentMethod }) {
+  if (type === 'yape' || type === 'plin') {
+    return <div className="mt-3 grid gap-3 sm:grid-cols-2"><Input name={`payment_${type}_phone`} defaultValue={current?.phone ?? ''} inputMode="numeric" maxLength={9} placeholder="Celular de 9 dígitos" /><Input name={`payment_${type}_holder`} defaultValue={current?.holder ?? ''} maxLength={100} placeholder="Nombre que verá el cliente" /></div>
+  }
+  if (type === 'transferencia') {
+    return <div className="mt-3 grid gap-3 sm:grid-cols-2"><Input name="payment_transferencia_bank" defaultValue={current?.bank ?? ''} maxLength={60} placeholder="Banco" /><Input name="payment_transferencia_holder" defaultValue={current?.holder ?? ''} maxLength={100} placeholder="Titular de la cuenta" /><Input name="payment_transferencia_account" defaultValue={current?.accountNumber ?? ''} maxLength={40} placeholder="Número de cuenta" /><Input name="payment_transferencia_cci" defaultValue={current?.cci ?? ''} inputMode="numeric" maxLength={20} placeholder="CCI (opcional si hay cuenta)" /></div>
+  }
+  if (type === 'otro') {
+    return <Input name="payment_otro_name" defaultValue={current?.name ?? ''} maxLength={60} placeholder="Nombre del medio de cobro" className="mt-3" />
+  }
+  return <p className="mt-2 text-xs text-muted-foreground">Disponible al registrar cobros realizados en el local.</p>
+}
+
+export function CommercialSettingsForm({ settings, paymentMethods, minimumAdvancePercentage }: { settings: LocalSettings; paymentMethods: LocalPaymentMethod[]; minimumAdvancePercentage: number }) {
+  const currentMethods = paymentMethods
   const [selected, setSelected] = useState<Set<PaymentMethodType>>(
-    () => new Set(currentMethods.map((method) => method.tipo)),
+    () => new Set(currentMethods.filter((method) => method.active).map((method) => method.type)),
   )
   const [state, action, pending] = useActionState(saveCommercialSettingsAction, initialSettingsActionState)
   useSettingsFormFeedback(state)
@@ -92,17 +105,39 @@ export function CommercialSettingsForm({ settings }: { settings: LocalSettings }
           <Field data-invalid={Boolean(state.fieldErrors?.advancePercentage)}>
             <FieldLabel htmlFor="advancePercentage">Porcentaje de adelanto</FieldLabel>
             <div className="relative max-w-48"><Input id="advancePercentage" name="advancePercentage" type="number" min={1} max={100} step="0.01" defaultValue={settings.porcentaje_adelanto ?? ''} required className="pr-10" /><span className="pointer-events-none absolute inset-y-0 right-3 grid place-items-center text-sm text-muted-foreground">%</span></div>
-            <FieldDescription>La base también comprobará el mínimo global configurado por Grassly.</FieldDescription>
+            <FieldDescription>{getMinimumAdvanceDescription(minimumAdvancePercentage)}</FieldDescription>
             <FieldError errors={state.fieldErrors?.advancePercentage?.map((message) => ({ message }))} />
           </Field>
 
           <fieldset>
-            <legend className="text-sm font-semibold">Medios aceptados para el adelanto</legend>
-            <p className="mt-1 text-sm text-muted-foreground">Marca solo medios que puedas verificar manualmente.</p>
-            <div className="mt-4 grid gap-3">
-              {methods.map((method) => {
+            <legend className="text-sm font-semibold">Medios de cobro</legend>
+            <p className="mt-1 text-sm text-muted-foreground">Una sola configuración para las reservas del app y los cobros que registras en el panel.</p>
+            <div className="mt-4 space-y-5">
+              <section>
+                <div className="mb-2"><p className="text-xs font-extrabold uppercase tracking-[.1em]">Pagos digitales</p><p className="mt-1 text-xs text-muted-foreground">Se mostrarán al cliente en el app y también estarán disponibles en el panel.</p></div>
+                <div className="grid gap-3">
+                  {methods.filter((method) => method.group === 'digital').map((method) => {
+                    const enabled = selected.has(method.type)
+                    const current = currentMethods.find((item) => item.type === method.type)
+                    return (
+                      <div key={method.type} className="rounded-2xl border bg-muted/15 p-4">
+                        <label className="flex cursor-pointer items-center gap-3 font-semibold">
+                          <input type="checkbox" name="paymentMethod" value={method.type} checked={enabled} onChange={() => toggle(method.type)} className="size-4 accent-primary" />
+                          <PaymentMethodIcon type={method.type} enabled={enabled} />
+                          <span>{method.label}</span>
+                        </label>
+                        <fieldset disabled={!enabled}><MethodFields type={method.type} current={current} /></fieldset>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+              <section>
+                <div className="mb-2"><p className="text-xs font-extrabold uppercase tracking-[.1em]">Cobros en el local</p></div>
+                <div className="grid gap-3">
+                  {methods.filter((method) => method.group === 'local').map((method) => {
                 const enabled = selected.has(method.type)
-                const current = currentMethods.find((item) => item.tipo === method.type)?.detalle ?? ''
+                const current = currentMethods.find((item) => item.type === method.type)
                 return (
                   <div key={method.type} className="rounded-2xl border bg-muted/15 p-4">
                     <label className="flex cursor-pointer items-center gap-3 font-semibold">
@@ -110,10 +145,12 @@ export function CommercialSettingsForm({ settings }: { settings: LocalSettings }
                       <PaymentMethodIcon type={method.type} enabled={enabled} />
                       <span>{method.label}</span>
                     </label>
-                    <Input name={`payment_${method.type}`} defaultValue={current} disabled={!enabled} required={enabled} maxLength={120} placeholder={method.placeholder} className="mt-3" />
+                    <fieldset disabled={!enabled}><MethodFields type={method.type} current={current} /></fieldset>
                   </div>
                 )
-              })}
+                  })}
+                </div>
+              </section>
             </div>
             <FieldError className="mt-2" errors={state.fieldErrors?.paymentMethods?.map((message) => ({ message }))} />
           </fieldset>

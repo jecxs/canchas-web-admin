@@ -26,7 +26,7 @@ export function GeneralSettingsForm({ settings }: { settings: LocalSettings }) {
         <CardDescription>Información comercial visible para los jugadores.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={action} className="space-y-7">
+        <form action={action} onReset={(event) => event.preventDefault()} className="space-y-7">
           <input type="hidden" name="localId" value={settings.id} />
           <FieldGroup>
             <div className="grid gap-5 sm:grid-cols-2">
