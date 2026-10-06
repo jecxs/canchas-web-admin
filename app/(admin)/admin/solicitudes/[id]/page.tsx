@@ -4,6 +4,7 @@ import { Building03Icon, UserIcon } from '@hugeicons/core-free-icons'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { SetBreadcrumb } from '@/components/dashboard/set-breadcrumb'
 import { ApplicationDecisionPanel } from '@/features/admin-applications/application-decision-panel'
 import { getAdminApplication } from '@/features/admin-applications/queries'
 import type { AdminApplicationStatus } from '@/features/admin-applications/types'
@@ -39,6 +40,7 @@ export default async function AdminApplicationDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-5xl">
+      <SetBreadcrumb label={application.name} />
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">

@@ -9,6 +9,7 @@ import { LocalModerationPanel } from '@/features/admin-locales/local-moderation-
 import { AdminLocalChecklist } from '@/features/admin-locales/admin-local-checklist'
 import { AdminLocalCourts } from '@/features/admin-locales/admin-local-courts'
 import { LockSection } from '@/components/dashboard/edit-guard'
+import { SetBreadcrumb } from '@/components/dashboard/set-breadcrumb'
 import { getAdminLocalAudit, getAdminLocalDetail } from '@/features/admin-locales/queries'
 import { OwnerCard } from '@/features/admin-owners/owner-card'
 import { getAdminOwnerCard } from '@/features/admin-owners/queries'
@@ -122,6 +123,7 @@ export default async function AdminLocalDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-6xl">
+      <SetBreadcrumb label={local.name} />
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

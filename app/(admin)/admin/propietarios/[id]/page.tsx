@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { localStatePresentation } from '@/components/dashboard/status'
+import { SetBreadcrumb } from '@/components/dashboard/set-breadcrumb'
 import { EntityAvatar, LocalLogo } from '@/components/dashboard/entity-media'
 import { getAdminOwnerDetail } from '@/features/admin-owners/queries'
 
@@ -95,6 +96,7 @@ export default async function AdminOwnerDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-6xl">
+      <SetBreadcrumb label={owner.name} />
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

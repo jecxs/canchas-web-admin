@@ -89,7 +89,7 @@ export function BenefitsSettingsForm({ localId, catalog, benefits }: { localId: 
       <CardContent>
         <form action={action} onReset={(event) => event.preventDefault()} className="space-y-7">
           <input type="hidden" name="localId" value={localId} />
-          {selectedIds.map((benefitId) => <input key={benefitId} type="hidden" name="benefitCatalogId" value={benefitId} />)}
+          {selectedIds.map((benefitId) => <input key={benefitId} type="hidden" name="benefitCatalogId" value={benefitId} data-label="Beneficios del catálogo" />)}
 
           <div className="space-y-5">
             {categories.map((category) => (
@@ -123,13 +123,13 @@ export function BenefitsSettingsForm({ localId, catalog, benefits }: { localId: 
             </div>
             {customError && <p className="mt-2 text-sm font-medium text-destructive">{customError}</p>}
             {customBenefits.length > 0 && <div className="mt-4 flex flex-wrap gap-2">
-              {customBenefits.map((benefit) => <span key={benefit} className="inline-flex items-center gap-1.5 rounded-full border bg-muted/35 py-1 pl-3 pr-1 text-sm font-semibold"><input type="hidden" name="customBenefit" value={benefit} /><HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5 text-primary" />{benefit}<button type="button" onClick={() => setCustomBenefits((current) => current.filter((item) => item !== benefit))} className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-background hover:text-foreground" aria-label={`Quitar ${benefit}`}><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-4" /></button></span>)}
+              {customBenefits.map((benefit) => <span key={benefit} className="inline-flex items-center gap-1.5 rounded-full border bg-muted/35 py-1 pl-3 pr-1 text-sm font-semibold"><input type="hidden" name="customBenefit" value={benefit} data-label="Beneficios personalizados" /><HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5 text-primary" />{benefit}<button type="button" onClick={() => setCustomBenefits((current) => current.filter((item) => item !== benefit))} className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-background hover:text-foreground" aria-label={`Quitar ${benefit}`}><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-4" /></button></span>)}
             </div>}
             <FieldError className="mt-2" errors={state.fieldErrors?.customBenefits?.map((message) => ({ message }))} />
           </fieldset>
 
           <FieldError errors={state.fieldErrors?.catalogIds?.map((message) => ({ message }))} />
-          <GuardActions pending={pending} submitLabel="Guardar beneficios" />
+          <GuardActions pending={pending} state={state} submitLabel="Guardar beneficios" />
         </form>
       </CardContent>
     </Card>

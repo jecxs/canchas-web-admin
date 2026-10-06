@@ -106,11 +106,11 @@ export function CommercialSettingsForm({ settings, minimumAdvancePercentage }: {
                 return (
                   <div key={method.type} className="rounded-2xl border bg-muted/15 p-4">
                     <label className="flex cursor-pointer items-center gap-3 font-semibold">
-                      <input type="checkbox" name="paymentMethod" value={method.type} checked={enabled} onChange={() => toggle(method.type)} className="size-4 accent-primary" />
+                      <input type="checkbox" name="paymentMethod" value={method.type} checked={enabled} onChange={() => toggle(method.type)} data-label="Medios de pago" className="size-4 accent-primary" />
                       <PaymentMethodIcon type={method.type} enabled={enabled} />
                       <span>{method.label}</span>
                     </label>
-                    <Input name={`payment_${method.type}`} defaultValue={current} disabled={!enabled} required={enabled} maxLength={120} placeholder={method.placeholder} className="mt-3" />
+                    <Input name={`payment_${method.type}`} defaultValue={current} disabled={!enabled} required={enabled} maxLength={120} placeholder={method.placeholder} data-label={`Detalle de ${method.label}`} className="mt-3" />
                   </div>
                 )
               })}
@@ -123,7 +123,7 @@ export function CommercialSettingsForm({ settings, minimumAdvancePercentage }: {
             <Textarea id="refundPolicy" name="refundPolicy" defaultValue={settings.politica_reembolso === 'Este local no especificó su política de reembolso.' ? '' : settings.politica_reembolso} minLength={20} maxLength={1500} rows={6} required placeholder="Explica con cuánta anticipación se puede cancelar y en qué casos corresponde una devolución." />
             <FieldError errors={state.fieldErrors?.refundPolicy?.map((message) => ({ message }))} />
           </Field>
-          <GuardActions pending={pending} submitLabel="Guardar reglas comerciales" />
+          <GuardActions pending={pending} state={state} submitLabel="Guardar reglas comerciales" />
         </form>
       </CardContent>
     </Card>

@@ -7,12 +7,9 @@ import {
   Task01Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { localStatePresentation } from '@/components/dashboard/status'
 import { requireAdmin } from '@/lib/auth/dal'
 import { getAdminOverview } from '@/features/admin-overview/queries'
-import { ADMIN_LOCAL_STATES } from '@/features/admin-locales/types'
 
 const metrics = [
   {
@@ -98,25 +95,6 @@ export default async function AdminDashboardPage() {
             </Card>
           </Link>
         ))}
-      </section>
-
-      <section className="mt-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-extrabold">Locales por estado</h2>
-          <Link href="/admin/locales" className="text-sm font-bold text-success-foreground hover:underline">
-            Ver todos
-          </Link>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {ADMIN_LOCAL_STATES.map((state) => (
-            <Link key={state} href={`/admin/locales?estado=${state}`}>
-              <Badge variant={localStatePresentation[state].tone} className="px-3 py-1.5">
-                {localStatePresentation[state].label}
-                <span className="font-black">{overview.locales.byState[state]}</span>
-              </Badge>
-            </Link>
-          ))}
-        </div>
       </section>
     </div>
   )

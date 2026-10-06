@@ -10,6 +10,8 @@ import { ScheduleSettingsForm } from '@/features/local-settings/schedule-setting
 import { SettingsSectionNav } from '@/features/local-settings/settings-section-nav'
 import { AdminLocalCourts } from '@/features/admin-locales/admin-local-courts'
 import { EditGuard, LockSection } from '@/components/dashboard/edit-guard'
+import { UnsavedChangesProvider } from '@/components/dashboard/unsaved-changes'
+import { SetBreadcrumb } from '@/components/dashboard/set-breadcrumb'
 import { getAdminLocalDetail } from '@/features/admin-locales/queries'
 import { getAdminLocalEditor } from '@/features/admin-locales/editor-queries'
 import type { AdminLocalState } from '@/features/admin-locales/types'
@@ -31,6 +33,7 @@ export default async function AdminLocalConfigPage({
   if (!isOperational) {
     return (
       <div className="mx-auto w-full max-w-3xl">
+        <SetBreadcrumb label={local.name} />
         <div className="flex flex-wrap items-center gap-2">
           <p className="eyebrow">Configuración del local</p>
           <Badge variant={state.tone}>{state.label}</Badge>
@@ -52,6 +55,7 @@ export default async function AdminLocalConfigPage({
 
   return (
     <div className="mx-auto w-full max-w-6xl">
+      <SetBreadcrumb label={local.name} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow">Configuración del local</p>
@@ -68,47 +72,49 @@ export default async function AdminLocalConfigPage({
 
       <div className="mt-9 grid items-start gap-7 lg:grid-cols-[220px_minmax(0,1fr)]">
         <SettingsSectionNav courtsHref={`/admin/locales/${local.id}/configuracion#canchas`} />
-        <div className="space-y-6">
-          <EditGuard>
-            <GeneralSettingsForm settings={editor.settings} />
-          </EditGuard>
+        <UnsavedChangesProvider>
+          <div className="space-y-6">
+            <EditGuard title="Datos generales">
+              <GeneralSettingsForm settings={editor.settings} />
+            </EditGuard>
 
-          <EditGuard>
-            <LocalMediaManager
-              localId={local.id}
-              logo={editor.settings.logo}
-              photos={editor.photos}
-              allowVisibility
-            />
-          </EditGuard>
-
-          <EditGuard>
-            <ScheduleSettingsForm localId={local.id} schedules={editor.schedules} />
-          </EditGuard>
-
-          <EditGuard>
-            <BenefitsSettingsForm localId={local.id} catalog={editor.benefitCatalog} benefits={editor.benefits} />
-          </EditGuard>
-
-          <EditGuard>
-            <CommercialSettingsForm
-              settings={editor.settings}
-              minimumAdvancePercentage={editor.minimumAdvancePercentage}
-            />
-          </EditGuard>
-
-          <div id="canchas" className="scroll-mt-24">
-            <LockSection>
-              <AdminLocalCourts
+            <EditGuard title="Logo y galería">
+              <LocalMediaManager
                 localId={local.id}
-                localName={local.name}
-                courts={editor.courts}
-                sports={editor.sports}
-                editable
+                logo={editor.settings.logo}
+                photos={editor.photos}
+                allowVisibility
               />
-            </LockSection>
+            </EditGuard>
+
+            <EditGuard title="Horarios">
+              <ScheduleSettingsForm localId={local.id} schedules={editor.schedules} />
+            </EditGuard>
+
+            <EditGuard title="Beneficios">
+              <BenefitsSettingsForm localId={local.id} catalog={editor.benefitCatalog} benefits={editor.benefits} />
+            </EditGuard>
+
+            <EditGuard title="Pagos y políticas">
+              <CommercialSettingsForm
+                settings={editor.settings}
+                minimumAdvancePercentage={editor.minimumAdvancePercentage}
+              />
+            </EditGuard>
+
+            <div id="canchas" className="scroll-mt-24">
+              <LockSection>
+                <AdminLocalCourts
+                  localId={local.id}
+                  localName={local.name}
+                  courts={editor.courts}
+                  sports={editor.sports}
+                  editable
+                />
+              </LockSection>
+            </div>
           </div>
-        </div>
+        </UnsavedChangesProvider>
       </div>
     </div>
   )

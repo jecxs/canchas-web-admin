@@ -77,7 +77,7 @@ export function GeneralSettingsForm({ settings }: { settings: LocalSettings }) {
               </Field>
             </div>
           </FieldGroup>
-          <GuardActions pending={pending} submitLabel="Guardar datos generales" />
+          <GuardActions pending={pending} state={state} submitLabel="Guardar datos generales" />
         </form>
       </CardContent>
     </Card>
