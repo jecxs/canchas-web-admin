@@ -8,12 +8,28 @@ import type { AuditIncident, AuditIncidentActor, AuditIncidentType } from './typ
 const TYPE_LABELS: Record<AuditIncidentType, string> = {
   cancelacion: 'Cancelación',
   rechazo: 'Rechazo de pago',
+  extension: 'Extensión',
+}
+
+const TYPE_VARIANTS: Record<AuditIncidentType, 'destructive' | 'warning' | 'info'> = {
+  cancelacion: 'destructive',
+  rechazo: 'warning',
+  extension: 'info',
 }
 
 const ACTOR_LABELS: Record<AuditIncidentActor, string> = {
   cliente: 'Cliente',
   dueno: 'Dueño',
   sistema: 'Sistema',
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'PEN',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value)
 }
 
 function formatDateTime(value: string) {
@@ -45,6 +61,7 @@ export function AuditIncidentsTable({ incidents }: { incidents: AuditIncident[] 
       todos: incidents.length,
       cancelacion: incidents.filter((incident) => incident.type === 'cancelacion').length,
       rechazo: incidents.filter((incident) => incident.type === 'rechazo').length,
+      extension: incidents.filter((incident) => incident.type === 'extension').length,
     }),
     [incidents],
   )
@@ -57,7 +74,7 @@ export function AuditIncidentsTable({ incidents }: { incidents: AuditIncident[] 
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        {(['todos', 'cancelacion', 'rechazo'] as const).map((key) => (
+        {(['todos', 'cancelacion', 'rechazo', 'extension'] as const).map((key) => (
           <button
             key={key}
             type="button"
@@ -84,6 +101,7 @@ export function AuditIncidentsTable({ incidents }: { incidents: AuditIncident[] 
               <th className="px-3 py-2">Cancha · Deporte</th>
               <th className="px-3 py-2">Fecha partido</th>
               <th className="px-3 py-2">Actor</th>
+              <th className="px-3 py-2">Monto</th>
               <th className="px-3 py-2">Motivo</th>
             </tr>
           </thead>
@@ -91,9 +109,7 @@ export function AuditIncidentsTable({ incidents }: { incidents: AuditIncident[] 
             {filtered.map((incident) => (
               <tr key={incident.id} className="border-b border-border/60">
                 <td className="px-3 py-2.5">
-                  <Badge variant={incident.type === 'cancelacion' ? 'destructive' : 'warning'}>
-                    {TYPE_LABELS[incident.type]}
-                  </Badge>
+                  <Badge variant={TYPE_VARIANTS[incident.type]}>{TYPE_LABELS[incident.type]}</Badge>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2.5 text-xs text-muted-foreground">
                   {formatDateTime(incident.eventAt)}
@@ -106,12 +122,15 @@ export function AuditIncidentsTable({ incidents }: { incidents: AuditIncident[] 
                   {formatDate(incident.gameDate)}
                 </td>
                 <td className="px-3 py-2.5">{ACTOR_LABELS[incident.actor]}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums">
+                  {incident.amount ? formatMoney(incident.amount) : '—'}
+                </td>
                 <td className="max-w-[260px] px-3 py-2.5 text-muted-foreground">{incident.reason ?? '—'}</td>
               </tr>
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                <td colSpan={8} className="px-3 py-8 text-center text-sm text-muted-foreground">
                   Sin incidencias en este periodo.
                 </td>
               </tr>

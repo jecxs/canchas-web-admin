@@ -58,6 +58,17 @@ type CobrosReader = {
   }>
 }
 
+type ExtensionRow = {
+  id: string
+  reserva_id: string
+  monto_adicional: number
+  estado_cobro: string
+  medio_cobro: string | null
+  medio_tipo_snapshot: string | null
+  created_at: string
+  reservas: { cancha_id: string; deporte_id: string } | null
+}
+
 type CountTotals = { income: number; count: number }
 
 function computeKpi(value: number, previous: number, goodWhenUp: boolean): ReportKpi {
@@ -74,7 +85,7 @@ function buildEmptyDaily(start: string, end: string): ReportDailyPoint[] {
   let cursor = start
   let guard = 0
   while (cursor <= end && guard < 800) {
-    points.push({ date: cursor, income: 0, reservations: 0 })
+    points.push({ date: cursor, income: 0, movements: 0 })
     cursor = shiftDate(cursor, 1)
     guard += 1
   }
@@ -183,22 +194,39 @@ export async function getIncomeReport(input: {
   const courtIds = courts.map((court) => court.id)
   const startIso = `${previous.start}T00:00:00-05:00`
   const endIso = `${shiftDate(end, 1)}T00:00:00-05:00`
+  const prevStartIso = `${previous.start}T00:00:00-05:00`
   const movementStart = shiftDate(start, -MOVEMENT_LOOKBACK_DAYS)
 
   const reader = supabase as unknown as CobrosReader
-  const [{ data: movementRows, error: movementsError }, rows] = await Promise.all([
+  const [
+    { data: movementRows, error: movementsError },
+    rows,
+    { data: extensionRows, error: extensionsError },
+  ] = await Promise.all([
     reader.rpc('obtener_cobros_reporte_local', {
       p_local_id: local.id,
       p_desde: movementStart,
       p_hasta: end,
     }),
     fetchReservations(supabase, courtIds, startIso, endIso),
+    supabase
+      .from('reserva_extensiones')
+      .select('id,reserva_id,monto_adicional,estado_cobro,medio_cobro,medio_tipo_snapshot,created_at,reservas!inner(cancha_id,deporte_id)')
+      .in('reservas.cancha_id', courtIds)
+      .gte('created_at', prevStartIso)
+      .lte('created_at', endIso),
   ])
 
   if (movementsError) {
     console.error('[reportes:movements]', { code: movementsError.code, message: movementsError.message })
     throw new Error('No se pudieron cargar los cobros para el reporte.')
   }
+  if (extensionsError) {
+    console.error('[reportes:extensions]', { code: extensionsError.code, message: extensionsError.message })
+    throw new Error('No se pudieron cargar las extensiones del reporte.')
+  }
+
+  const extensions = (extensionRows ?? []) as ExtensionRow[]
 
   const movements = (movementRows ?? []).map((row) => ({
     ...row,
@@ -285,11 +313,63 @@ export async function getIncomeReport(input: {
     }
   }
 
-  let outstanding = 0
+  // Extensiones de 30 min. Una extensión COBRADA genera un movimiento 'saldo'
+  // (ver extender_reserva_30_min_v2), así que ya está en los movimientos: solo
+  // se suma si NO existe ese movimiento (extensiones legadas). Las PENDIENTES
+  // no generan movimiento y se suman al saldo por cobrar.
+  const movementKeys = new Set(
+    movements.map((movement) => `${movement.reserva_id}|${movement.amount.toFixed(2)}`),
+  )
+  let extensionPending = 0
+  let extensionPendingPrev = 0
+  for (const extension of extensions) {
+    const amount = Number(extension.monto_adicional) || 0
+    if (amount <= 0) continue
+    const date = limaDate(extension.created_at)
+    const isPendiente = extension.estado_cobro === 'pendiente'
+    const inCurrent = date >= start && date <= end
+    const inPrev = date >= previous.start && date <= previous.end
+
+    if (isPendiente) {
+      if (inCurrent) extensionPending += amount
+      else if (inPrev) extensionPendingPrev += amount
+      continue
+    }
+
+    // Cobrada: si ya existe el movimiento equivalente, no se cuenta dos veces.
+    if (movementKeys.has(`${extension.reserva_id}|${amount.toFixed(2)}`)) continue
+
+    const method = (extension.medio_tipo_snapshot ?? extension.medio_cobro ?? '').trim().toLowerCase() || 'otro'
+    const canchaId = extension.reservas?.cancha_id
+    const deporteId = extension.reservas?.deporte_id
+
+    if (inCurrent) {
+      collected += amount
+      addMovement(dailyMap, date, amount)
+      addMovement(methodCash, method, amount)
+      if (!methodNames.has(method)) methodNames.set(method, formatMethodLabel(method))
+      if (deporteId) {
+        const sport = sportCash.get(deporteId) ?? { income: 0, reservations: new Set<string>() }
+        sport.income += amount
+        sport.reservations.add(extension.reserva_id)
+        sportCash.set(deporteId, sport)
+      }
+      if (canchaId) {
+        const court = courtCash.get(canchaId) ?? { income: 0, reservations: new Set<string>() }
+        court.income += amount
+        court.reservations.add(extension.reserva_id)
+        courtCash.set(canchaId, court)
+      }
+    } else if (inPrev) {
+      collectedPrev += amount
+    }
+  }
+
+  let outstanding = extensionPending
   for (const reservation of periodTotals.values()) {
     outstanding += Math.max(0, reservation.total - (paidTotal.get(reservation.id) ?? 0))
   }
-  let outstandingPrev = 0
+  let outstandingPrev = extensionPendingPrev
   for (const reservation of prevTotals.values()) {
     outstandingPrev += Math.max(0, reservation.total - (paidAsOfPrev.get(reservation.id) ?? 0))
   }
@@ -302,7 +382,7 @@ export async function getIncomeReport(input: {
   const daily = buildEmptyDaily(start, end).map((point) => {
     const bucket = dailyMap.get(point.date)
     return bucket
-      ? { ...point, income: bucket.income, reservations: bucket.count }
+      ? { ...point, income: bucket.income, movements: bucket.count }
       : point
   })
 

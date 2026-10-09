@@ -50,6 +50,57 @@ type CustomersReader = {
   ) => Promise<{ data: CustomerRow[] | null; error: { message?: string } | null }>
 }
 
+type RawExtensionRow = {
+  id: string
+  reserva_id: string
+  monto_adicional: number
+  estado_cobro: string
+  medio_cobro: string | null
+  medio_tipo_snapshot: string | null
+  created_at: string
+  reservas: { cancha_id: string; deporte_id: string; rango: unknown } | null
+}
+
+async function fetchExtensions(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  courtIds: string[],
+  startIso: string,
+  endIso: string,
+) {
+  const { data, error } = await supabase
+    .from('reserva_extensiones')
+    .select('id,reserva_id,monto_adicional,estado_cobro,medio_cobro,medio_tipo_snapshot,created_at,reservas!inner(cancha_id,deporte_id,rango)')
+    .in('reservas.cancha_id', courtIds)
+    .gte('created_at', startIso)
+    .lte('created_at', endIso)
+
+  if (error) {
+    console.error('[reportes-auditoria:extensions]', error)
+    throw new Error(error.message ?? 'No se pudieron cargar las extensiones.')
+  }
+  return (data ?? []) as RawExtensionRow[]
+}
+
+async function countExtensions(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  courtIds: string[],
+  startIso: string,
+  endIso: string,
+) {
+  const { count, error } = await supabase
+    .from('reserva_extensiones')
+    .select('id,reservas!inner(cancha_id)', { count: 'exact', head: true })
+    .in('reservas.cancha_id', courtIds)
+    .gte('created_at', startIso)
+    .lte('created_at', endIso)
+
+  if (error) {
+    console.error('[reportes-auditoria:extensions-count]', error)
+    throw new Error(error.message ?? 'No se pudieron contar las extensiones.')
+  }
+  return count ?? 0
+}
+
 function computeKpi(value: number, previous: number, goodWhenUp: boolean): ReportKpi {
   return {
     value,
@@ -160,14 +211,16 @@ export async function getAuditReport(input: {
     start,
     end,
     today,
-    totals: { cancelaciones: 0, rechazos: 0 },
+    totals: { cancelaciones: 0, rechazos: 0, extensiones: 0 },
     kpis: {
       cancelaciones: computeKpi(0, 0, false),
       rechazos: computeKpi(0, 0, false),
+      extensiones: computeKpi(0, 0, true),
     },
     series: [],
     cancellationsByType: [],
     rejectionsByReason: [],
+    extensionsByChargeStatus: [],
     incidents: [],
   }
 
@@ -190,12 +243,15 @@ export async function getAuditReport(input: {
   const prevStartIso = `${previous.start}T00:00:00-05:00`
   const prevEndIso = `${shiftDate(previous.end, 1)}T00:00:00-05:00`
 
-  const [cancellations, rejections, prevCancellations, prevRejections] = await Promise.all([
-    fetchByEvent(supabase, courtIds, 'cancelacion', startIso, endIso),
-    fetchByEvent(supabase, courtIds, 'rechazo', startIso, endIso),
-    countByEvent(supabase, courtIds, 'cancelacion', prevStartIso, prevEndIso),
-    countByEvent(supabase, courtIds, 'rechazo', prevStartIso, prevEndIso),
-  ])
+  const [cancellations, rejections, extensionRows, prevCancellations, prevRejections, prevExtensiones] =
+    await Promise.all([
+      fetchByEvent(supabase, courtIds, 'cancelacion', startIso, endIso),
+      fetchByEvent(supabase, courtIds, 'rechazo', startIso, endIso),
+      fetchExtensions(supabase, courtIds, startIso, endIso),
+      countByEvent(supabase, courtIds, 'cancelacion', prevStartIso, prevEndIso),
+      countByEvent(supabase, courtIds, 'rechazo', prevStartIso, prevEndIso),
+      countExtensions(supabase, courtIds, prevStartIso, prevEndIso),
+    ])
 
   const courtNames = new Map(courts.map((court) => [court.id, court.nombre]))
   const sportIds = [...new Set([...cancellations, ...rejections].map((row) => row.deporte_id))]
@@ -212,7 +268,11 @@ export async function getAuditReport(input: {
     for (const sport of sportRows ?? []) sportNames.set(sport.id, sport.nombre)
   }
 
-  const reservationIds = [...cancellations, ...rejections].map((row) => row.id)
+  const reservationIds = [
+    ...cancellations.map((row) => row.id),
+    ...rejections.map((row) => row.id),
+    ...extensionRows.map((row) => row.reserva_id),
+  ]
   const customerNames = new Map<string, string>()
   if (reservationIds.length) {
     const reader = supabase as unknown as CustomersReader
@@ -242,6 +302,7 @@ export async function getAuditReport(input: {
       gameDate: rawStart ? limaDate(rawStart) : '',
       actor: row.estado === 'cancelada_cliente' ? 'cliente' : 'dueno',
       reason: row.motivo_cancelacion || null,
+      amount: null,
     })
   }
 
@@ -262,16 +323,35 @@ export async function getAuditReport(input: {
       reason: row.motivo_rechazo_pago
         ? REJECTION_REASON_LABELS[row.motivo_rechazo_pago] ?? row.motivo_rechazo_pago
         : null,
+      amount: null,
+    })
+  }
+
+  for (const row of extensionRows) {
+    const { start: rawStart } = parseRange(row.reservas?.rango)
+    incidents.push({
+      id: `e-${row.id}`,
+      type: 'extension',
+      reservationId: row.reserva_id,
+      courtName: courtNames.get(row.reservas?.cancha_id ?? '') ?? 'Sin nombre',
+      sportName: sportNames.get(row.reservas?.deporte_id ?? '') ?? 'Sin nombre',
+      customerName: customerNames.get(row.reserva_id) ?? 'Cliente',
+      eventAt: row.created_at,
+      eventDate: limaDate(row.created_at),
+      gameDate: rawStart ? limaDate(rawStart) : '',
+      actor: 'dueno',
+      reason: row.estado_cobro === 'cobrado' ? 'Cobrada' : 'Pendiente',
+      amount: Number(row.monto_adicional) || 0,
     })
   }
 
   incidents.sort((a, b) => (a.eventAt < b.eventAt ? 1 : a.eventAt > b.eventAt ? -1 : 0))
 
-  const seriesMap = new Map<string, { cancelaciones: number; rechazos: number }>()
+  const seriesMap = new Map<string, { cancelaciones: number; rechazos: number; extensiones: number }>()
   let cursor = start
   let guard = 0
   while (cursor <= end && guard < 800) {
-    seriesMap.set(cursor, { cancelaciones: 0, rechazos: 0 })
+    seriesMap.set(cursor, { cancelaciones: 0, rechazos: 0, extensiones: 0 })
     cursor = shiftDate(cursor, 1)
     guard += 1
   }
@@ -279,13 +359,15 @@ export async function getAuditReport(input: {
     const bucket = seriesMap.get(incident.eventDate)
     if (!bucket) continue
     if (incident.type === 'cancelacion') bucket.cancelaciones += 1
-    else bucket.rechazos += 1
+    else if (incident.type === 'rechazo') bucket.rechazos += 1
+    else bucket.extensiones += 1
   }
   const series: AuditSeriesPoint[] = [...seriesMap.entries()].map(([date, value]) => ({
     date,
     label: shortDateLabel(date),
     cancelaciones: value.cancelaciones,
     rechazos: value.rechazos,
+    extensiones: value.extensiones,
   }))
 
   const cancellationsByType: AuditBreakdownItem[] = [
@@ -304,17 +386,30 @@ export async function getAuditReport(input: {
 
   const cancelaciones = cancellations.length
   const rechazos = rejections.length
+  const extensiones = extensionRows.length
+
+  const chargeCounts = new Map<string, number>()
+  for (const row of extensionRows) {
+    const key = row.estado_cobro === 'cobrado' ? 'cobrado' : 'pendiente'
+    chargeCounts.set(key, (chargeCounts.get(key) ?? 0) + 1)
+  }
+  const extensionsByChargeStatus: AuditBreakdownItem[] = [
+    { id: 'cobrado', label: 'Cobradas', count: chargeCounts.get('cobrado') ?? 0 },
+    { id: 'pendiente', label: 'Pendientes', count: chargeCounts.get('pendiente') ?? 0 },
+  ].filter((item) => item.count > 0)
 
   return {
     ...base,
-    totals: { cancelaciones, rechazos },
+    totals: { cancelaciones, rechazos, extensiones },
     kpis: {
       cancelaciones: computeKpi(cancelaciones, prevCancellations, false),
       rechazos: computeKpi(rechazos, prevRejections, false),
+      extensiones: computeKpi(extensiones, prevExtensiones, true),
     },
     series,
     cancellationsByType,
     rejectionsByReason,
+    extensionsByChargeStatus,
     incidents,
   }
 }

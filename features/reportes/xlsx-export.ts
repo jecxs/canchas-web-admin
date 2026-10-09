@@ -344,6 +344,7 @@ const AUDIT_INCIDENT_COLUMNS: Column[] = [
   { header: 'Deporte', width: 16 },
   { header: 'Fecha partido', width: 14, format: DATE_FORMAT },
   { header: 'Actor', width: 12 },
+  { header: 'Monto (S/)', width: 16, format: MONEY_FORMAT, align: 'right' },
   { header: 'Motivo', width: 44 },
 ]
 
@@ -353,15 +354,22 @@ const AUDIT_ACTOR_LABELS: Record<AuditIncident['actor'], string> = {
   sistema: 'Sistema',
 }
 
+const AUDIT_TYPE_LABELS: Record<AuditIncident['type'], string> = {
+  cancelacion: 'Cancelación',
+  rechazo: 'Rechazo de pago',
+  extension: 'Extensión',
+}
+
 function auditIncidentRow(incident: AuditIncident): CellValue[] {
   return [
-    incident.type === 'cancelacion' ? 'Cancelación' : 'Rechazo de pago',
+    AUDIT_TYPE_LABELS[incident.type],
     toDate(incident.eventAt),
     incident.customerName,
     incident.courtName,
     incident.sportName,
     toDate(incident.gameDate),
     AUDIT_ACTOR_LABELS[incident.actor],
+    incident.amount ?? null,
     incident.reason ?? '',
   ]
 }
@@ -395,17 +403,17 @@ export async function buildIncomeWorkbook(input: ExportInput) {
 
   if (included(sections, 'dia')) {
     const periodTotal = report.daily.reduce((sum, point) => sum + point.income, 0)
-    const periodReservations = report.daily.reduce((sum, point) => sum + point.reservations, 0)
+    const periodMovements = report.daily.reduce((sum, point) => sum + point.movements, 0)
     addTableSheet(
       workbook,
       'Cobros por día',
       [
         { header: 'Fecha', width: 14, format: DATE_FORMAT },
         { header: 'Monto (S/)', width: 16, format: MONEY_FORMAT, align: 'right' },
-        { header: 'Reservas', width: 12, format: INTEGER_FORMAT, align: 'right' },
+        { header: 'Cobros', width: 12, format: INTEGER_FORMAT, align: 'right' },
       ],
-      report.daily.map((point) => [toDate(point.date), point.income, point.reservations]),
-      ['Total', periodTotal, periodReservations],
+      report.daily.map((point) => [toDate(point.date), point.income, point.movements]),
+      ['Total', periodTotal, periodMovements],
     )
   }
 
@@ -642,8 +650,9 @@ export async function buildAuditWorkbook(input: ExportInput) {
         { header: 'Fecha', width: 14, format: DATE_FORMAT },
         { header: 'Cancelaciones', width: 16, format: INTEGER_FORMAT, align: 'right' },
         { header: 'Rechazos de pago', width: 18, format: INTEGER_FORMAT, align: 'right' },
+        { header: 'Extensiones', width: 14, format: INTEGER_FORMAT, align: 'right' },
       ],
-      report.series.map((point) => [toDate(point.date), point.cancelaciones, point.rechazos]),
+      report.series.map((point) => [toDate(point.date), point.cancelaciones, point.rechazos, point.extensiones]),
     )
   }
 
@@ -662,6 +671,15 @@ export async function buildAuditWorkbook(input: ExportInput) {
       'Rechazos de pago',
       AUDIT_INCIDENT_COLUMNS,
       report.incidents.filter((incident) => incident.type === 'rechazo').map(auditIncidentRow),
+    )
+  }
+
+  if (included(sections, 'extensiones')) {
+    addTableSheet(
+      workbook,
+      'Extensiones',
+      AUDIT_INCIDENT_COLUMNS,
+      report.incidents.filter((incident) => incident.type === 'extension').map(auditIncidentRow),
     )
   }
 

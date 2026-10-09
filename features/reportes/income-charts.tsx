@@ -40,7 +40,7 @@ function formatCompact(value: number) {
   return `S/ ${value}`
 }
 
-type TooltipDatum = { label?: string; income?: number; reservations?: number }
+type TooltipDatum = { label?: string; income?: number; movements?: number }
 type ChartTooltipProps = { active?: boolean; payload?: Array<{ payload?: TooltipDatum }> }
 
 function ChartTooltip({ active, payload }: ChartTooltipProps) {
@@ -55,7 +55,7 @@ function ChartTooltip({ active, payload }: ChartTooltipProps) {
       </p>
       <p className="mt-1 text-sm font-black">{formatMoney(datum.income ?? 0)}</p>
       <p className="mt-0.5 text-[11px] text-muted-foreground">
-        {datum.reservations ?? 0} reserva{(datum.reservations ?? 0) === 1 ? '' : 's'}
+        {datum.movements} cobro{(datum.movements ?? 0) === 1 ? '' : 's'}
       </p>
     </div>
   )

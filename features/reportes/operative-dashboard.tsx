@@ -69,6 +69,33 @@ function InsightCard({
   )
 }
 
+function StatCard({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: typeof Calendar03Icon
+  label: string
+  value: string
+  hint: string
+}) {
+  return (
+    <div className="flex flex-col justify-between gap-5 rounded-2xl border border-border/80 bg-card p-5 shadow-sm">
+      <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.12em] text-muted-foreground">
+        <span className="grid size-7 place-items-center rounded-lg bg-accent text-accent-foreground">
+          <HugeiconsIcon icon={icon} strokeWidth={2} className="size-4" />
+        </span>
+        {label}
+      </div>
+      <div>
+        <p className="text-3xl font-black leading-none tracking-[-.03em] tabular-nums">{value}</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{hint}</p>
+      </div>
+    </div>
+  )
+}
+
 function ChartEmpty({ message }: { message: string }) {
   return (
     <div className="grid h-64 place-items-center rounded-2xl border border-dashed border-border/80 text-center">
@@ -94,6 +121,21 @@ export function OperativeDashboard({ data }: { data: OperativeReport }) {
         />
         <InsightCard icon={Clock01Icon} label="Hora pico" insight={data.insights.peakHour} />
         <InsightCard icon={Clock01Icon} label="Hora muerta" insight={data.insights.deadHour} />
+      </section>
+
+      <section className="mt-5 grid gap-4 sm:grid-cols-2">
+        <StatCard
+          icon={Clock01Icon}
+          label="Extensiones"
+          value={String(data.totals.extensiones)}
+          hint="+30 min autorizadas en el rango"
+        />
+        <StatCard
+          icon={Clock01Icon}
+          label="Horas extra"
+          value={formatHours(data.totals.extraHours)}
+          hint="30 min por extensión"
+        />
       </section>
 
       <div className="mt-5">

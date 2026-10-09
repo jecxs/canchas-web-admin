@@ -4,13 +4,13 @@ import { Fragment } from 'react'
 import { cn } from '@/lib/utils'
 import type { OperativeHeatmap } from './types'
 
-const EMPTY_COLOR = '#F9FAFB'
-const LIME_RGB = '200, 255, 0'
+// Bind to semantic tokens (lima = --primary, vacío = --muted); sin literales.
+const EMPTY_COLOR = 'var(--muted)'
 
 function cellBackground(value: number, max: number) {
   if (value <= 0) return EMPTY_COLOR
   const intensity = Math.max(0.2, value / max)
-  return `rgba(${LIME_RGB}, ${intensity})`
+  return `color-mix(in oklab, var(--primary) ${Math.round(intensity * 100)}%, transparent)`
 }
 
 export function HeatmapDemanda({
@@ -72,11 +72,11 @@ export function HeatmapDemanda({
       <div className="mt-4 flex items-center justify-end gap-1.5 text-[10px] font-semibold text-muted-foreground">
         <span className="mr-1">Menos</span>
         <span className="size-3 rounded-sm" style={{ backgroundColor: EMPTY_COLOR }} />
-        {[0.2, 0.4, 0.6, 0.8, 1].map((step) => (
+        {[20, 40, 60, 80, 100].map((step) => (
           <span
             key={step}
             className="size-3 rounded-sm"
-            style={{ backgroundColor: `rgba(${LIME_RGB}, ${step})` }}
+            style={{ backgroundColor: `color-mix(in oklab, var(--primary) ${step}%, transparent)` }}
           />
         ))}
         <span className="ml-1">Más</span>

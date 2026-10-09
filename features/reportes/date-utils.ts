@@ -132,16 +132,16 @@ export function groupDaily(
       key: point.date,
       label: formatDayLabel(point.date),
       income: point.income,
-      reservations: point.reservations,
+      movements: point.movements,
     }))
   }
 
-  const map = new Map<string, { income: number; reservations: number }>()
+  const map = new Map<string, { income: number; movements: number }>()
   for (const point of points) {
     const key = granularity === 'semana' ? startOfWeek(point.date) : point.date.slice(0, 7)
-    const current = map.get(key) ?? { income: 0, reservations: 0 }
+    const current = map.get(key) ?? { income: 0, movements: 0 }
     current.income += point.income
-    current.reservations += point.reservations
+    current.movements += point.movements
     map.set(key, current)
   }
 
@@ -151,6 +151,6 @@ export function groupDaily(
       key,
       label: formatBucketLabel(key, granularity),
       income: value.income,
-      reservations: value.reservations,
+      movements: value.movements,
     }))
 }

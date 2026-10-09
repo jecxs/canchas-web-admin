@@ -17,6 +17,7 @@ import type {
 
 const WEEKDAY_LABELS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const OCCUPIED_STATES: Enums<'estado_reserva'>[] = ['confirmada', 'completada']
+const CANCELLED_STATES: Enums<'estado_reserva'>[] = ['cancelada_cliente', 'cancelada_local']
 const CHANNEL_FILLS = { app: 'var(--chart-1)', manual: 'var(--chart-2)' }
 
 type ScheduleRow = {
@@ -134,7 +135,7 @@ export async function getOperativeReport(input: {
     start,
     end,
     today,
-    totals: { reservations: 0, hours: 0 },
+    totals: { reservations: 0, hours: 0, extensiones: 0, extraHours: 0 },
     insights: { busiestDay: null, quietestDay: null, peakHour: null, deadHour: null },
     byWeekday: [],
     hourly: [],
@@ -180,6 +181,22 @@ export async function getOperativeReport(input: {
         .overlaps('rango', `[${startIso},${endIso})`)
     : { data: [] as { canal_origen: string | null }[] }
   const byChannel = groupByChannel(channelRows ?? [])
+
+  // Extensiones de 30 min autorizadas en el rango (por fecha de autorización).
+  // Se excluyen las de reservas canceladas: ya no ocupan horario ni generan cobro.
+  const { data: extensionRows } = courtIds.length
+    ? await supabase
+        .from('reserva_extensiones')
+        .select('id,reservas!inner(cancha_id,estado)')
+        .in('reservas.cancha_id', courtIds)
+        .gte('created_at', startIso)
+        .lte('created_at', endIso)
+    : { data: [] }
+  const extensiones = (extensionRows ?? []).filter((row) => {
+    const estado = row.reservas?.estado
+    return !estado || !CANCELLED_STATES.includes(estado)
+  }).length
+  const extraHours = extensiones * 0.5
 
   const weekdayCount = new Map<number, number>()
   const hourCount = new Map<number, number>()
@@ -305,7 +322,7 @@ export async function getOperativeReport(input: {
 
   return {
     ...base,
-    totals: { reservations: reservations.length, hours },
+    totals: { reservations: reservations.length, hours, extensiones, extraHours },
     insights: {
       busiestDay: busiest ? { label: busiest.label, detail: `${busiest.reservations} reservas` } : null,
       quietestDay: quietest ? { label: quietest.label, detail: `${quietest.reservations} reservas` } : null,

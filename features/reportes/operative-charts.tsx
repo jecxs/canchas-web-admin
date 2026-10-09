@@ -279,10 +279,10 @@ export function ChannelOriginChart({
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-black leading-none">{appPct.toFixed(0)}%</span>
-          <span className="mt-1 text-[10px] font-extrabold uppercase tracking-[.12em] text-muted-foreground">
+          <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-muted-foreground">
             Automático
           </span>
+          <span className="mt-1 text-lg font-black">{appPct.toFixed(0)}%</span>
         </div>
       </div>
       <ul className="w-full space-y-3">

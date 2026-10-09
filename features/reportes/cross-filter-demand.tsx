@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import type { OperativeHeatmap } from './types'
 
-const LIME = '#C8FF00'
-const MUTED = '#E5E7EB'
+// Bind to tokens: barras lima = --primary, atenuadas = --muted.
+const LIME = 'var(--primary)'
+const MUTED = 'var(--muted)'
 
 type DemandPoint = { label: string; reservations: number }
 

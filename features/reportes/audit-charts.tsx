@@ -17,6 +17,7 @@ import type { AuditBreakdownItem, AuditSeriesPoint } from './types'
 
 const CANCEL_COLOR = 'var(--destructive)'
 const REJECT_COLOR = 'var(--warning)'
+const EXTENSION_COLOR = 'var(--chart-1)'
 const PALETTE = [
   'var(--chart-1)',
   'var(--chart-2)',
@@ -50,6 +51,11 @@ function IncidentsTooltip({ active, payload }: IncidentsTooltipProps) {
           <span className="size-2 rounded-full" style={{ backgroundColor: REJECT_COLOR }} />
           Rechazos
           <span className="ml-auto font-bold text-foreground">{datum.rechazos}</span>
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="size-2 rounded-full" style={{ backgroundColor: EXTENSION_COLOR }} />
+          Extensiones
+          <span className="ml-auto font-bold text-foreground">{datum.extensiones}</span>
         </li>
       </ul>
     </div>
@@ -88,7 +94,8 @@ export function IncidentsOverTimeChart({
           />
           <Tooltip cursor={{ fill: 'var(--muted)', opacity: 0.45 }} content={<IncidentsTooltip />} />
           <Bar dataKey="cancelaciones" name="Cancelaciones" stackId="i" fill={CANCEL_COLOR} />
-          <Bar dataKey="rechazos" name="Rechazos de pago" stackId="i" fill={REJECT_COLOR} radius={[6, 6, 0, 0]} />
+          <Bar dataKey="rechazos" name="Rechazos de pago" stackId="i" fill={REJECT_COLOR} />
+          <Bar dataKey="extensiones" name="Extensiones" stackId="i" fill={EXTENSION_COLOR} radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -130,7 +137,7 @@ export function AuditDonutChart({
 
   return (
     <div className={cn('flex flex-col items-center gap-5 sm:flex-row sm:gap-7', className)}>
-      <div className="relative size-48 shrink-0">
+      <div className="relative size-52 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Tooltip content={<BreakdownTooltip total={total} />} wrapperStyle={{ zIndex: 20 }} />

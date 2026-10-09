@@ -12,14 +12,14 @@ export type ReportKpi = {
 export type ReportDailyPoint = {
   date: string
   income: number
-  reservations: number
+  movements: number
 }
 
 export type ReportSeriesPoint = {
   key: string
   label: string
   income: number
-  reservations: number
+  movements: number
 }
 
 export type ReportBreakdownItem = {
@@ -111,6 +111,8 @@ export type OperativeReport = {
   totals: {
     reservations: number
     hours: number
+    extensiones: number
+    extraHours: number
   }
   insights: {
     busiestDay: OperativeInsight | null
@@ -127,7 +129,7 @@ export type OperativeReport = {
   byChannel: ChannelOriginItem[]
 }
 
-export type AuditIncidentType = 'cancelacion' | 'rechazo'
+export type AuditIncidentType = 'cancelacion' | 'rechazo' | 'extension'
 
 export type AuditIncidentActor = 'cliente' | 'dueno' | 'sistema'
 
@@ -143,6 +145,7 @@ export type AuditIncident = {
   gameDate: string
   actor: AuditIncidentActor
   reason: string | null
+  amount: number | null
 }
 
 export type AuditSeriesPoint = {
@@ -150,6 +153,7 @@ export type AuditSeriesPoint = {
   label: string
   cancelaciones: number
   rechazos: number
+  extensiones: number
 }
 
 export type AuditBreakdownItem = {
@@ -167,13 +171,16 @@ export type AuditReport = {
   totals: {
     cancelaciones: number
     rechazos: number
+    extensiones: number
   }
   kpis: {
     cancelaciones: ReportKpi
     rechazos: ReportKpi
+    extensiones: ReportKpi
   }
   series: AuditSeriesPoint[]
   cancellationsByType: AuditBreakdownItem[]
   rejectionsByReason: AuditBreakdownItem[]
+  extensionsByChargeStatus: AuditBreakdownItem[]
   incidents: AuditIncident[]
 }

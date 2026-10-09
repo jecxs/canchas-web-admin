@@ -28,6 +28,7 @@ export const AUDIT_SECTIONS: ExportSection[] = [
   { id: 'incidencias', label: 'Incidencias por día' },
   { id: 'cancelaciones', label: 'Cancelaciones' },
   { id: 'rechazos', label: 'Rechazos de pago' },
+  { id: 'extensiones', label: 'Extensiones' },
   { id: 'detalle', label: 'Detalle de incidencias' },
 ]
 

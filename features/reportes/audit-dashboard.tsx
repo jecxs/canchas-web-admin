@@ -6,6 +6,7 @@ import {
   ArrowDown01Icon,
   ArrowUp01Icon,
   Cancel01Icon,
+  Clock01Icon,
   Invoice03Icon,
 } from '@hugeicons/core-free-icons'
 import { Card } from '@/components/ui/card'
@@ -88,7 +89,7 @@ function KpiCard({
         <TrendBadge kpi={kpi} dark={dark} />
       </div>
       <div>
-        <p className="text-3xl font-black leading-none tracking-[-.03em]">{value}</p>
+        <p className="text-3xl font-black leading-none tracking-[-.03em] tabular-nums">{value}</p>
         <p className={cn('mt-2 text-[11px]', dark ? 'text-secondary-foreground/60' : 'text-muted-foreground')}>
           {hint}
         </p>
@@ -99,7 +100,7 @@ function KpiCard({
 
 function ChartEmpty({ message }: { message: string }) {
   return (
-    <div className="grid h-56 place-items-center rounded-2xl border border-dashed border-border/80 text-center">
+    <div className="grid h-64 place-items-center rounded-2xl border border-dashed border-border/80 text-center">
       <p className="max-w-xs px-6 text-sm text-muted-foreground">{message}</p>
     </div>
   )
@@ -107,19 +108,20 @@ function ChartEmpty({ message }: { message: string }) {
 
 export function AuditDashboard({ data }: { data: AuditReport }) {
   const totalKpi: ReportKpi = {
-    value: data.kpis.cancelaciones.value + data.kpis.rechazos.value,
-    previous: data.kpis.cancelaciones.previous + data.kpis.rechazos.previous,
+    value: data.kpis.cancelaciones.value + data.kpis.rechazos.value + data.kpis.extensiones.value,
+    previous: data.kpis.cancelaciones.previous + data.kpis.rechazos.previous + data.kpis.extensiones.previous,
     changePct: null,
     goodWhenUp: false,
   }
   totalKpi.changePct =
     totalKpi.previous === 0 ? null : ((totalKpi.value - totalKpi.previous) / totalKpi.previous) * 100
 
-  const hasData = data.totals.cancelaciones + data.totals.rechazos > 0
+  const hasData =
+    data.totals.cancelaciones + data.totals.rechazos + data.totals.extensiones > 0
 
   return (
     <>
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           icon={Cancel01Icon}
           label="Cancelaciones"
@@ -136,10 +138,17 @@ export function AuditDashboard({ data }: { data: AuditReport }) {
           kpi={data.kpis.rechazos}
         />
         <KpiCard
+          icon={Clock01Icon}
+          label="Extensiones"
+          value={String(data.kpis.extensiones.value)}
+          hint="+30 min autorizadas"
+          kpi={data.kpis.extensiones}
+        />
+        <KpiCard
           icon={Alert02Icon}
           label="Total de incidencias"
           value={String(totalKpi.value)}
-          hint="Cancelaciones + rechazos"
+          hint="Cancelaciones + rechazos + extensiones"
           kpi={totalKpi}
         />
       </section>
@@ -162,7 +171,7 @@ export function AuditDashboard({ data }: { data: AuditReport }) {
         </Card>
       </section>
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-2">
+      <section className="mt-5 grid gap-5 xl:grid-cols-3">
         <Card className="gap-5 py-6">
           <div className="px-6">
             <h2 className="text-base font-black tracking-[-.02em]">Cancelaciones por tipo</h2>
@@ -173,6 +182,20 @@ export function AuditDashboard({ data }: { data: AuditReport }) {
               <AuditDonutChart data={data.cancellationsByType} />
             ) : (
               <ChartEmpty message="Sin cancelaciones en este periodo." />
+            )}
+          </div>
+        </Card>
+
+        <Card className="gap-5 py-6">
+          <div className="px-6">
+            <h2 className="text-base font-black tracking-[-.02em]">Extensiones por cobro</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Cobradas vs. pendientes.</p>
+          </div>
+          <div className="px-6">
+            {data.extensionsByChargeStatus.length ? (
+              <AuditDonutChart data={data.extensionsByChargeStatus} />
+            ) : (
+              <ChartEmpty message="Sin extensiones en este periodo." />
             )}
           </div>
         </Card>
@@ -197,7 +220,7 @@ export function AuditDashboard({ data }: { data: AuditReport }) {
           <div className="px-6">
             <h2 className="text-base font-black tracking-[-.02em]">Detalle de incidencias</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Cancelaciones y rechazos del rango, ordenados por fecha del evento.
+              Cancelaciones, rechazos y extensiones del rango, ordenados por fecha del evento.
             </p>
           </div>
           <div className="px-6">
@@ -207,7 +230,8 @@ export function AuditDashboard({ data }: { data: AuditReport }) {
       </section>
 
       <p className="mt-5 text-xs text-muted-foreground">
-        {data.totals.cancelaciones} cancelaciones · {data.totals.rechazos} rechazos de pago
+        {data.totals.cancelaciones} cancelaciones · {data.totals.rechazos} rechazos de pago ·{' '}
+        {data.totals.extensiones} extensiones
       </p>
 
       {!hasData ? (

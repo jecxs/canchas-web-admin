@@ -118,7 +118,7 @@ function KpiCard({
         <TrendBadge kpi={kpi} dark={dark} />
       </div>
       <div>
-        <p className="text-3xl font-black leading-none tracking-[-.03em]">{value}</p>
+        <p className="text-3xl font-black leading-none tracking-[-.03em] tabular-nums">{value}</p>
         <p className={cn('mt-2 text-[11px]', dark ? 'text-secondary-foreground/60' : 'text-muted-foreground')}>
           {hint}
         </p>
