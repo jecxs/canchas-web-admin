@@ -10,6 +10,7 @@ const sections = [
   { id: 'horarios', label: 'Horarios' },
   { id: 'beneficios', label: 'Beneficios' },
   { id: 'pagos-politicas', label: 'Pagos y políticas' },
+  { id: 'mercado-pago', label: 'Mercado Pago' },
 ] as const
 
 type SectionId = (typeof sections)[number]['id']

@@ -3,6 +3,7 @@ import { BenefitsSettingsForm } from '@/features/local-settings/benefits-setting
 import { CommercialSettingsForm } from '@/features/local-settings/commercial-settings-form'
 import { GeneralSettingsForm } from '@/features/local-settings/general-settings-form'
 import { LocalMediaManager } from '@/features/local-settings/local-media-manager'
+import { MercadoPagoConnectionCard } from '@/features/local-settings/mercadopago-connection-card'
 import { getLocalSettings } from '@/features/local-settings/queries'
 import { ScheduleSettingsForm } from '@/features/local-settings/schedule-settings-form'
 import { SettingsSectionNav } from '@/features/local-settings/settings-section-nav'
@@ -29,6 +30,7 @@ export default async function OwnerSettingsPage() {
           <ScheduleSettingsForm localId={settings.id} schedules={schedules} />
           <BenefitsSettingsForm localId={settings.id} catalog={benefitCatalog} benefits={benefits} />
           <CommercialSettingsForm settings={settings} paymentMethods={paymentMethods} minimumAdvancePercentage={minimumAdvancePercentage} />
+          <MercadoPagoConnectionCard />
         </div>
       </div>
     </div>
