@@ -5,8 +5,8 @@ import { Clock01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GuardActions, useEditGuard } from '@/components/dashboard/edit-guard'
 import { FieldError } from '@/components/ui/field'
-import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { saveScheduleSettingsAction } from './actions'
 import { useSettingsFormFeedback } from './form-feedback'
@@ -70,11 +70,15 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
   const [state, action, pending] = useActionState(saveScheduleSettingsAction, initialSettingsActionState)
   useSettingsFormFeedback(state)
 
+  const guard = useEditGuard()
+  const editable = guard ? guard.editing : true
+
   const activeRange = ranges[activeDay] ?? [7, 23]
   const activeIsOpen = openDays[activeDay] ?? false
   const activeDayLabel = days[activeDay]?.label ?? 'Día'
 
   function setDayOpen(day: number, isOpen: boolean) {
+    if (!editable) return
     setActiveDay(day)
     setOpenDays((current) => ({ ...current, [day]: isOpen }))
   }
@@ -90,6 +94,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
   }
 
   function startPainting(event: ReactPointerEvent<HTMLButtonElement>, day: number, hour: number) {
+    if (!editable) return
     setActiveDay(day)
     if (event.pointerType === 'touch') return
     event.preventDefault()
@@ -97,6 +102,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
   }
 
   function paintUntil(event: ReactPointerEvent<HTMLButtonElement>, day: number, hour: number) {
+    if (!editable) return
     if (!dragging || dragging.day !== day) return
     if (event.buttons === 0) {
       setDragging(null)
@@ -123,9 +129,9 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
             const range = ranges[day]
             return (
               <span key={day}>
-                {openDays[day] ? <input type="hidden" name="openDay" value={day} /> : null}
-                <input type="hidden" name={`opening_${day}`} value={formatHour(range[0])} />
-                <input type="hidden" name={`closing_${day}`} value={formatHour(range[1])} />
+                {openDays[day] ? <input type="hidden" name="openDay" value={day} data-label="Días abiertos" /> : null}
+                <input type="hidden" name={`opening_${day}`} value={formatHour(range[0])} data-label={`${days[day].label} — apertura`} />
+                <input type="hidden" name={`closing_${day}`} value={formatHour(range[1])} data-label={`${days[day].label} — cierre`} />
               </span>
             )
           })}
@@ -190,6 +196,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                             role="switch"
                             aria-checked={isOpen}
                             aria-label={isOpen ? `Cerrar ${day.label}` : `Abrir ${day.label}`}
+                            disabled={!editable}
                             onClick={() => setDayOpen(dayIndex, !isOpen)}
                             className={cn(
                               'block h-4 w-7 shrink-0 rounded-full bg-muted-foreground/25 p-0.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
@@ -208,6 +215,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                               key={hour}
                               type="button"
                               tabIndex={-1}
+                              disabled={!editable}
                               aria-label={`${day.label}, ${formatHour(hour)} a ${formatHour(hour + 1)}${isInsideRange ? ', abierto' : ', cerrado'}`}
                               title={`${formatHour(hour)}–${formatHour(hour + 1)}`}
                               onClick={() => setActiveDay(dayIndex)}
@@ -244,7 +252,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                   <p className="font-black">{activeDayLabel}</p>
                 </div>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => setDayOpen(activeDay, !activeIsOpen)}>
+              <Button type="button" variant="outline" size="sm" disabled={!editable} onClick={() => setDayOpen(activeDay, !activeIsOpen)}>
                 {activeIsOpen ? 'Marcar cerrado' : 'Abrir este día'}
               </Button>
             </div>
@@ -278,7 +286,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
 
           <FieldError errors={state.fieldErrors?.schedules?.map((message) => ({ message }))} />
           <p className="text-xs text-muted-foreground">Los cambios del tablero se aplican al guardar los horarios.</p>
-          <Button type="submit" disabled={pending}>{pending && <Spinner />}Guardar horarios</Button>
+          <GuardActions pending={pending} state={state} submitLabel="Guardar horarios" />
         </form>
       </CardContent>
     </Card>

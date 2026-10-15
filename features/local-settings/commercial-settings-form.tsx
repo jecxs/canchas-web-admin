@@ -4,11 +4,10 @@ import Image from 'next/image'
 import { useActionState, useState } from 'react'
 import { BankIcon, Cash01Icon, Wallet02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GuardActions } from '@/components/dashboard/edit-guard'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { saveCommercialSettingsAction } from './actions'
@@ -76,7 +75,7 @@ function MethodFields({ type, current }: { type: PaymentMethodType; current?: Lo
   return <p className="mt-2 text-xs text-muted-foreground">Disponible al registrar cobros realizados en el local.</p>
 }
 
-export function CommercialSettingsForm({ settings, paymentMethods, minimumAdvancePercentage }: { settings: LocalSettings; paymentMethods: LocalPaymentMethod[]; minimumAdvancePercentage: number }) {
+export function CommercialSettingsForm({ settings, paymentMethods, minimumAdvancePercentage }: { settings: LocalSettings; paymentMethods: LocalPaymentMethod[]; minimumAdvancePercentage: number | null }) {
   const currentMethods = paymentMethods
   const [selected, setSelected] = useState<Set<PaymentMethodType>>(
     () => new Set(currentMethods.filter((method) => method.active).map((method) => method.type)),
@@ -105,7 +104,7 @@ export function CommercialSettingsForm({ settings, paymentMethods, minimumAdvanc
           <Field data-invalid={Boolean(state.fieldErrors?.advancePercentage)}>
             <FieldLabel htmlFor="advancePercentage">Porcentaje de adelanto</FieldLabel>
             <div className="relative max-w-48"><Input id="advancePercentage" name="advancePercentage" type="number" min={1} max={100} step="0.01" defaultValue={settings.porcentaje_adelanto ?? ''} required className="pr-10" /><span className="pointer-events-none absolute inset-y-0 right-3 grid place-items-center text-sm text-muted-foreground">%</span></div>
-            <FieldDescription>{getMinimumAdvanceDescription(minimumAdvancePercentage)}</FieldDescription>
+            <FieldDescription>{minimumAdvancePercentage != null ? getMinimumAdvanceDescription(minimumAdvancePercentage) : 'El porcentaje debe cumplir la política vigente de Grassly.'}</FieldDescription>
             <FieldError errors={state.fieldErrors?.advancePercentage?.map((message) => ({ message }))} />
           </Field>
 
@@ -141,7 +140,7 @@ export function CommercialSettingsForm({ settings, paymentMethods, minimumAdvanc
                 return (
                   <div key={method.type} className="rounded-2xl border bg-muted/15 p-4">
                     <label className="flex cursor-pointer items-center gap-3 font-semibold">
-                      <input type="checkbox" name="paymentMethod" value={method.type} checked={enabled} onChange={() => toggle(method.type)} className="size-4 accent-primary" />
+                      <input type="checkbox" name="paymentMethod" value={method.type} checked={enabled} onChange={() => toggle(method.type)} data-label="Medios de pago" className="size-4 accent-primary" />
                       <PaymentMethodIcon type={method.type} enabled={enabled} />
                       <span>{method.label}</span>
                     </label>
@@ -160,7 +159,7 @@ export function CommercialSettingsForm({ settings, paymentMethods, minimumAdvanc
             <Textarea id="refundPolicy" name="refundPolicy" defaultValue={settings.politica_reembolso === 'Este local no especificó su política de reembolso.' ? '' : settings.politica_reembolso} minLength={20} maxLength={1500} rows={6} required placeholder="Explica con cuánta anticipación se puede cancelar y en qué casos corresponde una devolución." />
             <FieldError errors={state.fieldErrors?.refundPolicy?.map((message) => ({ message }))} />
           </Field>
-          <Button type="submit" disabled={pending}>{pending && <Spinner />}Guardar reglas comerciales</Button>
+          <GuardActions pending={pending} state={state} submitLabel="Guardar reglas comerciales" />
         </form>
       </CardContent>
     </Card>

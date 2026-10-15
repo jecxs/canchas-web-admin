@@ -1,5 +1,6 @@
 'use client'
 
+import { Fragment } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -12,7 +13,8 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import { getDashboardPageLabel } from './navigation'
+import { getDashboardBreadcrumbs } from './navigation'
+import { useEntityBreadcrumb } from './breadcrumb-store'
 import { LocalSwitcher } from './local-switcher'
 import { UserMenu } from './user-menu'
 import { NotificationsBell } from './notifications-bell'
@@ -30,28 +32,36 @@ type DashboardHeaderProps = {
 
 export function DashboardHeader({ role, user, locals, activeLocal, initialNotifications }: DashboardHeaderProps) {
   const pathname = usePathname()
-  const homeHref = role === 'admin' ? '/admin' : '/panel'
-  const pageLabel = getDashboardPageLabel(pathname, role)
-  const isHome = pathname === homeHref
+  const entityLabel = useEntityBreadcrumb()
+  const breadcrumbs = getDashboardBreadcrumbs(pathname, role, entityLabel)
 
   return (
     <header className="relative z-30 flex h-16 shrink-0 items-center border-b border-border/80 bg-background/95 px-3 backdrop-blur-xl md:px-5">
       <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger className="size-9 rounded-lg" aria-label="Alternar menú lateral" />
         <Separator orientation="vertical" className="h-5" />
-        <Breadcrumb>
+        <Breadcrumb className="min-w-0">
           <BreadcrumbList className="flex-nowrap">
-            {isHome ? (
-              <BreadcrumbItem><BreadcrumbPage>Resumen</BreadcrumbPage></BreadcrumbItem>
-            ) : (
-              <>
-                <BreadcrumbItem className="hidden sm:inline-flex">
-                  <BreadcrumbLink asChild><Link href={homeHref}>Resumen</Link></BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden sm:list-item" />
-                <BreadcrumbItem><BreadcrumbPage className="max-w-32 truncate sm:max-w-none">{pageLabel}</BreadcrumbPage></BreadcrumbItem>
-              </>
-            )}
+            {breadcrumbs.map((crumb, index) => {
+              const isLast = index === breadcrumbs.length - 1
+              const isHome = index === 0
+              return (
+                <Fragment key={`${crumb.href ?? crumb.label}-${index}`}>
+                  {index > 0 ? (
+                    <BreadcrumbSeparator className={index === 1 ? 'hidden sm:list-item' : undefined} />
+                  ) : null}
+                  <BreadcrumbItem className={isHome ? 'hidden sm:inline-flex' : undefined}>
+                    {isLast || !crumb.href ? (
+                      <BreadcrumbPage className="max-w-40 truncate sm:max-w-none">{crumb.label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <Link href={crumb.href}>{crumb.label}</Link>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </Fragment>
+              )
+            })}
           </BreadcrumbList>
         </Breadcrumb>
       </div>
