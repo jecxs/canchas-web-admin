@@ -34,7 +34,7 @@ export default async function OwnerReportsPage({
         start={data.start}
         end={data.end}
         today={data.today}
-        subtitle={`Volumen y comportamiento de las reservas de ${data.localName}.`}
+        subtitle={`Qué días y horas se llenan las canchas de ${data.localName}, y qué deportes mueven la agenda.`}
       >
         <OperativeDashboard data={data} />
       </ReportesShell>
@@ -49,7 +49,7 @@ export default async function OwnerReportsPage({
         start={data.start}
         end={data.end}
         today={data.today}
-        subtitle={`Cancelaciones y rechazos de pago de ${data.localName}.`}
+        subtitle={`Qué se canceló, qué pagos se rechazaron y qué extensiones se autorizaron en ${data.localName}.`}
       >
         <AuditDashboard data={data} />
       </ReportesShell>
@@ -63,7 +63,7 @@ export default async function OwnerReportsPage({
       start={data.start}
       end={data.end}
       today={data.today}
-      subtitle={`Dinero cobrado de ${data.localName} comparado con el periodo anterior.`}
+      subtitle={`Cuánto se cobró, por qué medio entró y cuánto queda por cobrar en ${data.localName}.`}
     >
       <ReportesDashboard data={data} />
     </ReportesShell>

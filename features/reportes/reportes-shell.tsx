@@ -19,20 +19,19 @@ export function ReportesShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="mx-auto w-full max-w-[1440px]">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="reportes mx-auto w-full max-w-[1120px]">
+      <div className="rp-head">
         <div>
-          <p className="eyebrow">Inteligencia del negocio</p>
-          <h1 className="mt-3 text-4xl font-black tracking-[-.045em] sm:text-5xl">Reportes</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{subtitle}</p>
+          <h1 className="rp-title">Reportes</h1>
+          <p className="rp-lede">{subtitle}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ExportMenu tab={tab} start={start} end={end} />
+        <div className="rp-actions">
           <DateRangePicker key={`${tab}-${start}-${end}`} start={start} end={end} today={today} tab={tab} />
+          <ExportMenu tab={tab} start={start} end={end} />
         </div>
       </div>
       <ReportesTabs activeTab={tab} start={start} end={end} />
-      <div className="mt-6">{children}</div>
+      <div>{children}</div>
     </div>
   )
 }

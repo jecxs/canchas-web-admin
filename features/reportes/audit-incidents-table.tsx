@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { AuditIncident, AuditIncidentActor, AuditIncidentType } from './types'
 
@@ -11,10 +10,10 @@ const TYPE_LABELS: Record<AuditIncidentType, string> = {
   extension: 'Extensión',
 }
 
-const TYPE_VARIANTS: Record<AuditIncidentType, 'destructive' | 'warning' | 'info'> = {
-  cancelacion: 'destructive',
-  rechazo: 'warning',
-  extension: 'info',
+const TYPE_BADGE: Record<AuditIncidentType, string> = {
+  cancelacion: 'rp-b-cancel',
+  rechazo: 'rp-b-reject',
+  extension: 'rp-b-ext',
 }
 
 const ACTOR_LABELS: Record<AuditIncidentActor, string> = {
@@ -73,64 +72,54 @@ export function AuditIncidentsTable({ incidents }: { incidents: AuditIncident[] 
 
   return (
     <div>
-      <div className="flex flex-wrap gap-2">
+      <div className="rp-filters" role="group" aria-label="Filtrar incidencias">
         {(['todos', 'cancelacion', 'rechazo', 'extension'] as const).map((key) => (
           <button
             key={key}
             type="button"
+            className="rp-filter"
+            aria-pressed={filter === key}
             onClick={() => setFilter(key)}
-            className={cn(
-              'rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors',
-              filter === key
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border/80 text-muted-foreground hover:text-foreground',
-            )}
           >
-            {key === 'todos' ? 'Todas' : TYPE_LABELS[key]} ({counts[key]})
+            {key === 'todos' ? 'Todas' : TYPE_LABELS[key]} {counts[key]}
           </button>
         ))}
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[860px] border-collapse text-sm">
+      <div className="rp-tablescroll">
+        <table className="rp-table">
           <thead>
-            <tr className="border-b border-border/80 text-left text-[11px] font-extrabold uppercase tracking-[.08em] text-muted-foreground">
-              <th className="px-3 py-2">Tipo</th>
-              <th className="px-3 py-2">Fecha evento</th>
-              <th className="px-3 py-2">Cliente</th>
-              <th className="px-3 py-2">Cancha · Deporte</th>
-              <th className="px-3 py-2">Fecha partido</th>
-              <th className="px-3 py-2">Actor</th>
-              <th className="px-3 py-2">Monto</th>
-              <th className="px-3 py-2">Motivo</th>
+            <tr>
+              <th>Tipo</th>
+              <th>Fecha evento</th>
+              <th>Cliente</th>
+              <th>Cancha</th>
+              <th>Deporte</th>
+              <th>Partido</th>
+              <th>Actor</th>
+              <th className="rp-num">Monto</th>
+              <th>Motivo</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((incident) => (
-              <tr key={incident.id} className="border-b border-border/60">
-                <td className="px-3 py-2.5">
-                  <Badge variant={TYPE_VARIANTS[incident.type]}>{TYPE_LABELS[incident.type]}</Badge>
+              <tr key={incident.id}>
+                <td>
+                  <span className={cn('rp-badge', TYPE_BADGE[incident.type])}>{TYPE_LABELS[incident.type]}</span>
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-xs text-muted-foreground">
-                  {formatDateTime(incident.eventAt)}
-                </td>
-                <td className="px-3 py-2.5 font-semibold">{incident.customerName}</td>
-                <td className="px-3 py-2.5 text-muted-foreground">
-                  {incident.courtName} · {incident.sportName}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
-                  {formatDate(incident.gameDate)}
-                </td>
-                <td className="px-3 py-2.5">{ACTOR_LABELS[incident.actor]}</td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums">
-                  {incident.amount ? formatMoney(incident.amount) : '—'}
-                </td>
-                <td className="max-w-[260px] px-3 py-2.5 text-muted-foreground">{incident.reason ?? '—'}</td>
+                <td className="rp-muted">{formatDateTime(incident.eventAt)}</td>
+                <td>{incident.customerName}</td>
+                <td className="rp-muted">{incident.courtName}</td>
+                <td className="rp-muted">{incident.sportName}</td>
+                <td className="rp-muted">{formatDate(incident.gameDate)}</td>
+                <td>{ACTOR_LABELS[incident.actor]}</td>
+                <td className="rp-num">{incident.amount != null ? formatMoney(incident.amount) : '—'}</td>
+                <td className="rp-muted rp-clip">{incident.reason ?? '—'}</td>
               </tr>
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                <td colSpan={9} className="rp-muted" style={{ textAlign: 'center', padding: '2rem' }}>
                   Sin incidencias en este periodo.
                 </td>
               </tr>

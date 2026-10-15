@@ -1,247 +1,138 @@
 'use client'
 
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Alert02Icon,
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-  Cancel01Icon,
-  Clock01Icon,
-  Invoice03Icon,
-} from '@hugeicons/core-free-icons'
-import { Card } from '@/components/ui/card'
-import { EmptyState } from '@/components/states/empty-state'
-import { cn } from '@/lib/utils'
-import { AuditBarChart, AuditDonutChart, IncidentsOverTimeChart } from './audit-charts'
+import { IncidentsOverTimeChart } from './audit-charts'
 import { AuditIncidentsTable } from './audit-incidents-table'
-import type { AuditReport, ReportKpi } from './types'
+import type { AuditBreakdownItem, AuditReport } from './types'
 
-function TrendBadge({ kpi, dark = false }: { kpi: ReportKpi; dark?: boolean }) {
-  if (kpi.changePct === null) {
-    return (
-      <span className={cn('text-[11px] font-semibold', dark ? 'text-secondary-foreground/55' : 'text-muted-foreground')}>
-        Sin periodo previo
-      </span>
-    )
-  }
-
-  const up = kpi.changePct >= 0
-  const positive = up === kpi.goodWhenUp
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold',
-        positive
-          ? dark
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-primary/22 text-success-foreground'
-          : dark
-            ? 'bg-destructive/35 text-white'
-            : 'bg-destructive/12 text-destructive',
-      )}
-    >
-      <HugeiconsIcon icon={up ? ArrowUp01Icon : ArrowDown01Icon} strokeWidth={2.6} className="size-3" />
-      {Math.abs(kpi.changePct).toFixed(1)}%
-      <span className="font-medium opacity-70">vs ant.</span>
-    </span>
-  )
-}
-
-function KpiCard({
-  icon,
-  label,
-  value,
-  hint,
-  kpi,
-  dark = false,
-}: {
-  icon: typeof Cancel01Icon
-  label: string
-  value: string
-  hint: string
-  kpi: ReportKpi
-  dark?: boolean
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col justify-between gap-5 rounded-2xl border p-5 shadow-sm',
-        dark ? 'border-secondary bg-secondary text-secondary-foreground' : 'border-border/80 bg-card',
-      )}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div
-          className={cn(
-            'flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.12em]',
-            dark ? 'text-secondary-foreground/65' : 'text-muted-foreground',
-          )}
-        >
-          <span
-            className={cn(
-              'grid size-7 place-items-center rounded-lg',
-              dark ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground',
-            )}
-          >
-            <HugeiconsIcon icon={icon} strokeWidth={2} className="size-4" />
-          </span>
-          {label}
-        </div>
-        <TrendBadge kpi={kpi} dark={dark} />
-      </div>
-      <div>
-        <p className="text-3xl font-black leading-none tracking-[-.03em] tabular-nums">{value}</p>
-        <p className={cn('mt-2 text-[11px]', dark ? 'text-secondary-foreground/60' : 'text-muted-foreground')}>
-          {hint}
-        </p>
-      </div>
-    </div>
-  )
-}
+const CANCEL = 'var(--rp-red)'
+const REJECT = 'var(--rp-amber)'
+const EXT = 'var(--rp-violet)'
+const CANCEL_SOFT = 'color-mix(in oklab, var(--rp-red) 45%, transparent)'
+const EXT_SOFT = 'color-mix(in oklab, var(--rp-violet) 40%, transparent)'
 
 function ChartEmpty({ message }: { message: string }) {
   return (
-    <div className="grid h-64 place-items-center rounded-2xl border border-dashed border-border/80 text-center">
-      <p className="max-w-xs px-6 text-sm text-muted-foreground">{message}</p>
+    <div className="rp-empty">
+      <p>{message}</p>
     </div>
+  )
+}
+
+function Split({ items, colors }: { items: AuditBreakdownItem[]; colors: string[] }) {
+  const total = items.reduce((sum, item) => sum + item.count, 0) || 1
+  return (
+    <>
+      <div className="rp-split" aria-hidden="true">
+        {items.map((item, index) => (
+          <i key={item.id} style={{ width: `${(item.count / total) * 100}%`, background: colors[index % colors.length] }} />
+        ))}
+      </div>
+      <div className="rp-splitlegend">
+        {items.map((item, index) => (
+          <span key={item.id}>
+            <span className="rp-dot" style={{ background: colors[index % colors.length] }} />
+            {item.label} <b>{item.count}</b>
+          </span>
+        ))}
+      </div>
+    </>
   )
 }
 
 export function AuditDashboard({ data }: { data: AuditReport }) {
-  const totalKpi: ReportKpi = {
-    value: data.kpis.cancelaciones.value + data.kpis.rechazos.value + data.kpis.extensiones.value,
-    previous: data.kpis.cancelaciones.previous + data.kpis.rechazos.previous + data.kpis.extensiones.previous,
-    changePct: null,
-    goodWhenUp: false,
-  }
-  totalKpi.changePct =
-    totalKpi.previous === 0 ? null : ((totalKpi.value - totalKpi.previous) / totalKpi.previous) * 100
-
-  const hasData =
-    data.totals.cancelaciones + data.totals.rechazos + data.totals.extensiones > 0
+  const hasData = data.totals.cancelaciones + data.totals.rechazos + data.totals.extensiones > 0
+  const totalIncidents = data.totals.cancelaciones + data.totals.rechazos + data.totals.extensiones
+  const maxReason = Math.max(1, ...data.rejectionsByReason.map((item) => item.count))
 
   return (
     <>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          icon={Cancel01Icon}
-          label="Cancelaciones"
-          value={String(data.kpis.cancelaciones.value)}
-          hint="Reservas canceladas en el rango"
-          kpi={data.kpis.cancelaciones}
-          dark
-        />
-        <KpiCard
-          icon={Invoice03Icon}
-          label="Rechazos de pago"
-          value={String(data.kpis.rechazos.value)}
-          hint="Comprobantes rechazados"
-          kpi={data.kpis.rechazos}
-        />
-        <KpiCard
-          icon={Clock01Icon}
-          label="Extensiones"
-          value={String(data.kpis.extensiones.value)}
-          hint="+30 min autorizadas"
-          kpi={data.kpis.extensiones}
-        />
-        <KpiCard
-          icon={Alert02Icon}
-          label="Total de incidencias"
-          value={String(totalKpi.value)}
-          hint="Cancelaciones + rechazos + extensiones"
-          kpi={totalKpi}
-        />
-      </section>
-
-      <section className="mt-5">
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Incidencias en el tiempo</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Eventos por día según su fecha de cancelación o rechazo.
-            </p>
+      <section className="rp-block">
+        <div className="rp-blockhead">
+          <div>
+            <h2 className="rp-h2">Incidencias en el tiempo</h2>
+            <p className="rp-hint">Eventos por día según su fecha de cancelación, rechazo o extensión.</p>
           </div>
-          <div className="px-2 sm:px-4">
-            {hasData ? (
-              <IncidentsOverTimeChart data={data.series} />
-            ) : (
-              <ChartEmpty message="Sin incidencias en este periodo." />
-            )}
+          <div className="rp-keys" aria-hidden="true">
+            <span><span className="rp-dot" style={{ background: CANCEL }} />Cancelaciones</span>
+            <span><span className="rp-dot" style={{ background: REJECT }} />Rechazos</span>
+            <span><span className="rp-dot" style={{ background: EXT }} />Extensiones</span>
           </div>
-        </Card>
-      </section>
-
-      <section className="mt-5 grid gap-5 xl:grid-cols-3">
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Cancelaciones por tipo</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Quién canceló: cliente o dueño.</p>
-          </div>
-          <div className="px-6">
-            {data.cancellationsByType.length ? (
-              <AuditDonutChart data={data.cancellationsByType} />
-            ) : (
-              <ChartEmpty message="Sin cancelaciones en este periodo." />
-            )}
-          </div>
-        </Card>
-
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Extensiones por cobro</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Cobradas vs. pendientes.</p>
-          </div>
-          <div className="px-6">
-            {data.extensionsByChargeStatus.length ? (
-              <AuditDonutChart data={data.extensionsByChargeStatus} />
-            ) : (
-              <ChartEmpty message="Sin extensiones en este periodo." />
-            )}
-          </div>
-        </Card>
-
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Rechazos por motivo</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Motivos estructurados de rechazo.</p>
-          </div>
-          <div className="px-3 sm:px-4">
-            {data.rejectionsByReason.length ? (
-              <AuditBarChart data={data.rejectionsByReason} />
-            ) : (
-              <ChartEmpty message="Sin rechazos en este periodo." />
-            )}
-          </div>
-        </Card>
-      </section>
-
-      <section className="mt-5">
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Detalle de incidencias</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Cancelaciones, rechazos y extensiones del rango, ordenados por fecha del evento.
-            </p>
-          </div>
-          <div className="px-6">
-            <AuditIncidentsTable incidents={data.incidents} />
-          </div>
-        </Card>
-      </section>
-
-      <p className="mt-5 text-xs text-muted-foreground">
-        {data.totals.cancelaciones} cancelaciones · {data.totals.rechazos} rechazos de pago ·{' '}
-        {data.totals.extensiones} extensiones
-      </p>
-
-      {!hasData ? (
-        <div className="mt-5">
-          <EmptyState
-            title="Aún no hay incidencias en este periodo"
-            description="Cuando se cancelen reservas o se rechacen comprobantes en el rango, aparecerán aquí."
-          />
         </div>
-      ) : null}
+        {hasData ? (
+          <IncidentsOverTimeChart data={data.series} />
+        ) : (
+          <ChartEmpty message="Sin incidencias en este periodo." />
+        )}
+      </section>
+
+      <section className="rp-block rp-metrics">
+        <div className="rp-metric">
+          <span className="rp-mval rp-red">{data.totals.cancelaciones}</span>
+          <span className="rp-mlab">Cancelaciones</span>
+        </div>
+        <div className="rp-metric">
+          <span className="rp-mval rp-amber">{data.totals.rechazos}</span>
+          <span className="rp-mlab">Rechazos de pago</span>
+        </div>
+        <div className="rp-metric">
+          <span className="rp-mval rp-violet">{data.totals.extensiones}</span>
+          <span className="rp-mlab">Extensiones de +30 min</span>
+        </div>
+        <div className="rp-metric">
+          <span className="rp-mval">{totalIncidents}</span>
+          <span className="rp-mlab">Total de incidencias</span>
+        </div>
+      </section>
+
+      <section className="rp-block rp-panels">
+        <div className="rp-panel">
+          <h3 className="rp-h3">Rechazos por motivo</h3>
+          {data.rejectionsByReason.length ? (
+            <div>
+              {data.rejectionsByReason.map((item) => (
+                <div className="rp-rank" key={item.id}>
+                  <span className="rp-ranklab">{item.label}</span>
+                  <span className="rp-ranktrack">
+                    <i style={{ width: `${Math.round((item.count / maxReason) * 100)}%`, background: REJECT }} />
+                  </span>
+                  <span className="rp-rankval">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ChartEmpty message="Sin rechazos en este periodo." />
+          )}
+        </div>
+
+        <div className="rp-panel">
+          <div className="rp-mini">
+            <h3 className="rp-h3">Cancelaciones por quién</h3>
+            {data.cancellationsByType.length ? (
+              <Split items={data.cancellationsByType} colors={[CANCEL, CANCEL_SOFT]} />
+            ) : (
+              <p className="rp-hint">Sin cancelaciones en este periodo.</p>
+            )}
+          </div>
+          <div className="rp-mini">
+            <h3 className="rp-h3">Extensiones por cobro</h3>
+            {data.extensionsByChargeStatus.length ? (
+              <Split items={data.extensionsByChargeStatus} colors={[EXT, EXT_SOFT]} />
+            ) : (
+              <p className="rp-hint">Sin extensiones en este periodo.</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="rp-block">
+        <div className="rp-blockhead">
+          <div>
+            <h2 className="rp-h2">Detalle de incidencias</h2>
+            <p className="rp-hint">Cancelaciones, rechazos y extensiones del rango, ordenados por fecha del evento.</p>
+          </div>
+        </div>
+        <AuditIncidentsTable incidents={data.incidents} />
+      </section>
     </>
   )
 }

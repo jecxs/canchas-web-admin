@@ -73,13 +73,10 @@ export function DateRangePicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className="h-11 justify-start gap-2 rounded-xl px-3.5 font-semibold"
-        >
-          <HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} className="size-4 text-muted-foreground" />
+        <button type="button" className="rp-chip">
+          <HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} className="size-4" aria-hidden="true" />
           <span className="truncate">{formatRangeLabel(start, end)}</span>
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-auto! max-w-[calc(100vw-1.5rem)] overflow-x-auto p-0!">
         <div className="flex flex-col md:flex-row">

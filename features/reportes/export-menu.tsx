@@ -28,10 +28,10 @@ export function ExportMenu({ tab, start, end }: { tab: ReportTab; start: string;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="h-11 gap-2 rounded-xl px-3.5 font-semibold">
-          <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="size-4 text-muted-foreground" />
-          Exportar Excel
-        </Button>
+        <button type="button" className="rp-btn">
+          <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="size-4" aria-hidden="true" />
+          Exportar
+        </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72! p-3!">
         <p className="mb-2 text-xs font-bold text-muted-foreground">¿Qué quieres exportar?</p>
@@ -62,13 +62,13 @@ export function ExportMenu({ tab, start, end }: { tab: ReportTab; start: string;
           {selected.length ? (
             <Button asChild size="sm">
               <a href={href} download onClick={() => setOpen(false)}>
-                <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="size-4" />
+                <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="size-4" aria-hidden="true" />
                 Exportar ({selected.length})
               </a>
             </Button>
           ) : (
             <Button size="sm" disabled>
-              <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="size-4" />
+              <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="size-4" aria-hidden="true" />
               Exportar
             </Button>
           )}

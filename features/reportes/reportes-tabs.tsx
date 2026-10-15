@@ -1,7 +1,7 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import type { ReportTab } from './types'
 
 const TABS: Array<{ value: ReportTab; label: string }> = [
@@ -19,34 +19,25 @@ export function ReportesTabs({
   start: string
   end: string
 }) {
-  const router = useRouter()
   const pathname = usePathname()
 
-  function select(tab: ReportTab) {
-    if (tab === activeTab) return
-    const params = new URLSearchParams({ start, end })
-    if (tab !== 'financiero') params.set('tab', tab)
-    router.replace(`${pathname}?${params.toString()}`)
-  }
-
   return (
-    <div className="mt-6 inline-flex items-center gap-1 self-start rounded-2xl border border-border/80 bg-card p-1.5 shadow-sm">
-      {TABS.map((tab) => (
-        <button
-          key={tab.value}
-          type="button"
-          onClick={() => select(tab.value)}
-          aria-pressed={activeTab === tab.value}
-          className={cn(
-            'rounded-xl px-5 py-2 text-sm font-bold transition-colors',
-            activeTab === tab.value
-              ? 'bg-primary text-primary-foreground shadow-xs'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <nav className="rp-tabs" aria-label="Secciones de reportes">
+      {TABS.map((tab) => {
+        const params = new URLSearchParams({ start, end })
+        if (tab.value !== 'financiero') params.set('tab', tab.value)
+        const active = activeTab === tab.value
+        return (
+          <Link
+            key={tab.value}
+            href={`${pathname}?${params.toString()}`}
+            className="rp-tab"
+            aria-current={active ? 'page' : undefined}
+          >
+            {tab.label}
+          </Link>
+        )
+      })}
+    </nav>
   )
 }

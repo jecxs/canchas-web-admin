@@ -1,229 +1,190 @@
 'use client'
 
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-  Calendar03Icon,
-  Clock01Icon,
-} from '@hugeicons/core-free-icons'
-import { Card } from '@/components/ui/card'
-import { EmptyState } from '@/components/states/empty-state'
-import { cn } from '@/lib/utils'
-import {
-  ChannelOriginChart,
-  CourtSportStackedChart,
-  SportsUsageDonut,
-} from './operative-charts'
 import { CrossFilterDemand } from './cross-filter-demand'
 import { HeatmapDemanda } from './heatmap-demanda'
-import type { OperativeInsight, OperativeReport } from './types'
+import type { OperativeReport } from './types'
 
 function formatHours(value: number) {
   return `${Number.isInteger(value) ? value : value.toFixed(1)} h`
 }
 
-function InsightCard({
-  icon,
-  label,
-  insight,
-  dark = false,
-}: {
-  icon: typeof Calendar03Icon
-  label: string
-  insight: OperativeInsight | null
-  dark?: boolean
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col justify-between gap-5 rounded-2xl border p-5 shadow-sm',
-        dark ? 'border-secondary bg-secondary text-secondary-foreground' : 'border-border/80 bg-card',
-      )}
-    >
-      <div
-        className={cn(
-          'flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.12em]',
-          dark ? 'text-secondary-foreground/65' : 'text-muted-foreground',
-        )}
-      >
-        <span
-          className={cn(
-            'grid size-7 place-items-center rounded-lg',
-            dark ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground',
-          )}
-        >
-          <HugeiconsIcon icon={icon} strokeWidth={2} className="size-4" />
-        </span>
-        {label}
-      </div>
-      <div>
-        <p className="text-2xl font-black leading-none tracking-[-.03em] capitalize">
-          {insight ? insight.label : '—'}
-        </p>
-        <p className={cn('mt-2 text-[11px]', dark ? 'text-secondary-foreground/60' : 'text-muted-foreground')}>
-          {insight ? insight.detail : 'Sin datos en el periodo'}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: typeof Calendar03Icon
-  label: string
-  value: string
-  hint: string
-}) {
-  return (
-    <div className="flex flex-col justify-between gap-5 rounded-2xl border border-border/80 bg-card p-5 shadow-sm">
-      <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.12em] text-muted-foreground">
-        <span className="grid size-7 place-items-center rounded-lg bg-accent text-accent-foreground">
-          <HugeiconsIcon icon={icon} strokeWidth={2} className="size-4" />
-        </span>
-        {label}
-      </div>
-      <div>
-        <p className="text-3xl font-black leading-none tracking-[-.03em] tabular-nums">{value}</p>
-        <p className="mt-2 text-[11px] text-muted-foreground">{hint}</p>
-      </div>
-    </div>
-  )
-}
+const SPORT_COLORS = ['var(--rp-ink)', 'var(--rp-cal)', 'var(--rp-violet)', 'var(--rp-violet-300)']
 
 function ChartEmpty({ message }: { message: string }) {
   return (
-    <div className="grid h-64 place-items-center rounded-2xl border border-dashed border-border/80 text-center">
-      <p className="max-w-xs px-6 text-sm text-muted-foreground">{message}</p>
+    <div className="rp-empty">
+      <p>{message}</p>
+    </div>
+  )
+}
+
+function Readout({ label, value }: { label: string; value: string | undefined }) {
+  return (
+    <div className="rp-ritem">
+      <span className="rp-rk">{label}</span>
+      <span className="rp-rv">{value ?? '—'}</span>
     </div>
   )
 }
 
 export function OperativeDashboard({ data }: { data: OperativeReport }) {
+  const maxSport = Math.max(1, ...data.bySport.map((sport) => sport.reservations))
+  const channelTotal = data.byChannel.reduce((sum, item) => sum + item.value, 0) || 1
+
   return (
     <>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <InsightCard
-          icon={ArrowUp01Icon}
-          label="Día más reservado"
-          insight={data.insights.busiestDay}
-          dark
-        />
-        <InsightCard
-          icon={ArrowDown01Icon}
-          label="Día menos reservado"
-          insight={data.insights.quietestDay}
-        />
-        <InsightCard icon={Clock01Icon} label="Hora pico" insight={data.insights.peakHour} />
-        <InsightCard icon={Clock01Icon} label="Hora muerta" insight={data.insights.deadHour} />
-      </section>
-
-      <section className="mt-5 grid gap-4 sm:grid-cols-2">
-        <StatCard
-          icon={Clock01Icon}
-          label="Extensiones"
-          value={String(data.totals.extensiones)}
-          hint="+30 min autorizadas en el rango"
-        />
-        <StatCard
-          icon={Clock01Icon}
-          label="Horas extra"
-          value={formatHours(data.totals.extraHours)}
-          hint="30 min por extensión"
-        />
-      </section>
-
-      <div className="mt-5">
-        <CrossFilterDemand heatmap={data.heatmap} />
-      </div>
-
-      <section className="mt-5 grid gap-5 xl:grid-cols-2">
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Deporte más jugado</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Participación por cantidad de reservas.
+      <section className="rp-block">
+        <div className="rp-blockhead">
+          <div>
+            <h2 className="rp-h2">Uso de canchas por día y hora</h2>
+            <p className="rp-hint">
+              Cada celda es una hora de cancha reservada en el periodo. Más contenido, más llena la hora.
             </p>
           </div>
-          <div className="px-6">
-            {data.bySport.length ? (
-              <SportsUsageDonut data={data.bySport} />
-            ) : (
-              <ChartEmpty message="Sin reservas por deporte en este periodo." />
-            )}
+        </div>
+        {data.heatmap.hours.length ? (
+          <div className="rp-cancha">
+            <HeatmapDemanda data={data.heatmap} />
           </div>
-        </Card>
-
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Canal de Origen</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Distribución de reservas automáticas vs. manuales.
-            </p>
-          </div>
-          <div className="px-6">
-            {data.byChannel.length ? (
-              <ChannelOriginChart data={data.byChannel} />
-            ) : (
-              <ChartEmpty message="Sin reservas en este periodo." />
-            )}
-          </div>
-        </Card>
+        ) : (
+          <ChartEmpty message="Sin reservas en este periodo." />
+        )}
       </section>
 
-      <section className="mt-5">
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Cancha por deporte</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Horas jugadas en cada cancha, apiladas por deporte.
-            </p>
-          </div>
-          <div className="px-3 sm:px-4">
-            {data.byCourtSport.length && data.sports.length ? (
-              <CourtSportStackedChart rows={data.byCourtSport} sports={data.sports} />
-            ) : (
-              <ChartEmpty message="Sin horas jugadas por cancha en este periodo." />
-            )}
-          </div>
-        </Card>
+      <section className="rp-block rp-metrics">
+        <div className="rp-metric">
+          <span className="rp-mval rp-violet">{formatHours(data.totals.hours)}</span>
+          <span className="rp-mlab">Horas de cancha ocupadas</span>
+        </div>
+        <div className="rp-metric">
+          <span className="rp-mval">{data.totals.reservations}</span>
+          <span className="rp-mlab">Reservas en el periodo</span>
+        </div>
+        <div className="rp-metric">
+          <span className="rp-mval">{data.totals.extensiones}</span>
+          <span className="rp-mlab">Extensiones de +30 min</span>
+        </div>
+        <div className="rp-metric">
+          <span className="rp-mval">{formatHours(data.totals.extraHours)}</span>
+          <span className="rp-mlab">Horas extra autorizadas</span>
+        </div>
       </section>
 
-      <section className="mt-5">
-        <Card className="gap-5 py-6">
-          <div className="px-6">
-            <h2 className="text-base font-black tracking-[-.02em]">Mapa de calor semanal</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Reservas por día y hora acumuladas en el rango. Los tonos más intensos concentran más reservas.
-            </p>
-          </div>
-          <div className="px-4 sm:px-6">
-            {data.heatmap.hours.length ? (
-              <HeatmapDemanda data={data.heatmap} />
-            ) : (
-              <ChartEmpty message="Sin reservas en este periodo." />
-            )}
-          </div>
-        </Card>
+      <section className="rp-block rp-readout">
+        <Readout label="Día más lleno" value={data.insights.busiestDay?.label} />
+        <Readout label="Día más flojo" value={data.insights.quietestDay?.label} />
+        <Readout label="Hora pico" value={data.insights.peakHour?.label} />
+        <Readout label="Hora muerta" value={data.insights.deadHour?.label} />
       </section>
 
-      <p className="mt-5 text-xs text-muted-foreground">
-        {data.totals.reservations} reservas · {formatHours(data.totals.hours)} ocupadas
-      </p>
-
-      {data.totals.reservations === 0 ? (
-        <div className="mt-5">
-          <EmptyState
-            title="Aún no hay reservas en este periodo"
-            description="Cuando se registren reservas en el rango seleccionado, verás aquí la demanda por día y hora, el deporte más jugado y el uso por cancha."
-          />
+      {data.totals.reservations > 0 ? (
+        <div className="rp-block">
+          <CrossFilterDemand heatmap={data.heatmap} />
         </div>
       ) : null}
+
+      <section className="rp-block rp-panels">
+        <div className="rp-panel">
+          <h3 className="rp-h3">Deportes más jugados</h3>
+          {data.bySport.length ? (
+            <div>
+              {data.bySport.map((sport) => (
+                <div className="rp-rank" key={sport.id}>
+                  <span className="rp-ranklab capitalize">{sport.label}</span>
+                  <span className="rp-ranktrack">
+                    <i style={{ width: `${Math.round((sport.reservations / maxSport) * 100)}%` }} />
+                  </span>
+                  <span className="rp-rankval">{sport.reservations} reservas</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ChartEmpty message="Sin reservas por deporte en este periodo." />
+          )}
+        </div>
+
+        <div className="rp-panel">
+          <h3 className="rp-h3">De dónde vienen las reservas</h3>
+          {data.byChannel.length ? (
+            <>
+              <div className="rp-split" aria-hidden="true">
+                {data.byChannel.map((item) => (
+                  <i
+                    key={item.name}
+                    style={{
+                      width: `${(item.value / channelTotal) * 100}%`,
+                      background: item.name === 'App Grassly' ? 'var(--rp-violet)' : 'var(--rp-cal)',
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="rp-splitlegend">
+                {data.byChannel.map((item) => (
+                  <span key={item.name}>
+                    <span
+                      className="rp-dot"
+                      style={{ background: item.name === 'App Grassly' ? 'var(--rp-violet)' : 'var(--rp-cal)' }}
+                    />
+                    {item.name} <b>{item.value}</b>
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <ChartEmpty message="Sin reservas en este periodo." />
+          )}
+        </div>
+      </section>
+
+      <section className="rp-block">
+        <div className="rp-blockhead">
+          <div>
+            <h2 className="rp-h2">Horas por cancha y deporte</h2>
+            <p className="rp-hint">Cuántas horas se jugaron en cada espacio, separadas por deporte.</p>
+          </div>
+        </div>
+        {data.byCourtSport.length && data.sports.length ? (
+          <div>
+            {data.byCourtSport.map((row) => {
+              const total = Object.values(row.values).reduce((sum, value) => sum + value, 0) || 1
+              return (
+                <div className="rp-stackrow" key={row.id}>
+                  <div className="rp-stacktop">
+                    <span>{row.label}</span>
+                    <span>{formatHours(total)}</span>
+                  </div>
+                  <div className="rp-stack">
+                    {data.sports.map((sport, index) => {
+                      const value = row.values[sport.id] ?? 0
+                      if (value <= 0) return null
+                      return (
+                        <i
+                          key={sport.id}
+                          title={`${sport.label}: ${formatHours(value)}`}
+                          style={{
+                            width: `${(value / total) * 100}%`,
+                            background: SPORT_COLORS[index % SPORT_COLORS.length],
+                          }}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+            <div className="rp-splitlegend">
+              {data.sports.map((sport, index) => (
+                <span key={sport.id}>
+                  <span className="rp-dot" style={{ background: SPORT_COLORS[index % SPORT_COLORS.length] }} />
+                  {sport.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <ChartEmpty message="Sin horas jugadas por cancha en este periodo." />
+        )}
+      </section>
     </>
   )
 }
