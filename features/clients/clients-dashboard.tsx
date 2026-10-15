@@ -19,6 +19,8 @@ const LIMA = 'America/Lima'
 
 const RESERVATION_STATUS: Record<ReservationStatus, { label: string; tone: string; dot: string }> = {
   pendiente_pago: { label: 'Pendiente de pago', tone: 'bg-info/15 text-info-foreground', dot: 'bg-info' },
+  checkout_online: { label: 'Pago online pendiente', tone: 'bg-info/15 text-info-foreground', dot: 'bg-info' },
+  pago_en_proceso: { label: 'Pago en proceso', tone: 'bg-warning/25 text-warning-foreground', dot: 'bg-warning' },
   pendiente_validacion: { label: 'Por validar', tone: 'bg-warning/25 text-warning-foreground', dot: 'bg-warning' },
   rechazada_pago: { label: 'Pago rechazado', tone: 'bg-destructive/12 text-destructive', dot: 'bg-destructive' },
   confirmada: { label: 'Confirmada', tone: 'bg-primary text-primary-foreground', dot: 'bg-primary' },

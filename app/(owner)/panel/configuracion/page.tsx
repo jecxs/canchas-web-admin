@@ -30,7 +30,7 @@ export default async function OwnerSettingsPage() {
           <ScheduleSettingsForm localId={settings.id} schedules={schedules} />
           <BenefitsSettingsForm localId={settings.id} catalog={benefitCatalog} benefits={benefits} />
           <CommercialSettingsForm settings={settings} paymentMethods={paymentMethods} minimumAdvancePercentage={minimumAdvancePercentage} />
-          <MercadoPagoConnectionCard />
+          <MercadoPagoConnectionCard localId={settings.id} />
         </div>
       </div>
     </div>

@@ -100,6 +100,8 @@ function reservationStatusLabel(status?: string) {
   switch (status) {
     case 'pendiente_validacion': return 'Por validar'
     case 'pendiente_pago': return 'Pendiente de pago'
+    case 'checkout_online': return 'Pago online pendiente'
+    case 'pago_en_proceso': return 'Pago en proceso'
     case 'confirmada': return 'Confirmada'
     case 'completada': return 'Completada'
     default: return 'Reserva'
@@ -110,6 +112,8 @@ function reservationTone(status?: string) {
   switch (status) {
     case 'pendiente_validacion': return 'border-warning bg-warning text-warning-foreground'
     case 'pendiente_pago': return 'border-info bg-info text-info-foreground'
+    case 'checkout_online': return 'border-info bg-info text-info-foreground'
+    case 'pago_en_proceso': return 'border-warning bg-warning text-warning-foreground'
     case 'completada': return 'border-success bg-success text-success-foreground'
     case 'confirmada': return 'border-primary bg-primary text-primary-foreground'
     default: return 'border-secondary bg-secondary text-secondary-foreground'
@@ -120,6 +124,8 @@ function statusDot(status?: string) {
   switch (status) {
     case 'pendiente_validacion': return 'bg-warning'
     case 'pendiente_pago': return 'bg-info'
+    case 'checkout_online': return 'bg-info'
+    case 'pago_en_proceso': return 'bg-warning'
     case 'completada': return 'bg-success'
     case 'confirmada': return 'bg-primary'
     default: return 'bg-secondary'
@@ -130,6 +136,8 @@ function reservationStatusBadgeTone(status?: string) {
   switch (status) {
     case 'pendiente_validacion': return 'bg-warning text-warning-foreground'
     case 'pendiente_pago': return 'bg-info text-info-foreground'
+    case 'checkout_online': return 'bg-info text-info-foreground'
+    case 'pago_en_proceso': return 'bg-warning text-warning-foreground'
     case 'completada': return 'bg-success text-success-foreground'
     case 'confirmada': return 'bg-primary text-primary-foreground'
     default: return 'bg-secondary text-secondary-foreground'
