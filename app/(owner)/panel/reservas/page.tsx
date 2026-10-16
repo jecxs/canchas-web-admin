@@ -4,7 +4,7 @@ import type { ReservationChannel, ReservationsFilters, ReservationStatus } from 
 
 type ReservationsSearchParams = Promise<{ status?: string; court?: string; channel?: string; from?: string; to?: string; page?: string }>
 
-const statuses = new Set<ReservationStatus>(['pendiente_pago', 'pendiente_validacion', 'rechazada_pago', 'confirmada', 'completada', 'no_show', 'cancelada_cliente', 'cancelada_local', 'expirada'])
+const statuses = new Set<ReservationStatus>(['pendiente_pago', 'checkout_online', 'pago_en_proceso', 'pendiente_validacion', 'rechazada_pago', 'confirmada', 'completada', 'no_show', 'cancelada_cliente', 'cancelada_local', 'expirada'])
 const channels = new Set<ReservationChannel>(['app', 'whatsapp', 'presencial'])
 const isDate = (value: string | undefined) => Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value))
 

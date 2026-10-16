@@ -1,5 +1,7 @@
 export type ReservationStatus =
   | 'pendiente_pago'
+  | 'checkout_online'
+  | 'pago_en_proceso'
   | 'pendiente_validacion'
   | 'rechazada_pago'
   | 'confirmada'

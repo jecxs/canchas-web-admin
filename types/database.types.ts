@@ -2356,6 +2356,8 @@ export type Database = {
       estado_resena: "pendiente_aprobacion" | "aprobada" | "rechazada"
       estado_reserva:
         | "pendiente_pago"
+        | "checkout_online"
+        | "pago_en_proceso"
         | "pendiente_validacion"
         | "rechazada_pago"
         | "confirmada"
@@ -2524,6 +2526,8 @@ export const Constants = {
       estado_resena: ["pendiente_aprobacion", "aprobada", "rechazada"],
       estado_reserva: [
         "pendiente_pago",
+        "checkout_online",
+        "pago_en_proceso",
         "pendiente_validacion",
         "rechazada_pago",
         "confirmada",

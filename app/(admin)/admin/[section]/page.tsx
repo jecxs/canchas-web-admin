@@ -5,8 +5,6 @@ import { requireAdmin } from '@/lib/auth/dal'
 
 const modules = {
   solicitudes: ['Solicitudes', 'Valida propietarios y locales pendientes de incorporación.'],
-  locales: ['Locales', 'Supervisa el estado y la información de los locales de la plataforma.'],
-  propietarios: ['Propietarios', 'Consulta y administra las cuentas responsables de cada negocio.'],
   suscripciones: ['Suscripciones', 'Controla planes, pagos y periodos de prueba de los propietarios.'],
   monitoreo: ['Monitoreo', 'Observa la actividad y salud operativa general de Grassly.'],
   configuracion: ['Configuración', 'Administra parámetros y reglas globales de la plataforma.'],

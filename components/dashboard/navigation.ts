@@ -70,3 +70,70 @@ export function getDashboardPageLabel(pathname: string, role: DashboardRole) {
 
   return 'Grassly'
 }
+
+export type DashboardBreadcrumb = {
+  label: string
+  href?: string
+}
+
+// Etiquetas por defecto para la miga de la ficha cuando la página todavía no
+// registró el nombre real de la entidad (SetBreadcrumb).
+const entityFallbackLabels: Record<string, string> = {
+  locales: 'Ficha del local',
+  propietarios: 'Ficha del propietario',
+  solicitudes: 'Revisión de solicitud',
+}
+
+const subPageLabels: Record<string, string> = {
+  configuracion: 'Configuración',
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Seguimiento jerárquico de la ruta actual: Resumen / Sección / Ficha / Subpágina.
+// Cada miga intermedia es clickeable para volver a ese nivel; la última es la
+// página actual. `entityLabel` es el nombre real que registra la ficha.
+export function getDashboardBreadcrumbs(
+  pathname: string,
+  role: DashboardRole,
+  entityLabel?: string | null,
+): DashboardBreadcrumb[] {
+  const segments = pathname.split('/').filter(Boolean)
+  const homeHref = role === 'admin' ? '/admin' : '/panel'
+
+  if (segments.length <= 1) {
+    return [{ label: 'Resumen' }]
+  }
+
+  const crumbs: DashboardBreadcrumb[] = [{ label: 'Resumen', href: homeHref }]
+
+  const sectionSegment = segments[1]
+  const sectionHref = `/${segments[0]}/${sectionSegment}`
+  const sectionItem = dashboardNavigation[role].find((item) => item.href === sectionHref)
+
+  if (!sectionItem) {
+    // Páginas sueltas (perfil, ayuda, suscripción, suspendido, sin local…).
+    crumbs.push({ label: getDashboardPageLabel(pathname, role) })
+    return crumbs
+  }
+
+  crumbs.push({ label: sectionItem.title, href: sectionHref })
+
+  for (let index = 2; index < segments.length; index += 1) {
+    const segment = segments[index]
+    const href = `/${segments.slice(0, index + 1).join('/')}`
+
+    if (subPageLabels[segment]) {
+      crumbs.push({ label: subPageLabels[segment], href })
+    } else if (UUID_PATTERN.test(segment)) {
+      crumbs.push({ label: entityLabel || entityFallbackLabels[sectionSegment] || 'Detalle', href })
+    } else {
+      crumbs.push({ label: segment, href })
+    }
+  }
+
+  const last = crumbs[crumbs.length - 1]
+  if (last) last.href = undefined
+
+  return crumbs
+}
