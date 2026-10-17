@@ -25,6 +25,7 @@ export type LocalSummary = Pick<
   | 'motivo_rechazo'
   | 'publicado'
   | 'publicado_at'
+  | 'porcentaje_adelanto'
   | 'created_at'
 >
 

@@ -42,7 +42,7 @@ export const getAccessContext = cache(
         supabase
           .from('locales')
           .select(
-            'id,nombre,direccion,ruc,estado,fecha_fin_trial,motivo_rechazo,publicado,publicado_at,created_at',
+            'id,nombre,direccion,ruc,estado,fecha_fin_trial,motivo_rechazo,publicado,publicado_at,porcentaje_adelanto,created_at',
           )
           .eq('dueno_id', userId)
           .order('created_at', { ascending: false }),
@@ -121,6 +121,13 @@ export async function requireOwner() {
     redirect(resolvePostLoginDestination(context))
   }
   return context
+}
+
+// Comprobación de rol para server actions de administración. Devuelve `false`
+// tanto si no hay sesión como si el usuario no es superadministrador.
+export async function isSuperAdmin() {
+  const context = await getAccessContext()
+  return context?.profile.rol === 'super_admin'
 }
 
 // Autoriza escrituras operativas de un local: su dueño (con local operativo) o
