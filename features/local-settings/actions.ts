@@ -43,6 +43,9 @@ function databaseFailure(error: { code?: string } | null, scope: string): Settin
 function saved(localId: string): SettingsActionState {
   revalidatePath('/panel')
   revalidatePath('/panel/configuracion')
+  // El aviso de adelanto vive en el layout del panel; sin revalidarlo, el
+  // bloqueo seguiría visible después de corregir el porcentaje.
+  revalidatePath('/panel', 'layout')
   revalidatePath('/admin/locales')
   revalidatePath(`/admin/locales/${localId}`)
   return { success: true, message: messages.saved }
