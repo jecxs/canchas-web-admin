@@ -9,6 +9,18 @@ export const PLATFORM_PARAMETER_KEYS = [
 
 export type PlatformParameterKey = (typeof PLATFORM_PARAMETER_KEYS)[number]
 
+// El nombre viaja como texto porque la definición cruza del server al cliente;
+// el componente lo resuelve a un icono real.
+export type PlatformParameterIcon = 'percent' | 'clock' | 'wallet' | 'money' | 'layers' | 'ban'
+
+export type PlatformParameterAccent =
+  | 'warning'
+  | 'info'
+  | 'plum'
+  | 'success'
+  | 'primary'
+  | 'destructive'
+
 export type PlatformParameterDefinition = {
   key: PlatformParameterKey
   title: string
@@ -16,6 +28,9 @@ export type PlatformParameterDefinition = {
   description: string
   impact: string | null
   input: 'number' | 'words'
+  icon: PlatformParameterIcon
+  accent: PlatformParameterAccent
+  rangeLabel: string | null
   min?: number
   max?: number
   step?: number
@@ -27,10 +42,13 @@ export const PLATFORM_PARAMETERS: readonly PlatformParameterDefinition[] = [
     title: 'Adelanto mínimo global',
     unit: '%',
     description:
-      'Piso que se le exige a todos los locales. Lo valida el trigger fn_validar_porcentaje_adelanto en cada escritura de locales.porcentaje_adelanto.',
+      'Porcentaje de adelanto más bajo que se le permite pedir a un local antes de confirmar una reserva.',
     impact:
-      'Subirlo por encima del valor ya configurado en un local invalida el valor de ese local: no podrá guardar ningún cambio hasta corregirlo.',
+      'Si lo subes por encima del porcentaje que un local ya tenía configurado, ese local queda con un valor inválido: no podrá guardar ningún cambio en su panel hasta corregirlo, y verá un aviso que le bloquea la pantalla.',
     input: 'number',
+    icon: 'percent',
+    accent: 'warning',
+    rangeLabel: '1 – 100 %',
     min: 1,
     max: 100,
     step: 1,
@@ -40,10 +58,13 @@ export const PLATFORM_PARAMETERS: readonly PlatformParameterDefinition[] = [
     title: 'Expiración del pago pendiente',
     unit: 'min',
     description:
-      'Tiempo que el cliente tiene para subir el comprobante antes de que la reserva se libere automáticamente.',
+      'Cuánto tiempo tiene el cliente para pagar el adelanto y subir su comprobante después de apartar un horario. Si no lo hace, el horario se libera solo.',
     impact:
-      'La app móvil muestra "10 minutos" escrito directamente en el texto del checkout: cambiar este valor deja la app diciendo algo distinto a la base.',
+      'El aviso que ve el cliente en el app se arma con este valor, así que el cambio se refleja solo. Debe quedar entre 1 y 60 minutos.',
     input: 'number',
+    icon: 'clock',
+    accent: 'info',
+    rangeLabel: '1 – 60 min',
     min: 1,
     max: 60,
     step: 1,
@@ -53,10 +74,13 @@ export const PLATFORM_PARAMETERS: readonly PlatformParameterDefinition[] = [
     title: 'Expiración del checkout online',
     unit: 'min',
     description:
-      'Tiempo que el cliente tiene para completar el pago con MercadoPago antes de que el backend inicie su conciliación.',
+      'Cuánto tiempo tiene el cliente para completar un pago en línea con Mercado Pago después de apartar un horario.',
     impact:
-      'Solo aplica a las reservas que entran en estado checkout_online. Las reservas con comprobante manual siguen usando el parámetro anterior. Este flujo todavía no está habilitado en el app.',
+      'Solo afecta a los pagos en línea. Quienes pagan subiendo comprobante usan el tiempo del parámetro anterior. Los pagos en línea todavía no están habilitados en el app.',
     input: 'number',
+    icon: 'wallet',
+    accent: 'plum',
+    rangeLabel: '1 – 60 min',
     min: 1,
     max: 60,
     step: 1,
@@ -65,9 +89,12 @@ export const PLATFORM_PARAMETERS: readonly PlatformParameterDefinition[] = [
     key: 'monto_base_soles',
     title: 'Monto base de suscripción',
     unit: 'S/',
-    description: 'Precio mensual de la suscripción de un propietario con una sede.',
+    description: 'Cuánto paga al mes un propietario por su primera sede.',
     impact: null,
     input: 'number',
+    icon: 'money',
+    accent: 'success',
+    rangeLabel: '0 – 100 000 S/',
     min: 0,
     max: 100000,
     step: 0.01,
@@ -77,9 +104,12 @@ export const PLATFORM_PARAMETERS: readonly PlatformParameterDefinition[] = [
     title: 'Add-on por sede adicional',
     unit: 'S/',
     description:
-      'Precio que se suma por cada sede extra contratada. Determina el cupo de locales mediante fn_cupo_locales.',
+      'Cuánto se suma a la mensualidad por cada sede adicional que contrata un propietario, y cuántos locales puede tener en total.',
     impact: null,
     input: 'number',
+    icon: 'layers',
+    accent: 'primary',
+    rangeLabel: '0 – 100 000 S/',
     min: 0,
     max: 100000,
     step: 0.01,
@@ -88,9 +118,13 @@ export const PLATFORM_PARAMETERS: readonly PlatformParameterDefinition[] = [
     key: 'palabras_prohibidas',
     title: 'Palabras prohibidas',
     unit: null,
-    description: 'Filtro aplicado al contenido que publican los locales. Una por línea o separadas por coma.',
+    description:
+      'Palabras que Grassly filtra en el contenido que publican los locales. Escríbelas una por línea o separadas por coma.',
     impact: null,
     input: 'words',
+    icon: 'ban',
+    accent: 'destructive',
+    rangeLabel: 'Máx. 500 palabras · 60 caracteres c/u',
   },
 ]
 

@@ -1,10 +1,11 @@
-import Link from 'next/link'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert02Icon } from '@hugeicons/core-free-icons'
-import { Button } from '@/components/ui/button'
 import { formatAdvancePercentage } from './advance-policy'
 import type { AdvanceAlert } from './advance-alert'
 
+// Variante en línea del bloqueo: se usa solo dentro de la configuración, que es
+// la sección donde el dueño corrige el porcentaje. Sin botón, porque el campo
+// está en la misma pantalla.
 export function AdvanceAlertBanner({ alert }: { alert: AdvanceAlert }) {
   return (
     <div className="mx-auto mb-6 w-full max-w-6xl rounded-2xl border border-destructive/30 bg-destructive/8 p-4">
@@ -21,12 +22,11 @@ export function AdvanceAlertBanner({ alert }: { alert: AdvanceAlert }) {
             <span className="font-bold text-foreground">{formatAdvancePercentage(alert.minimum)}%</span> y tu
             local está en{' '}
             <span className="font-bold text-foreground">{formatAdvancePercentage(alert.current)}%</span>.
-            Mientras tu porcentaje siga por debajo del mínimo, la base rechaza <span className="font-semibold text-foreground">cualquier</span>{' '}
-            cambio en la información del local, no solo el del porcentaje.
+            Mientras tu porcentaje siga por debajo del mínimo, la base rechaza{' '}
+            <span className="font-semibold text-foreground">cualquier</span> cambio en la información del local,
+            no solo el del porcentaje. Corrígelo en <span className="font-semibold text-foreground">“Adelanto,
+            pagos y política”</span>, aquí abajo.
           </p>
-          <Button asChild size="sm" variant="destructive" className="mt-3">
-            <Link href="/panel/configuracion#pagos-politicas">Actualizar porcentaje</Link>
-          </Button>
         </div>
       </div>
     </div>
