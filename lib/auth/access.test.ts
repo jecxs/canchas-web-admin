@@ -32,6 +32,7 @@ function context(
       motivo_rechazo: null,
       publicado: false,
       publicado_at: null,
+      porcentaje_adelanto: null,
       created_at: new Date(2026, 0, index + 1).toISOString(),
     })),
     subscription: null,

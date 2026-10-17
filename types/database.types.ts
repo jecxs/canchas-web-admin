@@ -2094,6 +2094,27 @@ export type Database = {
         }[]
       }
       obtener_minimo_adelanto_global: { Args: never; Returns: number }
+      obtener_parametros_plataforma: {
+        Args: never
+        Returns: {
+          clave: string
+          descripcion: string | null
+          valor: unknown
+        }[]
+      }
+      actualizar_parametro_plataforma: {
+        Args: {
+          p_clave: string
+          p_forzar?: boolean
+          p_valor: unknown
+        }
+        Returns: {
+          clave_actualizada: string
+          locales_por_debajo: number
+          valor_anterior: unknown
+          valor_nuevo: unknown
+        }[]
+      }
       obtener_proximos_turnos_locales_publicos: {
         Args: {
           p_fecha?: string
