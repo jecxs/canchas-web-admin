@@ -31,7 +31,6 @@ export default async function OwnerAgendaPage({ searchParams }: { searchParams: 
 
   return (
     <div className="mx-auto w-full max-w-[1440px]">
-      <p className="eyebrow mb-4">Operación diaria</p>
       <AgendaBoard data={data} selectedSportId={selectedSportId} view={view} weekData={weekData} selectedCourtId={params.court ?? ''} highlightReservationId={params.reservation ?? ''} newClient={newClient} />
     </div>
   )
