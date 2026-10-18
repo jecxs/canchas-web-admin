@@ -6,6 +6,7 @@ export const adminLocalMessages = {
   publicationUpdated: 'Publicación actualizada',
   approvedForPayment: 'Local aprobado para pago',
   trialGranted: 'Periodo de prueba activado',
+  reactivatedWithTrial: 'Local reactivado con periodo de prueba',
   rejected: 'Observación enviada al propietario',
 } as const
 

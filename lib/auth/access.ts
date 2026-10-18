@@ -62,6 +62,19 @@ export function isOperationalLocalState(state: LocalState) {
   return (OPERATIONAL_LOCAL_STATES as readonly LocalState[]).includes(state)
 }
 
+// Un local aprobado que puede contratar Billing. Incluye estados heredados
+// (trial/activo/en_gracia) que quedaron sin suscripción tras activar el cobro.
+export const SUBSCRIBABLE_LOCAL_STATES = [
+  'aprobado_pendiente_pago',
+  'trial',
+  'activo',
+  'en_gracia',
+] as const satisfies readonly LocalState[]
+
+export function isSubscribableLocalState(state: LocalState) {
+  return (SUBSCRIBABLE_LOCAL_STATES as readonly LocalState[]).includes(state)
+}
+
 export function hasActiveSubscription(
   subscription: SubscriptionSummary | null | undefined,
 ) {

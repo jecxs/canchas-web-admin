@@ -28,7 +28,7 @@ export async function getBillingCheckoutOffer() {
 
 export type BillingOverview = {
   subscription: Pick<Tables<'suscripciones'>,
-    'id' | 'estado_facturacion' | 'monto' | 'moneda' | 'sedes_extra_contratadas' |
+    'id' | 'estado' | 'fecha_proximo_cobro' | 'estado_facturacion' | 'monto' | 'moneda' | 'sedes_extra_contratadas' |
     'periodo_actual_fin' | 'proximo_cobro_at' | 'gracia_hasta' | 'mercadopago_preapproval_id' | 'metodo_pago_codigo'> | null
   invoices: Pick<Tables<'facturas_suscripcion'>,
     'id' | 'estado' | 'monto' | 'moneda' | 'periodo_inicio' | 'periodo_fin' | 'pagada_at'>[]
@@ -39,7 +39,7 @@ export async function getBillingOverview(): Promise<BillingOverview> {
   const supabase = await createClient()
   const { data: subscription, error } = await supabase
     .from('suscripciones')
-    .select('id,estado_facturacion,monto,moneda,sedes_extra_contratadas,periodo_actual_fin,proximo_cobro_at,gracia_hasta,mercadopago_preapproval_id,metodo_pago_codigo')
+    .select('id,estado,fecha_proximo_cobro,estado_facturacion,monto,moneda,sedes_extra_contratadas,periodo_actual_fin,proximo_cobro_at,gracia_hasta,mercadopago_preapproval_id,metodo_pago_codigo')
     .eq('dueno_id', context.userId)
     .maybeSingle()
   if (error) throw new Error('No se pudo cargar tu suscripción.')

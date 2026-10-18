@@ -9,6 +9,7 @@ import {
   Clock01Icon,
   CreditCardIcon,
   EyeIcon,
+  RefreshCwIcon,
   ViewOffIcon,
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,7 @@ import {
   approveLocalForPaymentAction,
   changeLocalPublicationAction,
   grantLocalTrialAction,
+  reactivateLocalTrialAction,
   rejectLocalAction,
 } from './actions'
 import { adminLocalMessages } from './messages'
@@ -41,6 +43,7 @@ import {
 } from './types'
 
 const OPERATIONAL_STATES: AdminLocalState[] = ['trial', 'activo', 'en_gracia']
+const REACTIVABLE_STATES: AdminLocalState[] = ['trial', 'activo', 'en_gracia', 'suspendido']
 
 function useActionFeedback(state: AdminLocalActionState) {
   const router = useRouter()
@@ -178,6 +181,58 @@ function GrantTrial({ localId }: { localId: string }) {
   )
 }
 
+function ReactivateTrial({ localId }: { localId: string }) {
+  const [state, action, pending] = useActionState(reactivateLocalTrialAction, initialAdminLocalActionState)
+  useActionFeedback(state)
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="secondary">
+          <HugeiconsIcon icon={RefreshCwIcon} strokeWidth={2} />
+          Reactivar con prueba
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="theme-admin">
+        <DialogHeader>
+          <DialogTitle>Reactivar local heredado</DialogTitle>
+          <DialogDescription>
+            Otorga un nuevo periodo de prueba a un local que quedó sin suscripción tras activar el
+            cobro SaaS (o que perdió acceso). El local conserva su publicación actual.
+          </DialogDescription>
+        </DialogHeader>
+        <form action={action} className="space-y-5">
+          <input type="hidden" name="localId" value={localId} />
+          <Field data-invalid={Boolean(state.fieldErrors?.days?.length)}>
+            <FieldLabel htmlFor="local-reactivate-days">Duración en días</FieldLabel>
+            <Input
+              id="local-reactivate-days"
+              name="days"
+              type="number"
+              min={1}
+              max={90}
+              defaultValue={30}
+              required
+              aria-invalid={Boolean(state.fieldErrors?.days?.length)}
+            />
+            <FieldError errors={state.fieldErrors?.days?.map((message) => ({ message }))} />
+          </Field>
+          <DecisionError state={state} />
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost">Cancelar</Button>
+            </DialogClose>
+            <Button type="submit" disabled={pending}>
+              {pending && <Spinner />}
+              Reactivar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function RejectLocal({ localId }: { localId: string }) {
   const [state, action, pending] = useActionState(rejectLocalAction, initialAdminLocalActionState)
   useActionFeedback(state)
@@ -243,14 +298,16 @@ export function LocalModerationPanel({
 }) {
   const canDecide = state === 'pendiente_aprobacion' || state === 'aprobado_pendiente_pago'
   const canPublish = published || OPERATIONAL_STATES.includes(state)
+  const canReactivate = REACTIVABLE_STATES.includes(state)
 
-  if (!canDecide && !canPublish) return null
+  if (!canDecide && !canPublish && !canReactivate) return null
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {canPublish ? <PublicationToggle localId={localId} published={published} ready={checklistReady} /> : null}
       {state === 'pendiente_aprobacion' ? <ApproveForPayment localId={localId} /> : null}
       {canDecide ? <GrantTrial localId={localId} /> : null}
+      {canReactivate ? <ReactivateTrial localId={localId} /> : null}
       {canDecide ? <RejectLocal localId={localId} /> : null}
     </div>
   )

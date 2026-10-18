@@ -119,6 +119,34 @@ export async function grantLocalTrialAction(
   return { success: true, message: adminLocalMessages.trialGranted }
 }
 
+export async function reactivateLocalTrialAction(
+  _state: AdminLocalActionState,
+  formData: FormData,
+): Promise<AdminLocalActionState> {
+  const authorizationError = await authorizeAdmin()
+  if (authorizationError) return authorizationError
+
+  const validation = localTrialSchema.safeParse({
+    localId: formData.get('localId'),
+    days: formData.get('days'),
+  })
+  if (!validation.success) return validationFailure(validation.error)
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('billing_reactivar_local_con_trial', {
+    p_local_id: validation.data.localId,
+    p_dias: validation.data.days,
+  })
+
+  if (error) {
+    console.error('[admin-locales:reactivate]', { code: error.code })
+    return { success: false, message: translateAdminLocalError(error) }
+  }
+
+  revalidateLocal(validation.data.localId)
+  return { success: true, message: adminLocalMessages.reactivatedWithTrial }
+}
+
 export async function rejectLocalAction(
   _state: AdminLocalActionState,
   formData: FormData,

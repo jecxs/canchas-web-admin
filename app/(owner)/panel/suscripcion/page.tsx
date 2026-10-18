@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SubscriptionCheckoutCard } from '@/features/billing/subscription-checkout-card'
 import { SubscriptionSeatsCard } from '@/features/billing/subscription-seats-card'
 import { getBillingCheckoutOffer, getBillingOverview, getBillingPlan } from '@/features/billing/queries'
+import { canOperateLocal, isSubscribableLocalState } from '@/lib/auth/access'
 import { requireOwner } from '@/lib/auth/dal'
 
 const labels: Record<string, string> = {
@@ -30,9 +31,9 @@ export default async function SubscriptionPage() {
   const context = await requireOwner()
   const { subscription, invoices } = await getBillingOverview()
   const canStart = (!subscription || subscription.estado_facturacion === 'pendiente_alta')
-    ? context.locals.some((local) => local.estado === 'aprobado_pendiente_pago')
+    ? context.locals.some((local) => isSubscribableLocalState(local.estado) && !canOperateLocal(local, subscription))
     : subscription.estado_facturacion === 'cancelada'
-      && context.locals.some((local) => local.estado === 'aprobado_pendiente_pago' || local.suspendido_por_facturacion)
+      && context.locals.some((local) => isSubscribableLocalState(local.estado) || local.suspendido_por_facturacion)
   const offer = canStart ? await getBillingCheckoutOffer() : null
   const plan = subscription?.mercadopago_preapproval_id ? await getBillingPlan() : null
 

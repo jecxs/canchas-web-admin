@@ -2321,6 +2321,13 @@ export type Database = {
           vigente_desde: string
         }[]
       }
+      billing_reactivar_local_con_trial: {
+        Args: { p_dias?: number; p_local_id: string }
+        Returns: {
+          estado: Database["public"]["Enums"]["estado_local"]
+          fecha_fin_trial: string
+        }[]
+      }
       billing_registrar_evento_webhook: {
         Args: { p_evento_id: string; p_payload: Json; p_tipo: string }
         Returns: boolean
