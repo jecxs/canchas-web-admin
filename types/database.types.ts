@@ -2181,12 +2181,16 @@ export type Database = {
         Args: { p_cambio_id: string }
         Returns: boolean
       }
+      billing_confirmar_cancelacion_cambio_sedes: {
+        Args: { p_cambio_id: string }
+        Returns: boolean
+      }
       billing_entitlement_vigente: {
         Args: { p_dueno_id: string }
         Returns: boolean
       }
       billing_establecer_gracia_propietario: {
-        Args: { p_dias_gracia?: number | null; p_dueno_id: string }
+        Args: { p_dias_gracia?: number; p_dueno_id: string }
         Returns: undefined
       }
       billing_eventos_pendientes: {
@@ -2267,6 +2271,15 @@ export type Database = {
           estado: string
           moneda: string
           monto_objetivo: number
+          preapproval_id: string
+        }[]
+      }
+      billing_preparar_cancelacion_cambio_sedes: {
+        Args: { p_dueno_id: string }
+        Returns: {
+          cambio_id: string
+          moneda: string
+          monto_restaurar: number
           preapproval_id: string
         }[]
       }
@@ -3024,6 +3037,23 @@ export type Database = {
           nombre: string
           orden: number
           slug: string
+        }[]
+      }
+      obtener_caja_local: {
+        Args: { p_desde: string; p_hasta: string; p_local_id: string }
+        Returns: {
+          cancha_id: string
+          cancha_nombre: string
+          cliente: string
+          created_at: string
+          fecha: string
+          medio_tipo: string
+          monto: number
+          movimiento_id: string
+          notas: string
+          referencia: string
+          reserva_id: string
+          tipo: string
         }[]
       }
       obtener_canchas_local: {

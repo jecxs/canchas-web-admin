@@ -2,6 +2,7 @@ import type { IconSvgElement } from '@hugeicons/react'
 import {
   Building03Icon,
   Calendar03Icon,
+  Cashier02Icon,
   ChartLineData01Icon,
   CreditCardIcon,
   DashboardSquare01Icon,
@@ -28,6 +29,7 @@ const ownerNavigation = [
   { title: 'Canchas', href: '/panel/canchas', icon: Building03Icon },
   { title: 'Tarifas', href: '/panel/tarifas', icon: Money03Icon },
   { title: 'Clientes', href: '/panel/clientes', icon: UserGroupIcon },
+  { title: 'Caja', href: '/panel/caja', icon: Cashier02Icon },
   { title: 'Reportes', href: '/panel/reportes', icon: ChartLineData01Icon },
   { title: 'Configuración', href: '/panel/configuracion', icon: Settings02Icon },
   { title: 'Facturación', href: '/panel/suscripcion', icon: CreditCardIcon },

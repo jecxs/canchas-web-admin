@@ -11,8 +11,8 @@ export async function setOwnerGraceAction(_previous: GraceState, formData: FormD
   if (!await isSuperAdmin()) return { success: false, message: 'No tienes permiso.' }
   const ownerId = String(formData.get('owner_id') ?? '')
   const raw = String(formData.get('days') ?? '').trim()
-  const days = raw === '' ? null : Number(raw)
-  if (!/^[0-9a-f-]{36}$/i.test(ownerId) || (days !== null && (!Number.isInteger(days) || days < 0 || days > 30))) {
+  const days = raw === '' ? undefined : Number(raw)
+  if (!/^[0-9a-f-]{36}$/i.test(ownerId) || (days !== undefined && (!Number.isInteger(days) || days < 0 || days > 30))) {
     return { success: false, message: 'Ingresa entre 0 y 30 días, o deja vacío para usar el plan.' }
   }
   const supabase = await createClient()
