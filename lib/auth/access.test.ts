@@ -69,6 +69,21 @@ describe('resolvePostLoginDestination', () => {
     ).toBe('/panel/suscripcion')
   })
 
+  it('envía al dueño ya cobrado a completar la configuración inicial', () => {
+    const paidContext = {
+      ...context('dueno', ['aprobado_pendiente_pago']),
+      subscription: {
+        id: 'subscription-1',
+        estado: 'activa' as const,
+        fecha_proximo_cobro: null,
+        monto: 49,
+        sedes_extra_contratadas: 0,
+      },
+    }
+
+    expect(resolvePostLoginDestination(paidContext)).toBe('/panel/configuracion')
+  })
+
   it('envía al dueño suspendido a su estado específico', () => {
     expect(
       resolvePostLoginDestination(context('dueno', ['suspendido'])),
