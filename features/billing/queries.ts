@@ -55,9 +55,20 @@ export async function getBillingOverview(): Promise<BillingOverview> {
   return { subscription, invoices: invoices ?? [] }
 }
 
-export async function getBillingPlan() {
+export type BillingPlan = {
+  sedes_incluidas: number
+  sedes_extra_actuales: number
+  monto_base: number
+  monto_sede_extra: number
+  sedes_extra_minimas: number
+  sedes_extra_pendientes: number | null
+  cambio_estado: string | null
+  efectivo_desde: string | null
+}
+
+export async function getBillingPlan(): Promise<BillingPlan | null> {
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('billing_obtener_plan_propio')
   if (error) throw new Error('No se pudo cargar el plan contratado.')
-  return data?.[0] ?? null
+  return (data?.[0] ?? null) as BillingPlan | null
 }

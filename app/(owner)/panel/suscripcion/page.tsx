@@ -61,6 +61,9 @@ export default async function SubscriptionPage() {
             {subscription.estado_facturacion === 'en_gracia' ? (
               <Alert variant="destructive"><AlertTitle>Regulariza tu pago</AlertTitle><AlertDescription>El acceso permanecerá disponible hasta el {date(subscription.gracia_hasta)}. Revisa tu medio de pago en Mercado Pago.</AlertDescription></Alert>
             ) : null}
+            {plan?.sedes_extra_pendientes !== null ? (
+              <Alert><AlertTitle>Cambio de sedes programado</AlertTitle><AlertDescription>Tienes un cambio de sedes programado para la próxima renovación. Los detalles están en la sección «Sedes del plan».</AlertDescription></Alert>
+            ) : null}
             {subscription.mercadopago_preapproval_id ? (
               <p className="text-sm text-muted-foreground">Para revisar tu medio de pago, abre <Link className="font-semibold text-primary underline" href="https://www.mercadopago.com.pe/" target="_blank" rel="noopener noreferrer">tu cuenta de Mercado Pago</Link>.</p>
             ) : null}
