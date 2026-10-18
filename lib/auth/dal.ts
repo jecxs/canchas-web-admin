@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import {
+  canConfigurePaidPendingLocal,
   findLocalWithState,
   isOperationalLocalState,
   OPERATIONAL_LOCAL_STATES,
@@ -141,6 +142,21 @@ export async function authorizeLocalWrite(localId: string) {
   )
 }
 
+// Permiso transitorio y deliberadamente estrecho: después de cobrar, un local
+// aún sin coordenadas puede abrir solo su configuración general. La base vuelve
+// a comprobar el entitlement antes de promoverlo a operativo.
+export async function authorizeLocalConfiguration(localId: string) {
+  const context = await getAccessContext()
+  if (!context) return false
+  if (context.profile.rol === 'super_admin') return true
+  const local = context.locals.find((candidate) => candidate.id === localId)
+  return Boolean(
+    local &&
+      (isOperationalLocalState(local.estado) ||
+        canConfigurePaidPendingLocal(context, local)),
+  )
+}
+
 export async function requireOwnerLocal(states: readonly LocalState[]) {
   const { context, activeLocal } = await getOwnerShellContext()
   const local =
@@ -156,8 +172,36 @@ export async function requireOwnerLocal(states: readonly LocalState[]) {
   return { context, local }
 }
 
-export function requireOperationalOwnerLocal() {
-  return requireOwnerLocal(OPERATIONAL_LOCAL_STATES)
+export async function requireOperationalOwnerLocal() {
+  const { context, activeLocal } = await getOwnerShellContext()
+  if (activeLocal && isOperationalLocalState(activeLocal.estado)) {
+    return { context, local: activeLocal }
+  }
+
+  if (canConfigurePaidPendingLocal(context, activeLocal)) {
+    redirect('/panel/configuracion')
+  }
+
+  if (activeLocal) {
+    redirect(resolveLocalDestination(activeLocal.estado))
+  }
+  redirect(resolvePostLoginDestination(context))
+}
+
+export async function requireConfigurableOwnerLocal() {
+  const { context, activeLocal } = await getOwnerShellContext()
+  if (
+    activeLocal &&
+    (isOperationalLocalState(activeLocal.estado) ||
+      canConfigurePaidPendingLocal(context, activeLocal))
+  ) {
+    return { context, local: activeLocal }
+  }
+
+  if (activeLocal) {
+    redirect(resolveLocalDestination(activeLocal.estado))
+  }
+  redirect(resolvePostLoginDestination(context))
 }
 
 export async function getOwnerShellContext() {

@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { BenefitsSettingsForm } from '@/features/local-settings/benefits-settings-form'
 import { CommercialSettingsForm } from '@/features/local-settings/commercial-settings-form'
 import { GeneralSettingsForm } from '@/features/local-settings/general-settings-form'
@@ -10,6 +11,7 @@ import { SettingsSectionNav } from '@/features/local-settings/settings-section-n
 
 export default async function OwnerSettingsPage() {
   const { local, settings, schedules, photos, benefitCatalog, benefits, paymentMethods, minimumAdvancePercentage } = await getLocalSettings()
+  const needsInitialLocation = local.estado === 'aprobado_pendiente_pago'
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -26,11 +28,22 @@ export default async function OwnerSettingsPage() {
         <SettingsSectionNav />
         <div className="space-y-6">
           <GeneralSettingsForm settings={settings} />
-          <LocalMediaManager localId={settings.id} logo={settings.logo} photos={photos} />
-          <ScheduleSettingsForm localId={settings.id} schedules={schedules} />
-          <BenefitsSettingsForm localId={settings.id} catalog={benefitCatalog} benefits={benefits} />
-          <CommercialSettingsForm settings={settings} paymentMethods={paymentMethods} minimumAdvancePercentage={minimumAdvancePercentage} />
-          <MercadoPagoConnectionCard localId={settings.id} />
+          {needsInitialLocation ? (
+            <Alert>
+              <AlertTitle>Completa primero los datos generales</AlertTitle>
+              <AlertDescription>
+                Tu suscripción ya fue habilitada. Guarda una ubicación real en el mapa para activar el local y continuar con horarios, canchas, tarifas y publicación.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              <LocalMediaManager localId={settings.id} logo={settings.logo} photos={photos} />
+              <ScheduleSettingsForm localId={settings.id} schedules={schedules} />
+              <BenefitsSettingsForm localId={settings.id} catalog={benefitCatalog} benefits={benefits} />
+              <CommercialSettingsForm settings={settings} paymentMethods={paymentMethods} minimumAdvancePercentage={minimumAdvancePercentage} />
+              <MercadoPagoConnectionCard localId={settings.id} />
+            </>
+          )}
         </div>
       </div>
     </div>

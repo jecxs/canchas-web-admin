@@ -42,6 +42,7 @@ export type AccessContext = {
 export type AppDestination =
   | '/admin'
   | '/panel'
+  | '/panel/configuracion'
   | '/panel/suscripcion'
   | '/panel/suspendido'
   | '/panel/sin-local'
@@ -56,6 +57,22 @@ export const OPERATIONAL_LOCAL_STATES = [
 
 export function isOperationalLocalState(state: LocalState) {
   return (OPERATIONAL_LOCAL_STATES as readonly LocalState[]).includes(state)
+}
+
+export function hasActiveSubscription(
+  subscription: SubscriptionSummary | null | undefined,
+) {
+  return subscription?.estado === 'activa'
+}
+
+export function canConfigurePaidPendingLocal(
+  context: AccessContext,
+  local: LocalSummary | null | undefined,
+) {
+  return (
+    local?.estado === 'aprobado_pendiente_pago' &&
+    hasActiveSubscription(context.subscription)
+  )
 }
 
 export function findLocalWithState(
@@ -110,6 +127,13 @@ export function resolvePostLoginDestination(
   if (context.profile.rol === 'dueno') {
     if (findLocalWithState(context, OPERATIONAL_LOCAL_STATES)) {
       return '/panel'
+    }
+
+    if (
+      hasActiveSubscription(context.subscription) &&
+      findLocalWithState(context, ['aprobado_pendiente_pago'])
+    ) {
+      return '/panel/configuracion'
     }
 
     if (findLocalWithState(context, ['aprobado_pendiente_pago'])) {

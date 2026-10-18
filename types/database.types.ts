@@ -10,32 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -259,6 +234,196 @@ export type Database = {
         }
         Relationships: []
       }
+      entitlements_suscripcion: {
+        Row: {
+          dueno_id: string
+          max_sedes: number
+          panel_habilitado: boolean
+          reservas_habilitadas: boolean
+          suscripcion_id: string | null
+          updated_at: string
+          vigente_hasta: string | null
+          visibilidad_app_habilitada: boolean
+        }
+        Insert: {
+          dueno_id: string
+          max_sedes?: number
+          panel_habilitado?: boolean
+          reservas_habilitadas?: boolean
+          suscripcion_id?: string | null
+          updated_at?: string
+          vigente_hasta?: string | null
+          visibilidad_app_habilitada?: boolean
+        }
+        Update: {
+          dueno_id?: string
+          max_sedes?: number
+          panel_habilitado?: boolean
+          reservas_habilitadas?: boolean
+          suscripcion_id?: string | null
+          updated_at?: string
+          vigente_hasta?: string | null
+          visibilidad_app_habilitada?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entitlements_suscripcion_dueno_id_fkey"
+            columns: ["dueno_id"]
+            isOneToOne: true
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entitlements_suscripcion_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eventos_intento_pago_reserva: {
+        Row: {
+          evento_externo_id: string | null
+          fuente: string
+          id: string
+          intento_id: string
+          ocurrido_en: string | null
+          payload: Json
+          recibido_at: string
+          tipo_evento: string
+        }
+        Insert: {
+          evento_externo_id?: string | null
+          fuente: string
+          id?: string
+          intento_id: string
+          ocurrido_en?: string | null
+          payload?: Json
+          recibido_at?: string
+          tipo_evento: string
+        }
+        Update: {
+          evento_externo_id?: string | null
+          fuente?: string
+          id?: string
+          intento_id?: string
+          ocurrido_en?: string | null
+          payload?: Json
+          recibido_at?: string
+          tipo_evento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eventos_intento_pago_reserva_intento_id_fkey"
+            columns: ["intento_id"]
+            isOneToOne: false
+            referencedRelation: "intentos_pago_reserva"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eventos_webhook_suscripcion: {
+        Row: {
+          error: string | null
+          id: string
+          payload: Json
+          procesado_at: string | null
+          proveedor: string
+          proveedor_evento_id: string
+          recibido_at: string
+          resultado: string | null
+          tipo: string
+        }
+        Insert: {
+          error?: string | null
+          id?: string
+          payload: Json
+          procesado_at?: string | null
+          proveedor?: string
+          proveedor_evento_id: string
+          recibido_at?: string
+          resultado?: string | null
+          tipo: string
+        }
+        Update: {
+          error?: string | null
+          id?: string
+          payload?: Json
+          procesado_at?: string | null
+          proveedor?: string
+          proveedor_evento_id?: string
+          recibido_at?: string
+          resultado?: string | null
+          tipo?: string
+        }
+        Relationships: []
+      }
+      facturas_suscripcion: {
+        Row: {
+          created_at: string
+          estado: string
+          external_reference: string
+          id: string
+          metadata: Json
+          moneda: string
+          monto: number
+          pagada_at: string | null
+          periodo_fin: string
+          periodo_inicio: string
+          proveedor: string
+          proveedor_invoice_id: string | null
+          proveedor_payment_id: string | null
+          suscripcion_id: string
+          updated_at: string
+          vence_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          estado: string
+          external_reference: string
+          id?: string
+          metadata?: Json
+          moneda?: string
+          monto: number
+          pagada_at?: string | null
+          periodo_fin: string
+          periodo_inicio: string
+          proveedor?: string
+          proveedor_invoice_id?: string | null
+          proveedor_payment_id?: string | null
+          suscripcion_id: string
+          updated_at?: string
+          vence_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          estado?: string
+          external_reference?: string
+          id?: string
+          metadata?: Json
+          moneda?: string
+          monto?: number
+          pagada_at?: string | null
+          periodo_fin?: string
+          periodo_inicio?: string
+          proveedor?: string
+          proveedor_invoice_id?: string | null
+          proveedor_payment_id?: string | null
+          suscripcion_id?: string
+          updated_at?: string
+          vence_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturas_suscripcion_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       favoritos_locales: {
         Row: {
           created_at: string
@@ -375,6 +540,219 @@ export type Database = {
             columns: ["local_id"]
             isOneToOne: false
             referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intentos_checkout_suscripcion: {
+        Row: {
+          checkout_url: string | null
+          created_at: string
+          detalle_error: string | null
+          estado: string
+          external_reference: string
+          id: string
+          idempotency_key: string
+          preapproval_id: string | null
+          suscripcion_id: string
+          updated_at: string
+        }
+        Insert: {
+          checkout_url?: string | null
+          created_at?: string
+          detalle_error?: string | null
+          estado?: string
+          external_reference: string
+          id?: string
+          idempotency_key: string
+          preapproval_id?: string | null
+          suscripcion_id: string
+          updated_at?: string
+        }
+        Update: {
+          checkout_url?: string | null
+          created_at?: string
+          detalle_error?: string | null
+          estado?: string
+          external_reference?: string
+          id?: string
+          idempotency_key?: string
+          preapproval_id?: string | null
+          suscripcion_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intentos_checkout_suscripcion_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intentos_pago_reserva: {
+        Row: {
+          ambiente: string
+          canal: string
+          checkout_expira_en: string | null
+          comision_proveedor: number | null
+          created_at: string
+          dueno_id: string
+          estado: string
+          external_reference: string
+          id: string
+          idempotency_key: string
+          local_id: string
+          marketplace_fee: number
+          metadatos_proveedor: Json
+          moneda: string
+          monto_bruto: number
+          monto_neto_recibido: number | null
+          payment_externo_id: string | null
+          preferencia_externa_id: string | null
+          procesando_at: string | null
+          proveedor: string
+          reintentos: number
+          reserva_id: string
+          resuelto_at: string | null
+          ultimo_detalle_proveedor: string | null
+          ultimo_estado_proveedor: string | null
+          ultimo_evento_proveedor_en: string | null
+          updated_at: string
+          vendedor_mp_id: string
+        }
+        Insert: {
+          ambiente: string
+          canal: string
+          checkout_expira_en?: string | null
+          comision_proveedor?: number | null
+          created_at?: string
+          dueno_id: string
+          estado?: string
+          external_reference: string
+          id?: string
+          idempotency_key: string
+          local_id: string
+          marketplace_fee?: number
+          metadatos_proveedor?: Json
+          moneda?: string
+          monto_bruto: number
+          monto_neto_recibido?: number | null
+          payment_externo_id?: string | null
+          preferencia_externa_id?: string | null
+          procesando_at?: string | null
+          proveedor: string
+          reintentos?: number
+          reserva_id: string
+          resuelto_at?: string | null
+          ultimo_detalle_proveedor?: string | null
+          ultimo_estado_proveedor?: string | null
+          ultimo_evento_proveedor_en?: string | null
+          updated_at?: string
+          vendedor_mp_id: string
+        }
+        Update: {
+          ambiente?: string
+          canal?: string
+          checkout_expira_en?: string | null
+          comision_proveedor?: number | null
+          created_at?: string
+          dueno_id?: string
+          estado?: string
+          external_reference?: string
+          id?: string
+          idempotency_key?: string
+          local_id?: string
+          marketplace_fee?: number
+          metadatos_proveedor?: Json
+          moneda?: string
+          monto_bruto?: number
+          monto_neto_recibido?: number | null
+          payment_externo_id?: string | null
+          preferencia_externa_id?: string | null
+          procesando_at?: string | null
+          proveedor?: string
+          reintentos?: number
+          reserva_id?: string
+          resuelto_at?: string | null
+          ultimo_detalle_proveedor?: string | null
+          ultimo_estado_proveedor?: string | null
+          ultimo_evento_proveedor_en?: string | null
+          updated_at?: string
+          vendedor_mp_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intentos_pago_reserva_dueno_id_fkey"
+            columns: ["dueno_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intentos_pago_reserva_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intentos_pago_reserva_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "reservas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      items_suscripcion: {
+        Row: {
+          cantidad: number
+          created_at: string
+          id: string
+          monto_total: number | null
+          precio_unitario: number
+          precio_version_id: string | null
+          suscripcion_id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string
+          id?: string
+          monto_total?: number | null
+          precio_unitario: number
+          precio_version_id?: string | null
+          suscripcion_id: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          id?: string
+          monto_total?: number | null
+          precio_unitario?: number
+          precio_version_id?: string | null
+          suscripcion_id?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_suscripcion_precio_version_id_fkey"
+            columns: ["precio_version_id"]
+            isOneToOne: false
+            referencedRelation: "precios_suscripcion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "items_suscripcion_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones"
             referencedColumns: ["id"]
           },
         ]
@@ -498,6 +876,7 @@ export type Database = {
           publicado: boolean
           publicado_at: string | null
           ruc: string | null
+          suspendido_por_facturacion: boolean
           telefono_contacto_principal: string
           telefono_contacto_secundario: string | null
           updated_at: string
@@ -525,6 +904,7 @@ export type Database = {
           publicado?: boolean
           publicado_at?: string | null
           ruc?: string | null
+          suspendido_por_facturacion?: boolean
           telefono_contacto_principal: string
           telefono_contacto_secundario?: string | null
           updated_at?: string
@@ -552,6 +932,7 @@ export type Database = {
           publicado?: boolean
           publicado_at?: string | null
           ruc?: string | null
+          suspendido_por_facturacion?: boolean
           telefono_contacto_principal?: string
           telefono_contacto_secundario?: string | null
           updated_at?: string
@@ -566,6 +947,111 @@ export type Database = {
           },
           {
             foreignKeyName: "locales_dueno_id_fkey"
+            columns: ["dueno_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_locales: {
+        Row: {
+          actualizada_at: string
+          habilitado: boolean
+          local_id: string
+        }
+        Insert: {
+          actualizada_at?: string
+          habilitado?: boolean
+          local_id: string
+        }
+        Update: {
+          actualizada_at?: string
+          habilitado?: boolean
+          local_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_locales_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: true
+            referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_oauth_intentos: {
+        Row: {
+          ambiente: string
+          code_verifier: string
+          creado_at: string
+          dueno_id: string
+          expira_en: string
+          state_hash: string
+        }
+        Insert: {
+          ambiente: string
+          code_verifier: string
+          creado_at?: string
+          dueno_id: string
+          expira_en: string
+          state_hash: string
+        }
+        Update: {
+          ambiente?: string
+          code_verifier?: string
+          creado_at?: string
+          dueno_id?: string
+          expira_en?: string
+          state_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_oauth_intentos_dueno_id_fkey"
+            columns: ["dueno_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_vinculaciones: {
+        Row: {
+          access_token_vault_id: string | null
+          actualizada_at: string
+          ambiente: string
+          dueno_id: string
+          estado: string
+          refresh_token_vault_id: string | null
+          token_expira_en: string | null
+          vendedor_mp_id: string | null
+          vinculada_at: string | null
+        }
+        Insert: {
+          access_token_vault_id?: string | null
+          actualizada_at?: string
+          ambiente: string
+          dueno_id: string
+          estado?: string
+          refresh_token_vault_id?: string | null
+          token_expira_en?: string | null
+          vendedor_mp_id?: string | null
+          vinculada_at?: string | null
+        }
+        Update: {
+          access_token_vault_id?: string | null
+          actualizada_at?: string
+          ambiente?: string
+          dueno_id?: string
+          estado?: string
+          refresh_token_vault_id?: string | null
+          token_expira_en?: string | null
+          vendedor_mp_id?: string | null
+          vinculada_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_vinculaciones_dueno_id_fkey"
             columns: ["dueno_id"]
             isOneToOne: false
             referencedRelation: "perfiles"
@@ -639,6 +1125,69 @@ export type Database = {
             columns: ["reserva_id"]
             isOneToOne: false
             referencedRelation: "reservas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notificacion_push_entregas: {
+        Row: {
+          actualizado_at: string
+          bloqueada_hasta: string | null
+          creado_at: string
+          destinatario_id: string
+          estado: string
+          id: string
+          intentos: number
+          notificacion_id: string
+          proximo_intento_at: string
+          recibo_intentos: number
+          ticket_id: string | null
+          token: string
+          ultimo_error: string | null
+        }
+        Insert: {
+          actualizado_at?: string
+          bloqueada_hasta?: string | null
+          creado_at?: string
+          destinatario_id: string
+          estado?: string
+          id?: string
+          intentos?: number
+          notificacion_id: string
+          proximo_intento_at?: string
+          recibo_intentos?: number
+          ticket_id?: string | null
+          token: string
+          ultimo_error?: string | null
+        }
+        Update: {
+          actualizado_at?: string
+          bloqueada_hasta?: string | null
+          creado_at?: string
+          destinatario_id?: string
+          estado?: string
+          id?: string
+          intentos?: number
+          notificacion_id?: string
+          proximo_intento_at?: string
+          recibo_intentos?: number
+          ticket_id?: string | null
+          token?: string
+          ultimo_error?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacion_push_entregas_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacion_push_entregas_notificacion_id_fkey"
+            columns: ["notificacion_id"]
+            isOneToOne: false
+            referencedRelation: "notificaciones"
             referencedColumns: ["id"]
           },
         ]
@@ -790,6 +1339,48 @@ export type Database = {
           rol?: Database["public"]["Enums"]["rol_usuario"]
           telefono?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      precios_suscripcion: {
+        Row: {
+          codigo: string
+          created_at: string
+          dias_gracia: number
+          id: string
+          moneda: string
+          monto_base: number
+          monto_sede_extra: number
+          sedes_incluidas: number
+          version: number
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          dias_gracia?: number
+          id?: string
+          moneda?: string
+          monto_base: number
+          monto_sede_extra: number
+          sedes_incluidas?: number
+          version: number
+          vigente_desde: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          dias_gracia?: number
+          id?: string
+          moneda?: string
+          monto_base?: number
+          monto_sede_extra?: number
+          sedes_incluidas?: number
+          version?: number
+          vigente_desde?: string
+          vigente_hasta?: string | null
         }
         Relationships: []
       }
@@ -1301,35 +1892,68 @@ export type Database = {
       }
       suscripciones: {
         Row: {
+          cancelacion_efectiva_at: string | null
           created_at: string
+          dias_gracia_contratada: number
+          dias_gracia_override: number | null
           dueno_id: string
           estado: Database["public"]["Enums"]["estado_suscripcion"]
+          estado_facturacion: string
           fecha_proximo_cobro: string | null
+          gracia_hasta: string | null
           id: string
           mercadopago_preapproval_id: string | null
+          moneda: string
           monto: number
+          periodo_actual_fin: string | null
+          periodo_actual_inicio: string | null
+          precio_version_id: string | null
+          proveedor: string
+          proximo_cobro_at: string | null
           sedes_extra_contratadas: number
           updated_at: string
         }
         Insert: {
+          cancelacion_efectiva_at?: string | null
           created_at?: string
+          dias_gracia_contratada?: number
+          dias_gracia_override?: number | null
           dueno_id: string
           estado?: Database["public"]["Enums"]["estado_suscripcion"]
+          estado_facturacion?: string
           fecha_proximo_cobro?: string | null
+          gracia_hasta?: string | null
           id?: string
           mercadopago_preapproval_id?: string | null
+          moneda?: string
           monto?: number
+          periodo_actual_fin?: string | null
+          periodo_actual_inicio?: string | null
+          precio_version_id?: string | null
+          proveedor?: string
+          proximo_cobro_at?: string | null
           sedes_extra_contratadas?: number
           updated_at?: string
         }
         Update: {
+          cancelacion_efectiva_at?: string | null
           created_at?: string
+          dias_gracia_contratada?: number
+          dias_gracia_override?: number | null
           dueno_id?: string
           estado?: Database["public"]["Enums"]["estado_suscripcion"]
+          estado_facturacion?: string
           fecha_proximo_cobro?: string | null
+          gracia_hasta?: string | null
           id?: string
           mercadopago_preapproval_id?: string | null
+          moneda?: string
           monto?: number
+          periodo_actual_fin?: string | null
+          periodo_actual_inicio?: string | null
+          precio_version_id?: string | null
+          proveedor?: string
+          proximo_cobro_at?: string | null
           sedes_extra_contratadas?: number
           updated_at?: string
         }
@@ -1339,6 +1963,13 @@ export type Database = {
             columns: ["dueno_id"]
             isOneToOne: true
             referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suscripciones_precio_version_id_fkey"
+            columns: ["precio_version_id"]
+            isOneToOne: false
+            referencedRelation: "precios_suscripcion"
             referencedColumns: ["id"]
           },
         ]
@@ -1366,6 +1997,15 @@ export type Database = {
         Args: { p_local_id: string; p_storage_path: string }
         Returns: string
       }
+      actualizar_parametro_plataforma: {
+        Args: { p_clave: string; p_forzar?: boolean; p_valor: Json }
+        Returns: {
+          clave_actualizada: string
+          locales_por_debajo: number
+          valor_anterior: Json
+          valor_nuevo: Json
+        }[]
+      }
       actualizar_reglas_comerciales_local: {
         Args: {
           p_local_id: string
@@ -1387,6 +2027,130 @@ export type Database = {
       aprobar_solicitud_local: {
         Args: { p_local_id: string }
         Returns: Database["public"]["Enums"]["estado_local"]
+      }
+      autorizar_push_cron: { Args: { p_secret: string }; Returns: boolean }
+      billing_activar_local_configurado: {
+        Args: { p_local_id: string }
+        Returns: boolean
+      }
+      billing_aplicar_preapproval: {
+        Args: {
+          p_estado_remoto: string
+          p_payload: Json
+          p_preapproval_id: string
+          p_proximo_cobro_at: string
+        }
+        Returns: boolean
+      }
+      billing_entitlement_vigente: {
+        Args: { p_dueno_id: string }
+        Returns: boolean
+      }
+      billing_establecer_gracia_propietario: {
+        Args: { p_dias_gracia?: number; p_dueno_id: string }
+        Returns: undefined
+      }
+      billing_expirar_gracias: { Args: never; Returns: number }
+      billing_finalizar_evento_webhook: {
+        Args: { p_error?: string; p_evento_id: string; p_resultado: string }
+        Returns: undefined
+      }
+      billing_marcar_checkout_revision: {
+        Args: { p_detalle: string; p_intento_id: string }
+        Returns: undefined
+      }
+      billing_obtener_oferta_checkout: {
+        Args: never
+        Returns: {
+          moneda: string
+          monto_base: number
+          monto_minimo: number
+          monto_sede_extra: number
+          precio_version_id: string
+          sedes_extra_minimas: number
+          sedes_incluidas: number
+        }[]
+      }
+      billing_obtener_precios_suscripcion_admin: {
+        Args: never
+        Returns: {
+          codigo: string
+          dias_gracia: number
+          es_vigente: boolean
+          id: string
+          moneda: string
+          monto_base: number
+          monto_sede_extra: number
+          sedes_incluidas: number
+          version: number
+          vigente_desde: string
+          vigente_hasta: string
+        }[]
+      }
+      billing_preparar_checkout: {
+        Args: {
+          p_dueno_id: string
+          p_idempotency_key: string
+          p_sedes_extra: number
+        }
+        Returns: {
+          checkout_url: string
+          estado: string
+          external_reference: string
+          intento_id: string
+          moneda: string
+          monto: number
+          preapproval_id: string
+          sedes_extra: number
+          sedes_incluidas: number
+          suscripcion_id: string
+        }[]
+      }
+      billing_publicar_precio_suscripcion: {
+        Args: {
+          p_dias_gracia?: number
+          p_monto_base: number
+          p_monto_sede_extra: number
+          p_sedes_incluidas?: number
+        }
+        Returns: {
+          codigo: string
+          dias_gracia: number
+          id: string
+          moneda: string
+          monto_base: number
+          monto_sede_extra: number
+          sedes_incluidas: number
+          version: number
+          vigente_desde: string
+        }[]
+      }
+      billing_registrar_evento_webhook: {
+        Args: { p_evento_id: string; p_payload: Json; p_tipo: string }
+        Returns: boolean
+      }
+      billing_registrar_pago_recurrente: {
+        Args: {
+          p_estado_remoto: string
+          p_fecha: string
+          p_monto: number
+          p_payload: Json
+          p_payment_id: string
+          p_preapproval_id: string
+        }
+        Returns: boolean
+      }
+      billing_registrar_preapproval_checkout: {
+        Args: {
+          p_checkout_url: string
+          p_intento_id: string
+          p_preapproval_id: string
+        }
+        Returns: undefined
+      }
+      billing_sincronizar_locales_entitlement: {
+        Args: { p_dueno_id: string; p_habilitado: boolean }
+        Returns: undefined
       }
       buscar_clientes_para_dueno: {
         Args: { p_busqueda: string; p_limite?: number }
@@ -1679,6 +2443,10 @@ export type Database = {
           reserva_id: string
         }[]
       }
+      desregistrar_push_token_cliente: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
       eliminar_foto_local: {
         Args: { p_foto_id: string; p_local_id: string }
         Returns: string
@@ -1686,6 +2454,95 @@ export type Database = {
       eliminar_regla_tarifaria: {
         Args: { p_regla_id: string }
         Returns: undefined
+      }
+      explorar_locales_mapa_decisiones_publicos: {
+        Args: {
+          p_busqueda?: string
+          p_calificacion_minima?: number
+          p_deporte_id?: string
+          p_duracion_horas?: number
+          p_este: number
+          p_fecha?: string
+          p_hora_desde?: string
+          p_hora_hasta?: string
+          p_hora_inicio?: string
+          p_latitud?: number
+          p_limite?: number
+          p_longitud?: number
+          p_norte: number
+          p_oeste: number
+          p_orden?: string
+          p_precio_total_max?: number
+          p_radio_metros?: number
+          p_solo_disponibles?: boolean
+          p_sur: number
+        }
+        Returns: {
+          atiende_fecha: boolean
+          direccion: string
+          distancia_metros: number
+          duracion_minima_minutos: number
+          id: string
+          latitud: number
+          logo: string
+          longitud: number
+          nombre: string
+          opciones_disponibles: number
+          portada_storage_path: string
+          precio_base_desde: number
+          promedio: number
+          promocion_reservable: boolean
+          proximo_cancha_id: string
+          proximo_deporte_id: string
+          proximo_es_promocion: boolean
+          proximo_inicio: string
+          proximo_precio_por_hora: number
+          proximo_precio_total: number
+          total_locales: number
+          total_resenas: number
+        }[]
+      }
+      explorar_locales_mapa_publicos: {
+        Args: {
+          p_busqueda?: string
+          p_calificacion_minima?: number
+          p_deporte_id?: string
+          p_duracion_horas?: number
+          p_este: number
+          p_fecha?: string
+          p_hora_inicio?: string
+          p_latitud?: number
+          p_limite?: number
+          p_longitud?: number
+          p_norte: number
+          p_oeste: number
+          p_orden?: string
+          p_radio_metros?: number
+          p_sur: number
+        }
+        Returns: {
+          atiende_fecha: boolean
+          direccion: string
+          distancia_metros: number
+          duracion_minima_minutos: number
+          id: string
+          latitud: number
+          logo: string
+          longitud: number
+          nombre: string
+          opciones_disponibles: number
+          portada_storage_path: string
+          precio_base_desde: number
+          promedio: number
+          proximo_cancha_id: string
+          proximo_deporte_id: string
+          proximo_es_promocion: boolean
+          proximo_inicio: string
+          proximo_precio_por_hora: number
+          proximo_precio_total: number
+          total_locales: number
+          total_resenas: number
+        }[]
       }
       explorar_locales_publicos: {
         Args: {
@@ -1801,6 +2658,10 @@ export type Database = {
         }[]
       }
       fn_primer_nombre_visible: { Args: { p_nombre: string }; Returns: string }
+      fn_puede_configurar_local: {
+        Args: { p_actor_id: string; p_local_id: string }
+        Returns: boolean
+      }
       fn_reserva_ocupa_horario: {
         Args: {
           p_estado: Database["public"]["Enums"]["estado_reserva"]
@@ -1844,6 +2705,10 @@ export type Database = {
         }
         Returns: string
       }
+      marcar_notificaciones_leidas_cliente: {
+        Args: { p_notificacion_id?: string }
+        Returns: number
+      }
       marcar_notificaciones_leidas_dueno: {
         Args: { p_notificacion_id?: string }
         Returns: number
@@ -1851,6 +2716,119 @@ export type Database = {
       marcar_reserva_no_show_dueno: {
         Args: { p_motivo?: string; p_reserva_id: string }
         Returns: undefined
+      }
+      mercadopago_autorizar_conciliador_cron: {
+        Args: { p_secret: string }
+        Returns: boolean
+      }
+      mercadopago_cambiar_a_comprobante_prueba: {
+        Args: {
+          p_cliente_id: string
+          p_medio_pago_id: string
+          p_reserva_id: string
+        }
+        Returns: {
+          pago_expira_en: string
+          reserva_id: string
+        }[]
+      }
+      mercadopago_cerrar_checkout_vencido_prueba: {
+        Args: { p_intento_id: string; p_origen?: string }
+        Returns: {
+          cerrado: boolean
+          reserva_id: string
+        }[]
+      }
+      mercadopago_conciliar_pago_reserva_prueba: {
+        Args: {
+          p_comision_proveedor: number
+          p_detalle_proveedor: string
+          p_estado_proveedor: string
+          p_evento_externo_id?: string
+          p_fuente?: string
+          p_intento_id: string
+          p_neto_recibido: number
+          p_payload: Json
+          p_payment_id: string
+        }
+        Returns: {
+          estado_intento: string
+          estado_reserva: Database["public"]["Enums"]["estado_reserva"]
+          reserva_id: string
+        }[]
+      }
+      mercadopago_consumir_oauth_intento: {
+        Args: { p_state_hash: string }
+        Returns: {
+          ambiente: string
+          code_verifier: string
+          dueno_id: string
+        }[]
+      }
+      mercadopago_credencial_prueba: {
+        Args: { p_dueno_id: string }
+        Returns: {
+          access_token: string
+          dueno_id: string
+          refresh_token: string
+          token_expira_en: string
+          vendedor_mp_id: string
+        }[]
+      }
+      mercadopago_guardar_vinculacion: {
+        Args: {
+          p_access_token: string
+          p_ambiente: string
+          p_dueno_id: string
+          p_expires_in: number
+          p_refresh_token: string
+          p_vendedor_mp_id: string
+        }
+        Returns: undefined
+      }
+      mercadopago_marcar_intento_revision_prueba: {
+        Args: { p_detalle: string; p_intento_id: string }
+        Returns: undefined
+      }
+      mercadopago_preparar_checkout_reserva_prueba: {
+        Args: {
+          p_bloques: number
+          p_cancha_id: string
+          p_cliente_id: string
+          p_deporte_id: string
+          p_idempotency_key: string
+          p_inicio: string
+          p_reserva_id?: string
+        }
+        Returns: {
+          cancha_nombre: string
+          checkout_expira_en: string
+          dueno_id: string
+          external_reference: string
+          fin: string
+          idempotency_key: string
+          inicio: string
+          intento_id: string
+          monto_bruto: number
+          preferencia_externa_id: string
+          reserva_id: string
+          vendedor_mp_id: string
+        }[]
+      }
+      mercadopago_registrar_preferencia_reserva_prueba: {
+        Args: { p_intento_id: string; p_preferencia_id: string }
+        Returns: undefined
+      }
+      mercadopago_reservas_disponible_para_local: {
+        Args: { p_local_id: string }
+        Returns: boolean
+      }
+      mercadopago_solicitar_cancelacion_checkout_prueba: {
+        Args: { p_expira_en: string; p_intento_id: string }
+        Returns: {
+          expira_en: string
+          reserva_id: string
+        }[]
       }
       obtener_beneficios_publicos_local: {
         Args: { p_local_id: string }
@@ -2033,6 +3011,18 @@ export type Database = {
           turnos_disponibles: number
         }[]
       }
+      obtener_entitlement_suscripcion_propio: {
+        Args: never
+        Returns: {
+          estado_facturacion: string
+          max_sedes: number
+          panel_habilitado: boolean
+          reservas_habilitadas: boolean
+          suscripcion_id: string
+          vigente_hasta: string
+          visibilidad_app_habilitada: boolean
+        }[]
+      }
       obtener_horarios_local: {
         Args: { p_local_id: string }
         Returns: {
@@ -2094,25 +3084,13 @@ export type Database = {
         }[]
       }
       obtener_minimo_adelanto_global: { Args: never; Returns: number }
+      obtener_minutos_expiracion_pago: { Args: never; Returns: number }
       obtener_parametros_plataforma: {
         Args: never
         Returns: {
           clave: string
-          descripcion: string | null
-          valor: unknown
-        }[]
-      }
-      actualizar_parametro_plataforma: {
-        Args: {
-          p_clave: string
-          p_forzar?: boolean
-          p_valor: unknown
-        }
-        Returns: {
-          clave_actualizada: string
-          locales_por_debajo: number
-          valor_anterior: unknown
-          valor_nuevo: unknown
+          descripcion: string
+          valor: Json
         }[]
       }
       obtener_proximos_turnos_locales_publicos: {
@@ -2248,6 +3226,8 @@ export type Database = {
           local_id: string
           precio_actual_desde: number
           precio_base_desde: number
+          proxima_promocion_fecha: string
+          proxima_promocion_precio: number
           proximo_turno: string
           tiene_descuento: boolean
           turnos_disponibles: number
@@ -2296,6 +3276,26 @@ export type Database = {
         Args: { p_local_id: string; p_motivo: string }
         Returns: Database["public"]["Enums"]["estado_local"]
       }
+      reclamar_push_pendientes: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: string
+          mensaje: string
+          notificacion_id: string
+          reserva_id: string
+          titulo: string
+          token: string
+        }[]
+      }
+      reclamar_push_recibos: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: string
+          recibo_intentos: number
+          ticket_id: string
+          token: string
+        }[]
+      }
       reemplazar_beneficios_local: {
         Args: {
           p_beneficio_catalogo_ids: string[]
@@ -2334,6 +3334,10 @@ export type Database = {
           p_referencia?: string
           p_reserva_id: string
         }
+        Returns: undefined
+      }
+      registrar_push_token_cliente: {
+        Args: { p_token: string }
         Returns: undefined
       }
       registrar_solicitud_propietario: {
@@ -2529,9 +3533,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       canal_origen_reserva: ["app", "whatsapp", "presencial"],

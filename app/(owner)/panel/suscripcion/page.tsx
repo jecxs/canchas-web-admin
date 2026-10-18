@@ -1,10 +1,18 @@
 import { SubscriptionRequiredState } from '@/components/states'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { redirect } from 'next/navigation'
+import { SubscriptionCheckoutCard } from '@/features/billing/subscription-checkout-card'
+import { getBillingCheckoutOffer } from '@/features/billing/queries'
+import { hasActiveSubscription } from '@/lib/auth/access'
 import { requireOwnerLocal } from '@/lib/auth/dal'
 
 export default async function SubscriptionRequiredPage() {
-  const { local } = await requireOwnerLocal(['aprobado_pendiente_pago'])
+  const { context, local } = await requireOwnerLocal(['aprobado_pendiente_pago'])
+  if (hasActiveSubscription(context.subscription)) {
+    redirect('/panel/configuracion')
+  }
+  const offer = await getBillingCheckoutOffer()
 
   return (
     <div className="mx-auto max-w-3xl py-6">
@@ -23,14 +31,16 @@ export default async function SubscriptionRequiredPage() {
               todavía no aparece en la app.
             </p>
           </div>
-          <Alert>
-            <AlertTitle>Pago en línea en preparación</AlertTitle>
-            <AlertDescription>
-              La activación por Mercado Pago se habilitará cuando se configure la
-              cuenta recaudadora de Grassly. Por ahora no se simulará ningún cobro ni
-              se solicitarán datos de pago.
-            </AlertDescription>
-          </Alert>
+          {offer ? (
+            <SubscriptionCheckoutCard offer={offer} />
+          ) : (
+            <Alert>
+              <AlertTitle>Plan pendiente de configuración</AlertTitle>
+              <AlertDescription>
+                Grassly aún no publicó una versión de precio vigente. No se iniciará ningún cobro hasta que el plan esté configurado y habilitado.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </SubscriptionRequiredState>
     </div>

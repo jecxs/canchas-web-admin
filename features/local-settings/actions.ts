@@ -3,7 +3,7 @@
 import 'server-only'
 
 import { revalidatePath } from 'next/cache'
-import { authorizeLocalWrite, getAccessContext } from '@/lib/auth/dal'
+import { authorizeLocalConfiguration, authorizeLocalWrite, getAccessContext } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { getMinimumAdvanceValidationMessage } from './advance-policy'
 import {
@@ -68,7 +68,7 @@ export async function saveGeneralSettingsAction(
   }
   const validation = generalSettingsSchema.safeParse(raw)
   if (!validation.success) return validationFailure(validation.error)
-  if (!await authorizeLocalWrite(validation.data.localId)) return { success: false, message: messages.denied }
+  if (!await authorizeLocalConfiguration(validation.data.localId)) return { success: false, message: messages.denied }
 
   const supabase = await createClient()
   const { error } = await supabase.rpc('actualizar_datos_generales_local', {

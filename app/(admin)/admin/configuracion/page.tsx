@@ -1,4 +1,6 @@
 import { UnsavedChangesProvider } from '@/components/dashboard/unsaved-changes'
+import { SubscriptionPricingCard } from '@/features/admin-billing/subscription-pricing-card'
+import { getSubscriptionPriceVersions } from '@/features/admin-billing/queries'
 import { PlatformParameterField } from '@/features/admin-platform/platform-parameter-field'
 import { getAdvancePercentageValues, getPlatformParameters } from '@/features/admin-platform/queries'
 import { PLATFORM_PARAMETERS } from '@/features/admin-platform/types'
@@ -6,9 +8,10 @@ import { requireAdmin } from '@/lib/auth/dal'
 
 export default async function AdminPlatformSettingsPage() {
   await requireAdmin()
-  const [rows, advancePercentages] = await Promise.all([
+  const [rows, advancePercentages, subscriptionPrices] = await Promise.all([
     getPlatformParameters(),
     getAdvancePercentageValues(),
+    getSubscriptionPriceVersions(),
   ])
 
   return (
@@ -23,6 +26,9 @@ export default async function AdminPlatformSettingsPage() {
       </p>
 
       <UnsavedChangesProvider>
+        <div className="mt-7">
+          <SubscriptionPricingCard prices={subscriptionPrices} />
+        </div>
         <div className="mt-7 grid gap-3 sm:grid-cols-2">
           {PLATFORM_PARAMETERS.map((definition) => (
             <PlatformParameterField

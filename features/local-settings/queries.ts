@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
+import { requireConfigurableOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import type { BenefitCatalogItem, LocalBenefit, LocalPhoto, LocalSettings, ScheduleRow } from './types'
 import type { LocalPaymentMethod, PaymentMethodType } from '@/features/payments/types'
@@ -11,7 +11,7 @@ function parseMinimumAdvancePercentage(value: unknown) {
 }
 
 export async function getLocalSettings() {
-  const { context, local } = await requireOperationalOwnerLocal()
+  const { context, local } = await requireConfigurableOwnerLocal()
   const supabase = await createClient()
   const [{ data: settings, error: settingsError }, { data: schedules, error: schedulesError }, { data: photos, error: photosError }, { data: benefitCatalog, error: benefitCatalogError }, { data: benefits, error: benefitsError }, { data: paymentMethods, error: paymentMethodsError }, { data: minimumAdvancePercentage, error: minimumAdvancePercentageError }] = await Promise.all([
     supabase
