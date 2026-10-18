@@ -24,6 +24,28 @@ type CheckoutResponse = {
   error?: string
 }
 
+async function readCheckoutError(
+  invokeError: unknown,
+  data: CheckoutResponse | null,
+) {
+  if (data?.error) return data.error
+
+  // supabase-js wraps any non-2xx Function response in FunctionsHttpError and
+  // keeps the real JSON body in `context`. Read only the user-safe `error`
+  // property emitted by our Edge Function.
+  const response = (invokeError as { context?: unknown } | null)?.context
+  if (response instanceof Response) {
+    try {
+      const body = await response.clone().json() as CheckoutResponse
+      if (typeof body.error === 'string' && body.error) return body.error
+    } catch {
+      // Fall through to the generic message below.
+    }
+  }
+
+  return 'No pudimos iniciar el checkout. Inténtalo de nuevo en unos minutos.'
+}
+
 export function SubscriptionCheckoutCard({ offer }: { offer: BillingCheckoutOffer }) {
   const [extraLocations, setExtraLocations] = useState(offer.sedes_extra_minimas)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +70,7 @@ export function SubscriptionCheckoutCard({ offer }: { offer: BillingCheckoutOffe
       )
 
       if (invokeError || !data?.checkout_url) {
-        setError(data?.error ?? 'No pudimos iniciar el checkout. Inténtalo de nuevo en unos minutos.')
+        setError(await readCheckoutError(invokeError, data))
         return
       }
 
