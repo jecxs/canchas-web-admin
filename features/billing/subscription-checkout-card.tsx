@@ -22,6 +22,13 @@ function formatPen(value: number) {
 type CheckoutResponse = {
   checkout_url?: string
   error?: string
+  test_payer_provisioning_available?: boolean
+  test_payer?: {
+    email: string
+    username: string
+    password: string
+    verification_code: string
+  }
 }
 
 async function readCheckoutError(
@@ -49,6 +56,8 @@ async function readCheckoutError(
 export function SubscriptionCheckoutCard({ offer }: { offer: BillingCheckoutOffer }) {
   const [extraLocations, setExtraLocations] = useState(offer.sedes_extra_minimas)
   const [error, setError] = useState<string | null>(null)
+  const [canProvisionTestPayer, setCanProvisionTestPayer] = useState(false)
+  const [testPayer, setTestPayer] = useState<NonNullable<CheckoutResponse['test_payer']> | null>(null)
   const [pending, startTransition] = useTransition()
   const total = useMemo(
     () => offer.monto_base + extraLocations * offer.monto_sede_extra,
@@ -65,16 +74,35 @@ export function SubscriptionCheckoutCard({ offer }: { offer: BillingCheckoutOffe
           body: {
             sedes_extra: extraLocations,
             idempotency_key: crypto.randomUUID(),
+            ...(testPayer ? { test_payer_email: testPayer.email } : {}),
           },
         },
       )
 
       if (invokeError || !data?.checkout_url) {
+        if (data?.test_payer_provisioning_available) setCanProvisionTestPayer(true)
         setError(await readCheckoutError(invokeError, data))
         return
       }
 
       window.location.assign(data.checkout_url)
+    })
+  }
+
+  function provisionTestPayer() {
+    setError(null)
+    startTransition(async () => {
+      const supabase = createClient()
+      const { data, error: invokeError } = await supabase.functions.invoke<CheckoutResponse>(
+        'mercadopago-billing-checkout',
+        { body: { action: 'provision_test_payer' } },
+      )
+      if (invokeError || !data?.test_payer) {
+        setError(await readCheckoutError(invokeError, data))
+        return
+      }
+      setTestPayer(data.test_payer)
+      setCanProvisionTestPayer(false)
     })
   }
 
@@ -111,6 +139,23 @@ export function SubscriptionCheckoutCard({ offer }: { offer: BillingCheckoutOffe
           <div className="mt-4 flex items-center justify-between gap-4 border-t pt-4"><span className="font-bold">Total mensual</span><strong className="text-lg">{formatPen(total)}</strong></div>
         </div>
         {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+        {testPayer ? (
+          <Alert>
+            <AlertDescription className="space-y-2 text-sm">
+              <p className="font-semibold">Comprador de prueba creado para este checkout.</p>
+              <p>En una ventana de incógnito inicia sesión en Mercado Pago con estas credenciales. Luego vuelve y continúa al checkout.</p>
+              <p><strong>Usuario:</strong> {testPayer.username}</p>
+              <p><strong>Contraseña:</strong> {testPayer.password}</p>
+              <p><strong>Código de verificación:</strong> {testPayer.verification_code}</p>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {canProvisionTestPayer ? (
+          <Button type="button" variant="outline" className="w-full" disabled={pending} onClick={provisionTestPayer}>
+            {pending ? <Spinner /> : null}
+            Crear comprador de prueba de Mercado Pago
+          </Button>
+        ) : null}
         <Button type="button" className="w-full" size="lg" disabled={pending} onClick={startCheckout}>
           {pending ? <Spinner /> : <HugeiconsIcon icon={CreditCardIcon} strokeWidth={2} />}
           {pending ? 'Abriendo Mercado Pago…' : 'Continuar con Mercado Pago'}
