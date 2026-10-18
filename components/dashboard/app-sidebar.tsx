@@ -24,6 +24,7 @@ import { dashboardNavigation, isNavigationItemActive } from './navigation'
 import { getSubscriptionPresentation, localStatePresentation } from './status'
 import type { DashboardRole } from './types'
 import type { LocalSummary, SubscriptionSummary } from '@/lib/auth/access'
+import { canOperateLocal } from '@/lib/auth/access'
 
 type AppSidebarProps = {
   role: DashboardRole
@@ -36,11 +37,9 @@ export function AppSidebar({ role, activeLocal, subscription }: AppSidebarProps)
   const { setOpenMobile } = useSidebar()
   const localState = activeLocal ? localStatePresentation[activeLocal.estado] : null
   const subscriptionState = getSubscriptionPresentation(subscription)
-  const isOperational = activeLocal
-    ? ['trial', 'activo', 'en_gracia'].includes(activeLocal.estado)
-    : false
+  const isOperational = activeLocal ? canOperateLocal(activeLocal, subscription) : false
   const navigation = role === 'owner' && !isOperational
-    ? dashboardNavigation.owner.filter((item) => item.href === '/panel')
+    ? dashboardNavigation.owner.filter((item) => item.href === '/panel' || item.href === '/panel/suscripcion')
     : dashboardNavigation[role]
   const homeHref = role === 'admin' ? '/admin' : '/panel'
   const helpHref = role === 'admin' ? '/admin/ayuda' : '/panel/ayuda'

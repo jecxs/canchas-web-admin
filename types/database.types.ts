@@ -104,6 +104,71 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_preapprovals_archivo: {
+        Row: {
+          archivado_at: string
+          motivo: string
+          preapproval_id: string
+          suscripcion_id: string
+        }
+        Insert: {
+          archivado_at?: string
+          motivo: string
+          preapproval_id: string
+          suscripcion_id: string
+        }
+        Update: {
+          archivado_at?: string
+          motivo?: string
+          preapproval_id?: string
+          suscripcion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_preapprovals_archivo_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_trials_empresa: {
+        Row: {
+          dueno_id: string
+          otorgado_at: string
+          primer_local_id: string
+          termina_at: string
+        }
+        Insert: {
+          dueno_id: string
+          otorgado_at?: string
+          primer_local_id: string
+          termina_at: string
+        }
+        Update: {
+          dueno_id?: string
+          otorgado_at?: string
+          primer_local_id?: string
+          termina_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_trials_empresa_dueno_id_fkey"
+            columns: ["dueno_id"]
+            isOneToOne: true
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_trials_empresa_primer_local_id_fkey"
+            columns: ["primer_local_id"]
+            isOneToOne: false
+            referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bloqueos_mantenimiento: {
         Row: {
           cancha_id: string
@@ -132,6 +197,59 @@ export type Database = {
             columns: ["cancha_id"]
             isOneToOne: false
             referencedRelation: "canchas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cambios_sedes_suscripcion: {
+        Row: {
+          created_at: string
+          detalle_error: string | null
+          efectivo_desde: string
+          estado: string
+          id: string
+          idempotency_key: string
+          monto_actual: number
+          monto_objetivo: number
+          sedes_extra_actuales: number
+          sedes_extra_objetivo: number
+          suscripcion_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          detalle_error?: string | null
+          efectivo_desde: string
+          estado?: string
+          id?: string
+          idempotency_key: string
+          monto_actual: number
+          monto_objetivo: number
+          sedes_extra_actuales: number
+          sedes_extra_objetivo: number
+          suscripcion_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          detalle_error?: string | null
+          efectivo_desde?: string
+          estado?: string
+          id?: string
+          idempotency_key?: string
+          monto_actual?: number
+          monto_objetivo?: number
+          sedes_extra_actuales?: number
+          sedes_extra_objetivo?: number
+          suscripcion_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cambios_sedes_suscripcion_suscripcion_id_fkey"
+            columns: ["suscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "suscripciones"
             referencedColumns: ["id"]
           },
         ]
@@ -327,6 +445,7 @@ export type Database = {
         Row: {
           error: string | null
           id: string
+          intentos: number
           payload: Json
           procesado_at: string | null
           proveedor: string
@@ -334,10 +453,12 @@ export type Database = {
           recibido_at: string
           resultado: string | null
           tipo: string
+          ultimo_intento_at: string | null
         }
         Insert: {
           error?: string | null
           id?: string
+          intentos?: number
           payload: Json
           procesado_at?: string | null
           proveedor?: string
@@ -345,10 +466,12 @@ export type Database = {
           recibido_at?: string
           resultado?: string | null
           tipo: string
+          ultimo_intento_at?: string | null
         }
         Update: {
           error?: string | null
           id?: string
+          intentos?: number
           payload?: Json
           procesado_at?: string | null
           proveedor?: string
@@ -356,6 +479,7 @@ export type Database = {
           recibido_at?: string
           resultado?: string | null
           tipo?: string
+          ultimo_intento_at?: string | null
         }
         Relationships: []
       }
@@ -1892,6 +2016,7 @@ export type Database = {
       }
       suscripciones: {
         Row: {
+          billing_ultima_conciliacion_at: string | null
           cancelacion_efectiva_at: string | null
           created_at: string
           dias_gracia_contratada: number
@@ -1903,6 +2028,7 @@ export type Database = {
           gracia_hasta: string | null
           id: string
           mercadopago_preapproval_id: string | null
+          metodo_pago_codigo: string | null
           moneda: string
           monto: number
           periodo_actual_fin: string | null
@@ -1914,6 +2040,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_ultima_conciliacion_at?: string | null
           cancelacion_efectiva_at?: string | null
           created_at?: string
           dias_gracia_contratada?: number
@@ -1925,6 +2052,7 @@ export type Database = {
           gracia_hasta?: string | null
           id?: string
           mercadopago_preapproval_id?: string | null
+          metodo_pago_codigo?: string | null
           moneda?: string
           monto?: number
           periodo_actual_fin?: string | null
@@ -1936,6 +2064,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_ultima_conciliacion_at?: string | null
           cancelacion_efectiva_at?: string | null
           created_at?: string
           dias_gracia_contratada?: number
@@ -1947,6 +2076,7 @@ export type Database = {
           gracia_hasta?: string | null
           id?: string
           mercadopago_preapproval_id?: string | null
+          metodo_pago_codigo?: string | null
           moneda?: string
           monto?: number
           periodo_actual_fin?: string | null
@@ -2029,6 +2159,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["estado_local"]
       }
       autorizar_push_cron: { Args: { p_secret: string }; Returns: boolean }
+      billing_activar_cron_conciliacion: { Args: never; Returns: undefined }
       billing_activar_local_configurado: {
         Args: { p_local_id: string }
         Returns: boolean
@@ -2042,17 +2173,42 @@ export type Database = {
         }
         Returns: boolean
       }
+      billing_cerrar_rechazos_checkout_deterministas: {
+        Args: { p_dueno_id: string }
+        Returns: number
+      }
+      billing_confirmar_cambio_sedes: {
+        Args: { p_cambio_id: string }
+        Returns: boolean
+      }
       billing_entitlement_vigente: {
         Args: { p_dueno_id: string }
         Returns: boolean
       }
       billing_establecer_gracia_propietario: {
-        Args: { p_dias_gracia?: number; p_dueno_id: string }
+        Args: { p_dias_gracia?: number | null; p_dueno_id: string }
         Returns: undefined
+      }
+      billing_eventos_pendientes: {
+        Args: { p_limite?: number }
+        Returns: {
+          evento_id: string
+          recurso_id: string
+          tipo: string
+        }[]
       }
       billing_expirar_gracias: { Args: never; Returns: number }
       billing_finalizar_evento_webhook: {
         Args: { p_error?: string; p_evento_id: string; p_resultado: string }
+        Returns: undefined
+      }
+      billing_local_operativo: {
+        Args: { p_local_id: string }
+        Returns: boolean
+      }
+      billing_local_vigente: { Args: { p_local_id: string }; Returns: boolean }
+      billing_marcar_cambio_sedes_revision: {
+        Args: { p_cambio_id: string; p_detalle: string }
         Returns: undefined
       }
       billing_marcar_checkout_revision: {
@@ -2071,6 +2227,19 @@ export type Database = {
           sedes_incluidas: number
         }[]
       }
+      billing_obtener_plan_propio: {
+        Args: never
+        Returns: {
+          cambio_estado: string
+          efectivo_desde: string
+          monto_base: number
+          monto_sede_extra: number
+          sedes_extra_actuales: number
+          sedes_extra_minimas: number
+          sedes_extra_pendientes: number
+          sedes_incluidas: number
+        }[]
+      }
       billing_obtener_precios_suscripcion_admin: {
         Args: never
         Returns: {
@@ -2085,6 +2254,20 @@ export type Database = {
           version: number
           vigente_desde: string
           vigente_hasta: string
+        }[]
+      }
+      billing_preparar_cambio_sedes: {
+        Args: {
+          p_dueno_id: string
+          p_idempotency_key: string
+          p_sedes_extra: number
+        }
+        Returns: {
+          cambio_id: string
+          estado: string
+          moneda: string
+          monto_objetivo: number
+          preapproval_id: string
         }[]
       }
       billing_preparar_checkout: {

@@ -6,9 +6,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import {
   canConfigurePaidPendingLocal,
+  canOperateLocal,
   findLocalWithState,
-  isOperationalLocalState,
-  OPERATIONAL_LOCAL_STATES,
   resolveActiveLocal,
   resolveLocalDestination,
   resolvePostLoginDestination,
@@ -43,13 +42,13 @@ export const getAccessContext = cache(
         supabase
           .from('locales')
           .select(
-            'id,nombre,direccion,ruc,estado,fecha_fin_trial,motivo_rechazo,publicado,publicado_at,porcentaje_adelanto,created_at',
+            'id,nombre,direccion,ruc,estado,fecha_fin_trial,motivo_rechazo,publicado,publicado_at,porcentaje_adelanto,created_at,suspendido_por_facturacion',
           )
           .eq('dueno_id', userId)
           .order('created_at', { ascending: false }),
         supabase
           .from('suscripciones')
-          .select('id,estado,fecha_proximo_cobro,monto,sedes_extra_contratadas')
+          .select('id,estado,estado_facturacion,gracia_hasta,fecha_proximo_cobro,monto,sedes_extra_contratadas')
           .eq('dueno_id', userId)
           .maybeSingle(),
       ])
@@ -138,7 +137,7 @@ export async function authorizeLocalWrite(localId: string) {
   if (!context) return false
   if (context.profile.rol === 'super_admin') return true
   return context.locals.some(
-    (local) => local.id === localId && isOperationalLocalState(local.estado),
+    (local) => local.id === localId && canOperateLocal(local, context.subscription),
   )
 }
 
@@ -152,7 +151,7 @@ export async function authorizeLocalConfiguration(localId: string) {
   const local = context.locals.find((candidate) => candidate.id === localId)
   return Boolean(
     local &&
-      (isOperationalLocalState(local.estado) ||
+      (canOperateLocal(local, context.subscription) ||
         canConfigurePaidPendingLocal(context, local)),
   )
 }
@@ -174,7 +173,7 @@ export async function requireOwnerLocal(states: readonly LocalState[]) {
 
 export async function requireOperationalOwnerLocal() {
   const { context, activeLocal } = await getOwnerShellContext()
-  if (activeLocal && isOperationalLocalState(activeLocal.estado)) {
+  if (activeLocal && canOperateLocal(activeLocal, context.subscription)) {
     return { context, local: activeLocal }
   }
 
@@ -183,7 +182,7 @@ export async function requireOperationalOwnerLocal() {
   }
 
   if (activeLocal) {
-    redirect(resolveLocalDestination(activeLocal.estado))
+    redirect(resolvePostLoginDestination(context))
   }
   redirect(resolvePostLoginDestination(context))
 }
@@ -192,14 +191,14 @@ export async function requireConfigurableOwnerLocal() {
   const { context, activeLocal } = await getOwnerShellContext()
   if (
     activeLocal &&
-    (isOperationalLocalState(activeLocal.estado) ||
+    (canOperateLocal(activeLocal, context.subscription) ||
       canConfigurePaidPendingLocal(context, activeLocal))
   ) {
     return { context, local: activeLocal }
   }
 
   if (activeLocal) {
-    redirect(resolveLocalDestination(activeLocal.estado))
+    redirect(resolvePostLoginDestination(context))
   }
   redirect(resolvePostLoginDestination(context))
 }

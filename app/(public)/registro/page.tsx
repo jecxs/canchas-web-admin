@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowLeft01Icon, SecurityCheckIcon } from '@hugeicons/core-free-icons'
 import { GrasslyMark } from '@/components/brand/grassly-mark'
 import { AuthErrorNotification } from '@/components/auth/auth-error-notification'
+import { EmailPasswordSignInForm } from '@/components/auth/email-password-sign-in-form'
 import { GoogleSignInButton } from '@/components/auth/google-sign-in-button'
 import { redirectAuthenticatedUser } from '@/lib/auth/dal'
 
@@ -41,9 +42,15 @@ export default async function RegistroPage({
           <p className="eyebrow mt-7">Para propietarios y administración</p>
           <h2 className="mt-3 text-4xl font-black tracking-[-.055em]">Ingresa a Grassly</h2>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Usa tu cuenta de Google. Grassly te llevará al espacio que corresponde a tu rol y al estado de tu local.
+            Ingresa con tu cuenta de Google o con tu correo y contraseña. Grassly te llevará al espacio que corresponde a tu rol y al estado de tu local.
           </p>
           <GoogleSignInButton />
+          <div className="my-6 flex items-center gap-3 text-xs font-semibold text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            o
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <EmailPasswordSignInForm />
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
             Si todavía no tienes un local registrado, podrás completar tu solicitud después de ingresar.
           </p>

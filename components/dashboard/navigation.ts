@@ -30,6 +30,7 @@ const ownerNavigation = [
   { title: 'Clientes', href: '/panel/clientes', icon: UserGroupIcon },
   { title: 'Reportes', href: '/panel/reportes', icon: ChartLineData01Icon },
   { title: 'Configuración', href: '/panel/configuracion', icon: Settings02Icon },
+  { title: 'Facturación', href: '/panel/suscripcion', icon: CreditCardIcon },
 ] satisfies DashboardNavigationItem[]
 
 const adminNavigation = [

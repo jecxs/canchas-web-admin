@@ -321,6 +321,26 @@ Las migraciones de Billing ya aplicadas en el proyecto remoto son:
 - `20261021000200_billing_checkout_and_webhook_contract.sql`;
 - `20261021000300_billing_entitlements_and_owner_activation.sql`;
 - `20261021000400_billing_pricing_and_grace_policy.sql`.
+- `20261021000500_billing_fix_checkout_state_ambiguity.sql`;
+- `20261021000600_billing_close_deterministic_checkout_rejections.sql`;
+- `20261021000700_billing_reset_sandbox_ambiguous_attempts.sql`.
+
+La migración `20261021000800_billing_hardening_seats_reconciliation.sql` está
+**aplicada en el remoto**. Reemplaza
+el atajo de recuperación sandbox por un contrato verificable, evita que un evento
+duplicado extienda el período, confirma el pago interno de la factura recurrente,
+limita el trial a una vez por empresa y programa cambios de sedes para la próxima
+renovación. El aumento de cupo espera un pago aprobado por el nuevo importe; la
+reducción exige retirar antes los locales que excedan el cupo.
+
+Las cuatro Edge Functions de Billing están desplegadas. El secreto
+`MP_BILLING_RECONCILE_SECRET` está configurado en Edge Functions y Vault, y
+`billing-conciliar-v1` está activo cada 15 minutos. Una ejecución puntual del
+conciliador respondió HTTP 200. El token configurado en Supabase coincide con las
+credenciales de prueba de **GrasslyBillingSuscripciones** (`2663470584628537`),
+cuyo webhook de Billing está configurado para producción y sandbox. El panel web ya muestra facturas, estado, próxima renovación y excepción
+individual de gracia. Quedan pendientes las pruebas E2E y publicar los cambios
+web para probarlos desde el despliegue.
 
 La versión inicial publicada es: **S/ 80.00 mensuales**, una sede incluida,
 **S/ 20.00 por cada sede extra** y **5 días de gracia**. Está en
@@ -336,24 +356,21 @@ entitlement; el cron y `vigente_hasta` garantizan que la autorización no depend
 solo del scheduler.
 
 El superadministrador también puede asignar una excepción individual mediante
-`billing_establecer_gracia_propietario(dueno_id, dias)`. La interfaz específica de
-esa excepción debe vivir en el detalle de propietario/facturación; no se debe
-modificar la tabla directamente.
+`billing_establecer_gracia_propietario(dueno_id, dias)`. La interfaz está en el
+detalle del propietario y registra el cambio mediante esa RPC auditada.
 
-### Pendiente de configuración externa y activación
+### Pendiente de pruebas y publicación web
 
-1. Desplegar `mercadopago-billing-checkout` y
-   `mercadopago-billing-webhook`.
-2. En los secretos de Edge Functions configurar `MP_BILLING_ACCESS_TOKEN`,
-   `MP_BILLING_WEBHOOK_SECRET`,
-   `MP_BILLING_RETURN_URL=https://canchas-web-admin.vercel.app/panel/suscripcion`
-   y, al finalizar pruebas, `MP_BILLING_ENABLED=true`.
-3. Configurar en la aplicación **Grassly Billing** los eventos
-   `subscription_preapproval`, `subscription_authorized_payment` y `payment` para
-   `https://wezvongujgnnwuxasdbz.supabase.co/functions/v1/mercadopago-billing-webhook`.
-4. Antes de activar cobros reales, ejecutar el guion de pruebas de alta,
-   renovación aprobada, rechazo, recuperación, evento duplicado y evento fuera de
-   orden. Mantener `MP_BILLING_ENABLED=false` hasta terminarlo.
+1. Publicar los cambios web o ejecutar el panel local contra Supabase remoto.
+2. Verificar en el panel de Mercado Pago que `MP_BILLING_WEBHOOK_SECRET` coincide
+   con la firma de **GrasslyBillingSuscripciones**; la CLI de Supabase solo expone su hash.
+3. Ejecutar el guion E2E de alta, renovación aprobada, rechazo, recuperación,
+   evento duplicado, evento fuera de orden, cambios de sedes y conciliación.
+4. `MP_BILLING_ENABLED` ya estaba en `true` en el remoto antes de este despliegue;
+   el checkout usa el token de prueba configurado de Billing. Usar únicamente
+   cuentas de prueba controladas al ejecutar el flujo. Antes de cobrar en
+   producción, reemplazar el token por uno de producción de la misma aplicación
+   y repetir la verificación de firma y los casos E2E.
 
 ## Criterios de aceptación
 

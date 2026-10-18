@@ -1,13 +1,13 @@
 import { DashboardShell } from '@/components/dashboard/dashboard-shell'
 import { getOwnerShellContext } from '@/lib/auth/dal'
-import { isOperationalLocalState } from '@/lib/auth/access'
+import { canOperateLocal } from '@/lib/auth/access'
 import { getAdvanceAlert } from '@/features/local-settings/advance-alert'
 import { AdvanceAlertGate } from '@/features/local-settings/advance-alert-gate'
 
 export default async function OwnerLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { context, activeLocal } = await getOwnerShellContext()
   const advanceAlert =
-    activeLocal && isOperationalLocalState(activeLocal.estado)
+    activeLocal && canOperateLocal(activeLocal, context.subscription)
       ? await getAdvanceAlert(activeLocal)
       : null
 

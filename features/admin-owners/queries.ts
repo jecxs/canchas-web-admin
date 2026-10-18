@@ -164,7 +164,7 @@ export async function getAdminOwnerDetail(
       .order('created_at', { ascending: false }),
     supabase
       .from('suscripciones')
-      .select('id,estado,monto,fecha_proximo_cobro,sedes_extra_contratadas')
+      .select('id,estado,monto,fecha_proximo_cobro,sedes_extra_contratadas,dias_gracia_contratada,dias_gracia_override,gracia_hasta')
       .eq('dueno_id', ownerId)
       .maybeSingle(),
     supabase.rpc('fn_cupo_locales', { p_dueno_id: ownerId }),
@@ -181,10 +181,10 @@ export async function getAdminOwnerDetail(
 
   if (subscriptionRow) {
     const { data: paymentRows, error: paymentsError } = await supabase
-      .from('pagos_suscripcion')
-      .select('id,estado,monto,fecha_pago,mercadopago_payment_id')
+      .from('facturas_suscripcion')
+      .select('id,estado,monto,pagada_at,proveedor_payment_id')
       .eq('suscripcion_id', subscriptionRow.id)
-      .order('fecha_pago', { ascending: false })
+      .order('periodo_inicio', { ascending: false })
 
     if (paymentsError) {
       console.error('[admin-owners:detail-payments]', { code: paymentsError.code })
@@ -193,8 +193,8 @@ export async function getAdminOwnerDetail(
         id: payment.id,
         status: payment.estado,
         amount: Number(payment.monto),
-        paidAt: payment.fecha_pago,
-        reference: payment.mercadopago_payment_id,
+        paidAt: payment.pagada_at,
+        reference: payment.proveedor_payment_id,
       }))
     }
   }
@@ -206,6 +206,9 @@ export async function getAdminOwnerDetail(
         amount: Number(subscriptionRow.monto),
         nextChargeAt: subscriptionRow.fecha_proximo_cobro,
         extraSedes: subscriptionRow.sedes_extra_contratadas,
+        graceDays: subscriptionRow.dias_gracia_contratada,
+        graceOverrideDays: subscriptionRow.dias_gracia_override,
+        graceUntil: subscriptionRow.gracia_hasta,
         payments,
       }
     : null

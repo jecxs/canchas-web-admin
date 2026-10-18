@@ -12,6 +12,8 @@ export type SubscriptionSummary = Pick<
   | 'fecha_proximo_cobro'
   | 'monto'
   | 'sedes_extra_contratadas'
+  | 'estado_facturacion'
+  | 'gracia_hasta'
 >
 
 export type LocalSummary = Pick<
@@ -27,6 +29,7 @@ export type LocalSummary = Pick<
   | 'publicado_at'
   | 'porcentaje_adelanto'
   | 'created_at'
+  | 'suspendido_por_facturacion'
 >
 
 export type LocalState = Enums<'estado_local'>
@@ -62,7 +65,25 @@ export function isOperationalLocalState(state: LocalState) {
 export function hasActiveSubscription(
   subscription: SubscriptionSummary | null | undefined,
 ) {
-  return subscription?.estado === 'activa'
+  return subscription?.estado_facturacion === 'activa'
+}
+
+export function canOperateLocal(
+  local: LocalSummary,
+  subscription: SubscriptionSummary | null,
+) {
+  if (local.estado === 'trial') {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date())
+    const part = (type: string) => parts.find((item) => item.type === type)?.value ?? ''
+    const today = `${part('year')}-${part('month')}-${part('day')}`
+    return Boolean(local.fecha_fin_trial && local.fecha_fin_trial >= today)
+  }
+  if (local.estado !== 'activo' && local.estado !== 'en_gracia') return false
+  if (subscription?.estado_facturacion === 'activa') return true
+  return subscription?.estado_facturacion === 'en_gracia'
+    && Boolean(subscription.gracia_hasta && Date.parse(subscription.gracia_hasta) > Date.now())
 }
 
 export function canConfigurePaidPendingLocal(
@@ -125,8 +146,12 @@ export function resolvePostLoginDestination(
   }
 
   if (context.profile.rol === 'dueno') {
-    if (findLocalWithState(context, OPERATIONAL_LOCAL_STATES)) {
+    if (context.locals.some((local) => canOperateLocal(local, context.subscription))) {
       return '/panel'
+    }
+
+    if (findLocalWithState(context, OPERATIONAL_LOCAL_STATES)) {
+      return '/panel/suscripcion'
     }
 
     if (

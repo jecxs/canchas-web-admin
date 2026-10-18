@@ -28,14 +28,21 @@ function context(
       direccion: 'Ayacucho',
       ruc: null,
       estado,
-      fecha_fin_trial: null,
+      fecha_fin_trial: estado === 'trial' ? '2099-01-01' : null,
       motivo_rechazo: null,
       publicado: false,
       publicado_at: null,
       porcentaje_adelanto: null,
       created_at: new Date(2026, 0, index + 1).toISOString(),
+      suspendido_por_facturacion: false,
     })),
-    subscription: null,
+    subscription: states.some((state) => state === 'activo' || state === 'en_gracia')
+      ? {
+          id: 'subscription-1', estado: 'activa', estado_facturacion: 'activa',
+          gracia_hasta: null, fecha_proximo_cobro: null, monto: 80,
+          sedes_extra_contratadas: 0,
+        }
+      : null,
   }
 }
 
@@ -75,6 +82,8 @@ describe('resolvePostLoginDestination', () => {
       subscription: {
         id: 'subscription-1',
         estado: 'activa' as const,
+        estado_facturacion: 'activa',
+        gracia_hasta: null,
         fecha_proximo_cobro: null,
         monto: 49,
         sedes_extra_contratadas: 0,
@@ -88,6 +97,15 @@ describe('resolvePostLoginDestination', () => {
     expect(
       resolvePostLoginDestination(context('dueno', ['suspendido'])),
     ).toBe('/panel/suspendido')
+  })
+
+  it('lleva a facturación cuando venció la gracia aunque el local aún figure activo', () => {
+    const owner = context('dueno', ['activo'])
+    owner.subscription = {
+      ...owner.subscription!, estado: 'pago_fallido', estado_facturacion: 'en_gracia',
+      gracia_hasta: '2020-01-01T00:00:00Z',
+    }
+    expect(resolvePostLoginDestination(owner)).toBe('/panel/suscripcion')
   })
 
   it('maneja una cuenta dueña heredada sin locales sin crear un bucle', () => {
