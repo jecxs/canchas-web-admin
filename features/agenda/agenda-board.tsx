@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent, ty
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Calendar03Icon, CheckmarkCircle01Icon, Clock01Icon, FilterHorizontalIcon, MoreHorizontalIcon, Cancel01Icon, Maximize02Icon, Minimize02Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Calendar03Icon, CheckmarkCircle01Icon, Clock01Icon, FilterHorizontalIcon, Moon02Icon, MoreHorizontalIcon, Cancel01Icon, Maximize02Icon, Minimize02Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -230,6 +230,10 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
 
   const nowMinutes = useMemo(() => (nowMs > 0 ? getLocalMinutes(new Date(nowMs).toISOString()) : -1), [nowMs])
   const showNowLine = !isWeek && data.date === getTodayInLima()
+  // Día finalizado: pasó la hora de cierre, así que ninguna hora se puede
+  // reservar y toda la grilla queda como pasada.
+  const lastSlot = dailySlots.at(-1)
+  const dayEnded = Boolean(!isWeek && lastSlot && nowMs > 0 && isPastSlot(data, { start: lastSlot.end, end: lastSlot.end, label: '' }))
 
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
@@ -577,7 +581,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
     openPanel({ date: day.date, courtId: court.id, courtName: court.name, slot, occupation: reservation }, 'move')
   }
 
-  function renderCell(day: AgendaData, court: AgendaCourt, slot: Slot, showPastText = true) {
+  function renderCell(day: AgendaData, court: AgendaCourt, slot: Slot, dimPast = true) {
     const segment = getOccupationSegment(day.occupations, court.id, slot)
     // selectedCell conserva blocks al abrir el formulario; así el rango sigue
     // visible y no aparenta reducirse al primer bloque seleccionado.
@@ -632,7 +636,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
           'group relative min-h-16 overflow-visible border-r border-b p-1.5 text-left outline-none transition-colors duration-300 last:border-r-0',
           isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
           past
-            ? 'cursor-not-allowed bg-muted-foreground/20 text-muted-foreground'
+            ? cn('cursor-not-allowed text-muted-foreground', dimPast && 'bg-muted-foreground/6')
             : cn('hover:bg-primary/8 focus-visible:bg-primary/10', selected || selectedByRange ? 'bg-primary/18' : 'bg-background'),
           isDragPreview && (dragPreviewAllowed ? 'bg-primary/15' : 'bg-destructive/10'),
           'focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
@@ -650,9 +654,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
         />
         {segment?.isAnchor ? (
           <ReservationCard occupation={segment.occupation} top={segmentTop} durationMinutes={segmentDuration} highlighted={isHighlighted} charge={chargeState} />
-        ) : segment ? null : past ? (
-          showPastText ? <span className="pointer-events-none absolute inset-0 grid place-items-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/70">Hora pasada</span> : null
-        ) : (
+        ) : segment ? null : past ? null : (
           <span className="pointer-events-none absolute inset-0 grid place-items-center">
             <span className="grid size-7 place-items-center rounded-full border border-primary/40 bg-primary/10 text-primary opacity-25 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 sm:opacity-0">
               <HugeiconsIcon icon={Add01Icon} strokeWidth={2.5} className="size-4" />
@@ -665,7 +667,6 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   }
 
   function renderDailyGrid() {
-    const firstPastStart = dailySlots.find((slot) => isPastSlot(data, slot))?.start
     return (
       <div className="overflow-x-auto">
         <div className="min-w-[760px]">
@@ -683,7 +684,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
             return (
               <div key={slot.start} className="relative grid" style={{ gridTemplateColumns: `72px repeat(${data.courts.length}, minmax(170px, 1fr))` }}>
                 <div className="sticky left-0 z-20 flex min-h-16 items-start justify-end border-r border-b bg-background px-3 py-1.5 font-display text-sm font-bold tabular-nums text-muted-foreground">{slot.label}</div>
-                {data.courts.map((court, courtIndex) => renderCell(data, court, slot, courtIndex === 0 && slot.start === firstPastStart))}
+                {data.courts.map((court) => renderCell(data, court, slot, !dayEnded))}
                 {showNow && (
                   <div className="pointer-events-none absolute inset-x-0 z-20" style={{ top: `${((nowMinutes - slot.start) / 60) * 100}%` }}>
                     <div className="relative border-t-2 border-destructive/70">
@@ -723,7 +724,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
                 const available = buildSlots(day.openingTime, day.closingTime).some((candidate) => candidate.start === slot.start)
                 return available
                   ? renderCell(day, selectedCourt, slot)
-                  : <div key={`${day.date}-${slot.start}`} className="grid min-h-16 place-items-center border-r border-b bg-muted-foreground/20 px-2 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/75 last:border-r-0" aria-label={`${day.date}, fuera de horario`}>Fuera de horario</div>
+                  : <div key={`${day.date}-${slot.start}`} className="grid min-h-16 place-items-center border-r border-b bg-muted-foreground/6 px-2 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/75 last:border-r-0" aria-label={`${day.date}, fuera de horario`}>Fuera de horario</div>
               })}
             </div>
           ))}
@@ -871,7 +872,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
         </div>
       </header>
 
-      <Card className="overflow-hidden p-0 shadow-sm">
+      <Card className="gap-0 overflow-hidden p-0 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/20 px-5 py-4">
           <div className="min-w-0">
             <p className="font-display text-lg font-extrabold uppercase tracking-[.01em]">{data.localName}</p>
@@ -890,6 +891,12 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
           </div>
           <Button ref={newReservationButtonRef} type="button" size="sm" variant="outline" onClick={() => openFirstFree('manual')} disabled={!data.courts.length}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Nueva reserva</Button>
         </div>
+        {dayEnded && (
+          <div className="flex items-center gap-2 border-b bg-muted/45 px-5 py-2.5 text-xs font-semibold text-muted-foreground">
+            <HugeiconsIcon icon={Moon02Icon} strokeWidth={2} className="size-3.5" />
+            El día ya terminó. No quedan horas por reservar.
+          </div>
+        )}
         <div key={`${view}-${data.date}-${selectedSportId}-${selectedCourt?.id ?? 'all'}`} className={cn('animate-in fade-in-0 duration-300 motion-reduce:animate-none', boardTransition === 'forward' && 'slide-in-from-right-3', boardTransition === 'backward' && 'slide-in-from-left-3')}>{renderBoardBody()}</div>
       </Card>
 

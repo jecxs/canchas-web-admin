@@ -29,7 +29,7 @@ const STATUS_DESIGN: Record<ReservationStatus, StatusDesign> = {
   pago_en_proceso: { label: 'Pago en proceso', card: 'border-warning/60 bg-warning/24 text-foreground', dot: 'bg-warning' },
   pendiente_validacion: { label: 'Por validar', card: 'border-warning/60 bg-warning/24 text-foreground', dot: 'bg-warning' },
   rechazada_pago: { label: 'Pago rechazado', card: 'border-destructive/55 bg-destructive/20 text-foreground', dot: 'bg-destructive' },
-  confirmada: { label: 'Confirmada', card: 'border-primary/55 bg-primary/20 text-foreground', dot: 'bg-primary' },
+  confirmada: { label: 'Confirmada', card: 'border-primary/70 bg-primary/35 text-foreground', dot: 'bg-primary' },
   completada: { label: 'Completada', card: 'border-success/55 bg-success/20 text-foreground', dot: 'bg-success' },
   no_show: { label: 'No se presentó', card: 'border-destructive/55 bg-destructive/20 text-foreground', dot: 'bg-destructive' },
   cancelada_cliente: { label: 'Cancelada', card: 'border-border bg-muted/75 text-muted-foreground', dot: 'bg-muted-foreground' },
