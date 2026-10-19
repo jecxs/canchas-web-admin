@@ -7,6 +7,7 @@ export type CajaMedioTipo =
   | 'comprobante'
   | 'manual'
   | 'otro'
+  | 'reembolso'
 
 export type CajaMovement = {
   movimiento_id: string
@@ -41,6 +42,7 @@ export type CajaReport = {
     mercadopago: number
     comprobante: number
     reembolsos: number
+    neto: number
     count: number
   }
   byMethod: CajaMethodItem[]

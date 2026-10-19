@@ -14,6 +14,7 @@ const MEDIO_LABELS: Record<CajaMedioTipo, string> = {
   comprobante: 'Comprobante',
   manual: 'Registro manual',
   otro: 'Otro',
+  reembolso: 'Reembolso',
 }
 
 export async function getCajaReport(input: {
@@ -87,7 +88,7 @@ export async function getCajaReport(input: {
     start,
     end,
     today,
-    totals: { collected, mercadopago, comprobante, reembolsos, count },
+    totals: { collected, mercadopago, comprobante, reembolsos, neto: collected - reembolsos, count },
     byMethod,
     movements,
   }

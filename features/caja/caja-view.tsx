@@ -17,6 +17,7 @@ const MEDIO_COLORS: Record<string, string> = {
   comprobante: 'bg-slate-400',
   manual: 'bg-slate-300',
   otro: 'bg-slate-200',
+  reembolso: 'bg-destructive',
 }
 
 function money(value: number) {
@@ -94,10 +95,17 @@ export function CajaView({ data }: { data: CajaReport }) {
         <PeriodPicker start={data.start} end={data.end} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Ingresos del periodo</p>
+            <p className="text-sm text-muted-foreground">Neto del periodo</p>
+            <p className="mt-2 text-2xl font-black">{money(data.totals.neto)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">ingresos menos reembolsos</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Ingresos brutos</p>
             <p className="mt-2 text-2xl font-black">{money(total)}</p>
             <p className="mt-1 text-xs text-muted-foreground">{data.totals.count} cobro{data.totals.count === 1 ? '' : 's'}</p>
           </CardContent>

@@ -79,7 +79,7 @@ export const cancelReservationSchema = z.object({
   reservationId: z.uuid(),
   status: z.enum(['cancelada_cliente', 'cancelada_local']),
   reason: z.string().trim().max(500),
-  refundStatus: z.enum(['no_aplica', 'solicitado', 'aprobado', 'rechazado']),
+  refundStatus: z.enum(['no_aplica', 'aprobado', 'rechazado']),
 })
 
 export const noShowReservationSchema = z.object({
