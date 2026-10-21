@@ -8,6 +8,8 @@ import { createClient } from '@/utils/supabase/server'
 import { adminLocalMessages, translateAdminLocalError } from './messages'
 import {
   localIdSchema,
+  liftLocalModerationSchema,
+  localModerationSchema,
   localPublicationSchema,
   localRejectionSchema,
   localTrialSchema,
@@ -145,6 +147,75 @@ export async function reactivateLocalTrialAction(
 
   revalidateLocal(validation.data.localId)
   return { success: true, message: adminLocalMessages.reactivatedWithTrial }
+}
+
+export async function applyLocalModerationAction(
+  _state: AdminLocalActionState,
+  formData: FormData,
+): Promise<AdminLocalActionState> {
+  const authorizationError = await authorizeAdmin()
+  if (authorizationError) return authorizationError
+
+  const validation = localModerationSchema.safeParse({
+    localId: formData.get('localId'),
+    type: formData.get('type'),
+    reason: formData.get('reason'),
+    internalNotes: formData.get('internalNotes'),
+    endsAt: formData.get('endsAt') || undefined,
+  })
+  if (!validation.success) return validationFailure(validation.error)
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('moderacion_aplicar_medida', {
+    p_local_id: validation.data.localId,
+    p_tipo: validation.data.type,
+    p_motivo: validation.data.reason,
+    p_notas_internas: validation.data.internalNotes || null,
+    // El panel opera en Perú; datetime-local no incluye zona horaria.
+    p_vigente_hasta: validation.data.endsAt
+      ? new Date(`${validation.data.endsAt}:00-05:00`).toISOString()
+      : null,
+  })
+
+  if (error) {
+    console.error('[admin-locales:moderation-apply]', { code: error.code })
+    return { success: false, message: translateAdminLocalError(error) }
+  }
+
+  revalidateLocal(validation.data.localId)
+  revalidatePath('/panel')
+  revalidatePath('/panel/suspendido')
+  return { success: true, message: 'La medida administrativa fue aplicada.' }
+}
+
+export async function liftLocalModerationAction(
+  _state: AdminLocalActionState,
+  formData: FormData,
+): Promise<AdminLocalActionState> {
+  const authorizationError = await authorizeAdmin()
+  if (authorizationError) return authorizationError
+
+  const validation = liftLocalModerationSchema.safeParse({
+    localId: formData.get('localId'),
+    reason: formData.get('reason'),
+  })
+  if (!validation.success) return validationFailure(validation.error)
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('moderacion_levantar_medida', {
+    p_local_id: validation.data.localId,
+    p_motivo: validation.data.reason || null,
+  })
+
+  if (error) {
+    console.error('[admin-locales:moderation-lift]', { code: error.code })
+    return { success: false, message: translateAdminLocalError(error) }
+  }
+
+  revalidateLocal(validation.data.localId)
+  revalidatePath('/panel')
+  revalidatePath('/panel/suspendido')
+  return { success: true, message: 'La medida administrativa fue levantada.' }
 }
 
 export async function rejectLocalAction(

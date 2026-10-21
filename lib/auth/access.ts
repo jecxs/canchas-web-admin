@@ -16,6 +16,14 @@ export type SubscriptionSummary = Pick<
   | 'gracia_hasta'
 >
 
+export type LocalModeration = {
+  id: string
+  type: 'advertencia' | 'pausa_reservas' | 'suspension_temporal' | 'retiro_definitivo'
+  reason: string
+  startsAt: string
+  endsAt: string | null
+}
+
 export type LocalSummary = Pick<
   Tables<'locales'>,
   | 'id'
@@ -30,7 +38,9 @@ export type LocalSummary = Pick<
   | 'porcentaje_adelanto'
   | 'created_at'
   | 'suspendido_por_facturacion'
->
+> & {
+  moderation?: LocalModeration | null
+}
 
 export type LocalState = Enums<'estado_local'>
 
@@ -47,6 +57,7 @@ export type AppDestination =
   | '/panel'
   | '/panel/configuracion'
   | '/panel/suscripcion'
+  | '/panel/estado-local'
   | '/panel/suspendido'
   | '/panel/sin-local'
   | '/estado-solicitud'
@@ -81,10 +92,15 @@ export function hasActiveSubscription(
   return subscription?.estado_facturacion === 'activa'
 }
 
+export function moderationBlocksOperation(moderation: LocalModeration | null | undefined) {
+  return moderation?.type === 'suspension_temporal' || moderation?.type === 'retiro_definitivo'
+}
+
 export function canOperateLocal(
   local: LocalSummary,
   subscription: SubscriptionSummary | null,
 ) {
+  if (moderationBlocksOperation(local.moderation)) return false
   if (local.estado === 'trial') {
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -129,13 +145,17 @@ export function resolveActiveLocal(
   }
 
   return (
-    locals.find((local) => isOperationalLocalState(local.estado)) ??
+    locals.find((local) => isOperationalLocalState(local.estado) && !moderationBlocksOperation(local.moderation)) ??
     locals[0] ??
     null
   )
 }
 
-export function resolveLocalDestination(state: LocalState): AppDestination {
+export function resolveLocalDestination(localOrState: LocalSummary | LocalState): AppDestination {
+  if (typeof localOrState !== 'string' && moderationBlocksOperation(localOrState.moderation)) {
+    return '/panel/suspendido'
+  }
+  const state = typeof localOrState === 'string' ? localOrState : localOrState.estado
   if (isOperationalLocalState(state)) {
     return '/panel'
   }
@@ -161,6 +181,10 @@ export function resolvePostLoginDestination(
   if (context.profile.rol === 'dueno') {
     if (context.locals.some((local) => canOperateLocal(local, context.subscription))) {
       return '/panel'
+    }
+
+    if (context.locals.some((local) => moderationBlocksOperation(local.moderation))) {
+      return '/panel/suspendido'
     }
 
     if (findLocalWithState(context, OPERATIONAL_LOCAL_STATES)) {

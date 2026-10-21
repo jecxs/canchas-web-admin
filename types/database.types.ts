@@ -2920,6 +2920,43 @@ export type Database = {
         Args: { p_motivo?: string; p_reserva_id: string }
         Returns: undefined
       }
+      moderacion_aplicar_medida: {
+        Args: {
+          p_local_id: string
+          p_motivo: string
+          p_notas_internas?: string | null
+          p_tipo: string
+          p_vigente_hasta?: string | null
+        }
+        Returns: string
+      }
+      moderacion_levantar_medida: {
+        Args: { p_local_id: string; p_motivo?: string | null }
+        Returns: boolean
+      }
+      moderacion_listar_activas_propietario: {
+        Args: never
+        Returns: {
+          creada_at: string
+          id: string
+          local_id: string
+          motivo: string
+          tipo: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }[]
+      }
+      moderacion_obtener_activa: {
+        Args: { p_local_id: string }
+        Returns: {
+          creada_at: string
+          id: string
+          motivo: string
+          tipo: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }[]
+      }
       mercadopago_autorizar_conciliador_cron: {
         Args: { p_secret: string }
         Returns: boolean

@@ -22,6 +22,7 @@ export async function getOwnerNotifications({ limit = 20, before }: { limit?: nu
     .from('notificaciones')
     .select('id,destinatario_id,reserva_id,titulo,mensaje,href,leida_at,created_at,tipo')
     .eq('destinatario_id', context.userId)
+    .in('tipo', ['reserva_pendiente_validacion', 'moderacion_local'])
     .order('created_at', { ascending: false })
 
   if (before) query = query.lt('created_at', before)

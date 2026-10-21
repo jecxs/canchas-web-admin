@@ -16,6 +16,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { getDashboardBreadcrumbs } from './navigation'
 import { useEntityBreadcrumb } from './breadcrumb-store'
 import { LocalSwitcher } from './local-switcher'
+import { LocalModerationIndicator } from './local-moderation-indicator'
 import { UserMenu } from './user-menu'
 import { NotificationsBell } from './notifications-bell'
 import type { DashboardRole, DashboardUser } from './types'
@@ -67,6 +68,7 @@ export function DashboardHeader({ role, user, locals, activeLocal, initialNotifi
       </div>
       <div className="ml-auto flex min-w-0 items-center gap-2">
         {role === 'owner' ? <LocalSwitcher locals={locals} activeLocal={activeLocal} /> : null}
+        {role === 'owner' ? <LocalModerationIndicator moderation={activeLocal?.moderation} /> : null}
         {role === 'owner' ? <NotificationsBell recipientId={user.id} initialNotifications={initialNotifications} /> : null}
         <UserMenu user={user} />
       </div>

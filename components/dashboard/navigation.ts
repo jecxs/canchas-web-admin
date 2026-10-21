@@ -68,6 +68,7 @@ export function getDashboardPageLabel(pathname: string, role: DashboardRole) {
   if (pathname.endsWith('/perfil')) return 'Mi perfil'
   if (pathname.endsWith('/ayuda')) return 'Ayuda'
   if (pathname.endsWith('/suscripcion')) return 'Suscripción'
+  if (pathname.endsWith('/estado-local')) return 'Estado del local'
   if (pathname.endsWith('/suspendido')) return 'Acceso suspendido'
   if (pathname.endsWith('/sin-local')) return 'Sin local'
 

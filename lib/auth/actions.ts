@@ -23,7 +23,7 @@ export async function selectActiveLocalAction(localId: string) {
     maxAge: 60 * 60 * 24 * 365,
   })
 
-  redirect(resolveLocalDestination(local.estado))
+  redirect(resolveLocalDestination(local))
 }
 
 export async function signOutAction() {

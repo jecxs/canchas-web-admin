@@ -30,11 +30,11 @@ export function OwnerCard({ owner }: { owner: AdminOwnerListItem }) {
   return (
     <Link
       href={`/admin/propietarios/${owner.id}`}
-      className="group block h-full rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+      className="group block rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
       aria-label={`Ver propietario ${owner.name}`}
     >
-      <Card className="relative h-full gap-0 py-0 transition-[transform,border-color,box-shadow,background-color] duration-300 ease-out group-hover:-translate-y-1 group-hover:border-plum/50 group-hover:bg-plum/[.05] group-hover:shadow-md group-active:translate-y-0 group-active:scale-[.995]">
-        <CardContent className="flex h-full flex-col gap-2.5 p-3.5">
+      <Card className="relative gap-0 py-0 transition-[transform,border-color,box-shadow,background-color] duration-300 ease-out group-hover:-translate-y-1 group-hover:border-plum/50 group-hover:bg-plum/[.05] group-hover:shadow-md group-active:translate-y-0 group-active:scale-[.995]">
+        <CardContent className="flex flex-col gap-2.5 p-3.5">
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2.5">
               <EntityAvatar src={owner.avatarUrl} name={owner.name} size="lg" className="transition-transform duration-300 group-hover:scale-105" />

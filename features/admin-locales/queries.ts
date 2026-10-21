@@ -12,6 +12,7 @@ import type {
   AdminLocalDetail,
   AdminLocalFilters,
   AdminLocalListItem,
+  AdminLocalModeration,
   AdminLocalPayment,
   AdminLocalReview,
   AdminLocalState,
@@ -225,7 +226,7 @@ export async function getAdminLocalDetail(
 
   const local = data as unknown as LocalDetailRow
 
-  const [courtsResult, sportsResult, schedulesResult, photosResult, benefitsResult, paymentMethodsResult, subscriptionResult, checklistResult, reviewsResult] =
+  const [courtsResult, sportsResult, schedulesResult, photosResult, benefitsResult, paymentMethodsResult, subscriptionResult, checklistResult, reviewsResult, moderationResult] =
     await Promise.all([
       supabase
         .from('canchas')
@@ -267,6 +268,7 @@ export async function getAdminLocalDetail(
         .eq('local_id', localId)
         .order('created_at', { ascending: false })
         .limit(50),
+      supabase.rpc('moderacion_obtener_activa', { p_local_id: localId }),
     ])
 
   if (courtsResult.error || schedulesResult.error || photosResult.error || benefitsResult.error || paymentMethodsResult.error || reviewsResult.error) {
@@ -414,6 +416,16 @@ export async function getAdminLocalDetail(
           nextChargeAt: subscriptionRow.fecha_proximo_cobro,
           extraSedes: subscriptionRow.sedes_extra_contratadas,
           payments,
+        }
+      : null,
+    moderation: moderationResult.data?.[0]
+      ? {
+          id: moderationResult.data[0].id,
+          type: moderationResult.data[0].tipo as AdminLocalModeration['type'],
+          reason: moderationResult.data[0].motivo,
+          startsAt: moderationResult.data[0].vigente_desde,
+          endsAt: moderationResult.data[0].vigente_hasta,
+          createdAt: moderationResult.data[0].creada_at,
         }
       : null,
     checklist,

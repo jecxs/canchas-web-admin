@@ -8,10 +8,12 @@ import {
   canConfigurePaidPendingLocal,
   canOperateLocal,
   findLocalWithState,
+  moderationBlocksOperation,
   resolveActiveLocal,
   resolveLocalDestination,
   resolvePostLoginDestination,
   type AccessContext,
+  type LocalModeration,
   type LocalState,
 } from './access'
 
@@ -32,6 +34,7 @@ export const getAccessContext = cache(
       { data: profile, error: profileError },
       { data: locals, error: localsError },
       { data: subscription, error: subscriptionError },
+      { data: moderations, error: moderationsError },
     ] =
       await Promise.all([
         supabase
@@ -51,6 +54,7 @@ export const getAccessContext = cache(
           .select('id,estado,estado_facturacion,gracia_hasta,fecha_proximo_cobro,monto,sedes_extra_contratadas')
           .eq('dueno_id', userId)
           .maybeSingle(),
+        supabase.rpc('moderacion_listar_activas_propietario'),
       ])
 
     if (profileError) {
@@ -69,6 +73,11 @@ export const getAccessContext = cache(
       throw new Error('No se pudo cargar la información de la cuenta.')
     }
 
+    if (moderationsError) {
+      console.error('[auth-dal:moderations]', { code: moderationsError.code })
+      throw new Error('No se pudo cargar el estado administrativo de los locales.')
+    }
+
     if (!profile) {
       throw new Error('La sesión no tiene un perfil de Grassly asociado.')
     }
@@ -81,7 +90,21 @@ export const getAccessContext = cache(
       avatarUrl:
         typeof avatarCandidate === 'string' ? avatarCandidate : null,
       profile,
-      locals: locals ?? [],
+      locals: (locals ?? []).map((local) => {
+        const moderation = moderations?.find((item) => item.local_id === local.id)
+        return {
+          ...local,
+          moderation: moderation
+            ? {
+                id: moderation.id,
+                type: moderation.tipo as LocalModeration['type'],
+                reason: moderation.motivo,
+                startsAt: moderation.vigente_desde,
+                endsAt: moderation.vigente_hasta,
+              }
+            : null,
+        }
+      }),
       subscription,
     }
   },
@@ -159,11 +182,14 @@ export async function authorizeLocalConfiguration(localId: string) {
 export async function requireOwnerLocal(states: readonly LocalState[]) {
   const { context, activeLocal } = await getOwnerShellContext()
   const local =
-    activeLocal && states.includes(activeLocal.estado) ? activeLocal : null
+    activeLocal && (
+      states.includes(activeLocal.estado)
+      || (states.includes('suspendido') && moderationBlocksOperation(activeLocal.moderation))
+    ) ? activeLocal : null
 
   if (!local) {
     if (activeLocal) {
-      redirect(resolveLocalDestination(activeLocal.estado))
+      redirect(resolveLocalDestination(activeLocal))
     }
 
     redirect(resolvePostLoginDestination(context))
