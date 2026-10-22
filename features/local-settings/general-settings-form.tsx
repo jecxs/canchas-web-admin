@@ -1,6 +1,9 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Loading03Icon, RefreshIcon } from '@hugeicons/core-free-icons'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { GuardActions } from '@/components/dashboard/edit-guard'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -9,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { saveGeneralSettingsAction } from './actions'
 import { useSettingsFormFeedback } from './form-feedback'
 import { MapLocationPicker, type LocationPatch } from './map-location-picker'
+import { reverseGeocodeAddress } from './map-geocoding'
 import { initialSettingsActionState, type LocalSettings } from './types'
 
 function errors(messages?: string[]) {
@@ -22,11 +26,32 @@ export function GeneralSettingsForm({ settings }: { settings: LocalSettings }) {
   const [address, setAddress] = useState(settings.direccion)
   const [latitude, setLatitude] = useState<number | null>(settings.latitud)
   const [longitude, setLongitude] = useState<number | null>(settings.longitud)
+  const [updatingAddress, setUpdatingAddress] = useState(false)
+  const [addressError, setAddressError] = useState<string | null>(null)
 
   function handleLocationChange(patch: LocationPatch) {
     if (typeof patch.latitude === 'number') setLatitude(patch.latitude)
     if (typeof patch.longitude === 'number') setLongitude(patch.longitude)
-    if (typeof patch.address === 'string') setAddress(patch.address)
+  }
+
+  async function handleUpdateAddress() {
+    if (updatingAddress) return
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      setAddressError('Ubica primero el local en el mapa.')
+      return
+    }
+    setUpdatingAddress(true)
+    setAddressError(null)
+    try {
+      const nextAddress = await reverseGeocodeAddress(longitude, latitude)
+      if (!nextAddress) {
+        setAddressError('No encontramos una dirección en este punto. Ajusta el pin e inténtalo de nuevo.')
+        return
+      }
+      setAddress(nextAddress)
+    } finally {
+      setUpdatingAddress(false)
+    }
   }
 
   return (
@@ -71,9 +96,24 @@ export function GeneralSettingsForm({ settings }: { settings: LocalSettings }) {
             </div>
             <Field data-invalid={Boolean(state.fieldErrors?.address)}>
               <FieldLabel htmlFor="address">Dirección</FieldLabel>
-              <Input id="address" name="address" value={address} onChange={(event) => setAddress(event.target.value)} maxLength={250} required />
-              <FieldDescription>Se completa automáticamente al elegir la zona en el mapa; puedes ajustarla si hace falta.</FieldDescription>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input id="address" name="address" value={address} onChange={(event) => setAddress(event.target.value)} maxLength={250} required />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleUpdateAddress()}
+                  disabled={updatingAddress || latitude === null || longitude === null}
+                  className="h-11 shrink-0"
+                >
+                  {updatingAddress
+                    ? <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="animate-spin" />
+                    : <HugeiconsIcon icon={RefreshIcon} strokeWidth={2} />}
+                  Actualizar según el mapa
+                </Button>
+              </div>
+              <FieldDescription>Escríbela o usa «Actualizar según el mapa» para tomarla del pin.</FieldDescription>
               <FieldError errors={errors(state.fieldErrors?.address)} />
+              {addressError ? <p className="text-sm font-medium text-destructive">{addressError}</p> : null}
             </Field>
             <Field>
               <FieldLabel>Ubicación en el mapa</FieldLabel>
