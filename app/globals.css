@@ -471,6 +471,12 @@
   .reportes .rp-panel + .rp-panel { border-left:0; border-top:1px solid var(--rp-line); margin-top:22px; padding-top:22px; }
 }
 
+/* El dashboard del dueño arranca con un hero full-bleed pegado al header;
+   el resto de páginas conserva su padding superior normal. */
+[data-slot="dashboard-content"]:has([data-owner-dashboard]) {
+  padding-top: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
