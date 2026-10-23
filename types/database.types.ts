@@ -1183,6 +1183,76 @@ export type Database = {
           },
         ]
       }
+      moderaciones_locales: {
+        Row: {
+          creada_at: string
+          creada_por: string
+          estado: string
+          id: string
+          levantada_at: string | null
+          levantada_por: string | null
+          local_id: string
+          motivo: string
+          motivo_levantamiento: string | null
+          notas_internas: string | null
+          tipo: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          creada_at?: string
+          creada_por: string
+          estado?: string
+          id?: string
+          levantada_at?: string | null
+          levantada_por?: string | null
+          local_id: string
+          motivo: string
+          motivo_levantamiento?: string | null
+          notas_internas?: string | null
+          tipo: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          creada_at?: string
+          creada_por?: string
+          estado?: string
+          id?: string
+          levantada_at?: string | null
+          levantada_por?: string | null
+          local_id?: string
+          motivo?: string
+          motivo_levantamiento?: string | null
+          notas_internas?: string | null
+          tipo?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderaciones_locales_creada_por_fkey"
+            columns: ["creada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderaciones_locales_levantada_por_fkey"
+            columns: ["levantada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderaciones_locales_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movimientos_pago_reserva: {
         Row: {
           created_at: string
@@ -2920,43 +2990,6 @@ export type Database = {
         Args: { p_motivo?: string; p_reserva_id: string }
         Returns: undefined
       }
-      moderacion_aplicar_medida: {
-        Args: {
-          p_local_id: string
-          p_motivo: string
-          p_notas_internas?: string | null
-          p_tipo: string
-          p_vigente_hasta?: string | null
-        }
-        Returns: string
-      }
-      moderacion_levantar_medida: {
-        Args: { p_local_id: string; p_motivo?: string | null }
-        Returns: boolean
-      }
-      moderacion_listar_activas_propietario: {
-        Args: never
-        Returns: {
-          creada_at: string
-          id: string
-          local_id: string
-          motivo: string
-          tipo: string
-          vigente_desde: string
-          vigente_hasta: string | null
-        }[]
-      }
-      moderacion_obtener_activa: {
-        Args: { p_local_id: string }
-        Returns: {
-          creada_at: string
-          id: string
-          motivo: string
-          tipo: string
-          vigente_desde: string
-          vigente_hasta: string | null
-        }[]
-      }
       mercadopago_autorizar_conciliador_cron: {
         Args: { p_secret: string }
         Returns: boolean
@@ -3068,6 +3101,51 @@ export type Database = {
         Returns: {
           expira_en: string
           reserva_id: string
+        }[]
+      }
+      moderacion_aplicar_medida: {
+        Args: {
+          p_local_id: string
+          p_motivo: string
+          p_notas_internas?: string
+          p_tipo: string
+          p_vigente_hasta?: string
+        }
+        Returns: string
+      }
+      moderacion_bloquea_operacion: {
+        Args: { p_local_id: string }
+        Returns: boolean
+      }
+      moderacion_bloquea_reservas: {
+        Args: { p_local_id: string }
+        Returns: boolean
+      }
+      moderacion_levantar_medida: {
+        Args: { p_local_id: string; p_motivo?: string }
+        Returns: boolean
+      }
+      moderacion_listar_activas_propietario: {
+        Args: never
+        Returns: {
+          creada_at: string
+          id: string
+          local_id: string
+          motivo: string
+          tipo: string
+          vigente_desde: string
+          vigente_hasta: string
+        }[]
+      }
+      moderacion_obtener_activa: {
+        Args: { p_local_id: string }
+        Returns: {
+          creada_at: string
+          id: string
+          motivo: string
+          tipo: string
+          vigente_desde: string
+          vigente_hasta: string
         }[]
       }
       obtener_beneficios_publicos_local: {
@@ -3429,6 +3507,33 @@ export type Database = {
           monto_adelanto_requerido: number
           monto_total: number
           reserva_id: string
+        }[]
+      }
+      obtener_reservas_export_dueno: {
+        Args: { p_desde?: string; p_hasta?: string; p_local_id: string }
+        Returns: {
+          canal: string
+          cancelada_at: string
+          cancha: string
+          cliente: string
+          created_at: string
+          deporte: string
+          estado: string
+          extension_monto: number
+          fin: string
+          inicio: string
+          monto_adelanto: number
+          monto_cobrado: number
+          monto_reembolsado: number
+          monto_total: number
+          motivo_cancelacion: string
+          motivo_rechazo: string
+          notas: string
+          reembolso_resultado: string
+          reserva_id: string
+          saldo_pendiente: number
+          telefono: string
+          tiene_comprobante: boolean
         }[]
       }
       obtener_reservas_local: {

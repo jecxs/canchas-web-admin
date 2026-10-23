@@ -20,7 +20,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { dashboardNavigation, isNavigationItemActive } from './navigation'
+import { dashboardNavigation, isNavigationItemActive, ownerDataNavigationItem } from './navigation'
 import { getSubscriptionPresentation, localStatePresentation } from './status'
 import type { DashboardRole } from './types'
 import type { LocalSummary, SubscriptionSummary } from '@/lib/auth/access'
@@ -39,7 +39,7 @@ export function AppSidebar({ role, activeLocal, subscription }: AppSidebarProps)
   const subscriptionState = getSubscriptionPresentation(subscription)
   const isOperational = activeLocal ? canOperateLocal(activeLocal, subscription) : false
   const navigation = role === 'owner' && !isOperational
-    ? dashboardNavigation.owner.filter((item) => item.href === '/panel' || item.href === '/panel/suscripcion')
+    ? [...dashboardNavigation.owner.filter((item) => item.href === '/panel' || item.href === '/panel/suscripcion'), ownerDataNavigationItem]
     : dashboardNavigation[role]
   const homeHref = role === 'admin' ? '/admin' : '/panel'
   const helpHref = role === 'admin' ? '/admin/ayuda' : '/panel/ayuda'

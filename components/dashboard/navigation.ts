@@ -6,6 +6,7 @@ import {
   ChartLineData01Icon,
   CreditCardIcon,
   DashboardSquare01Icon,
+  Download04Icon,
   Invoice03Icon,
   Money03Icon,
   Settings02Icon,
@@ -50,6 +51,14 @@ export const dashboardNavigation = {
   admin: adminNavigation,
 } satisfies Record<DashboardRole, DashboardNavigationItem[]>
 
+// Módulo de respaldo visible solo cuando el panel operativo está restringido
+// (moderación o facturación), para que el dueño no pierda acceso a sus datos.
+export const ownerDataNavigationItem: DashboardNavigationItem = {
+  title: 'Mis datos',
+  href: '/panel/mis-datos',
+  icon: Download04Icon,
+}
+
 export function isNavigationItemActive(
   pathname: string,
   item: DashboardNavigationItem,
@@ -68,6 +77,7 @@ export function getDashboardPageLabel(pathname: string, role: DashboardRole) {
   if (pathname.endsWith('/perfil')) return 'Mi perfil'
   if (pathname.endsWith('/ayuda')) return 'Ayuda'
   if (pathname.endsWith('/suscripcion')) return 'Suscripción'
+  if (pathname.endsWith('/mis-datos')) return 'Mis datos'
   if (pathname.endsWith('/estado-local')) return 'Estado del local'
   if (pathname.endsWith('/suspendido')) return 'Acceso suspendido'
   if (pathname.endsWith('/sin-local')) return 'Sin local'
