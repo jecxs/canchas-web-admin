@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { ArrowDown01Icon, Building03Icon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { selectActiveLocalAction } from '@/lib/auth/actions'
@@ -84,6 +85,13 @@ export function LocalSwitcher({ locals, activeLocal }: LocalSwitcherProps) {
             </form>
           )
         })}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild className="rounded-lg">
+          <Link href="/panel/sedes" className="flex w-full items-center gap-3 px-2 py-2.5 text-sm font-semibold">
+            <HugeiconsIcon icon={Building03Icon} strokeWidth={2} className="size-4 text-muted-foreground" />
+            Gestionar sedes
+          </Link>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

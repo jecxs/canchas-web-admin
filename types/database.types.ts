@@ -2314,6 +2314,17 @@ export type Database = {
           sedes_incluidas: number
         }[]
       }
+      billing_obtener_resumen_sedes: {
+        Args: never
+        Returns: {
+          asientos_disponibles: number
+          max_sedes: number
+          puede_crear_sede: boolean
+          sedes_extra_contratadas: number
+          sedes_incluidas: number
+          sedes_usadas: number
+        }[]
+      }
       billing_obtener_precios_suscripcion_admin: {
         Args: never
         Returns: {
@@ -2716,6 +2727,22 @@ export type Database = {
           reserva_id: string
         }[]
       }
+      crear_sede_adicional: {
+        Args: {
+          p_descripcion: string
+          p_direccion: string
+          p_latitud: number
+          p_longitud: number
+          p_nombre: string
+          p_ruc: string
+          p_telefono_principal: string
+          p_telefono_secundario: string
+        }
+        Returns: {
+          estado: Database["public"]["Enums"]["estado_local"]
+          local_id: string
+        }[]
+      }
       desregistrar_push_token_cliente: {
         Args: { p_token: string }
         Returns: undefined
@@ -2984,6 +3011,10 @@ export type Database = {
       }
       marcar_notificaciones_leidas_dueno: {
         Args: { p_notificacion_id?: string }
+        Returns: number
+      }
+      marcar_notificaciones_leidas_dueno_local: {
+        Args: { p_local_id: string }
         Returns: number
       }
       marcar_reserva_no_show_dueno: {

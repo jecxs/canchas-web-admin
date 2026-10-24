@@ -25,6 +25,7 @@ export type DashboardNavigationItem = {
 
 const ownerNavigation = [
   { title: 'Resumen', href: '/panel', icon: DashboardSquare01Icon, exact: true },
+  { title: 'Sedes', href: '/panel/sedes', icon: Store01Icon },
   { title: 'Agenda', href: '/panel/agenda', icon: Calendar03Icon },
   { title: 'Reservas', href: '/panel/reservas', icon: Invoice03Icon },
   { title: 'Canchas', href: '/panel/canchas', icon: Building03Icon },
@@ -100,6 +101,7 @@ const entityFallbackLabels: Record<string, string> = {
 
 const subPageLabels: Record<string, string> = {
   configuracion: 'Configuración',
+  nueva: 'Nueva sede',
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

@@ -38,8 +38,14 @@ export function AppSidebar({ role, activeLocal, subscription }: AppSidebarProps)
   const localState = activeLocal ? localStatePresentation[activeLocal.estado] : null
   const subscriptionState = getSubscriptionPresentation(subscription)
   const isOperational = activeLocal ? canOperateLocal(activeLocal, subscription) : false
+  const canConfigurePaidLocal =
+    activeLocal?.estado === 'aprobado_pendiente_pago'
+    && subscription?.estado_facturacion === 'activa'
+  const restrictedNavigation = canConfigurePaidLocal
+    ? ['/panel', '/panel/sedes', '/panel/configuracion', '/panel/suscripcion']
+    : ['/panel', '/panel/sedes', '/panel/suscripcion']
   const navigation = role === 'owner' && !isOperational
-    ? [...dashboardNavigation.owner.filter((item) => item.href === '/panel' || item.href === '/panel/suscripcion'), ownerDataNavigationItem]
+    ? [...dashboardNavigation.owner.filter((item) => restrictedNavigation.includes(item.href)), ownerDataNavigationItem]
     : dashboardNavigation[role]
   const homeHref = role === 'admin' ? '/admin' : '/panel'
   const helpHref = role === 'admin' ? '/admin/ayuda' : '/panel/ayuda'

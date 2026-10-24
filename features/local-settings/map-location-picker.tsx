@@ -39,10 +39,12 @@ function readAddress(feature?: GeocodeFeature) {
 export function MapLocationPicker({
   latitude,
   longitude,
+  defaultCenter,
   onLocationChange,
 }: {
   latitude: number | null
   longitude: number | null
+  defaultCenter?: { latitude: number; longitude: number }
   onLocationChange: (patch: LocationPatch) => void
 }) {
   const guard = useEditGuard()
@@ -133,8 +135,8 @@ export function MapLocationPicker({
         mapboxgl.accessToken = ACCESS_TOKEN
         mapboxRef.current = mapboxgl
 
-        const startLat = initial.current.latitude ?? DEFAULT_CENTER.latitude
-        const startLng = initial.current.longitude ?? DEFAULT_CENTER.longitude
+        const startLat = initial.current.latitude ?? defaultCenter?.latitude ?? DEFAULT_CENTER.latitude
+        const startLng = initial.current.longitude ?? defaultCenter?.longitude ?? DEFAULT_CENTER.longitude
         const hasPoint =
           typeof initial.current.latitude === 'number' && typeof initial.current.longitude === 'number'
 
@@ -184,7 +186,7 @@ export function MapLocationPicker({
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [placeMarker, reverseGeocode])
+  }, [defaultCenter?.latitude, defaultCenter?.longitude, placeMarker, reverseGeocode])
 
   async function handleSearch() {
     const value = query.trim()

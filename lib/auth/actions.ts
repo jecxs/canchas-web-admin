@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { resolveLocalDestination } from './access'
-import { ACTIVE_LOCAL_COOKIE, requireOwner } from './dal'
+import { ACTIVE_LOCAL_COOKIE, ACTIVE_LOCAL_COOKIE_OPTIONS, requireOwner } from './dal'
 
 export async function selectActiveLocalAction(localId: string) {
   const context = await requireOwner()
@@ -15,13 +15,22 @@ export async function selectActiveLocalAction(localId: string) {
   }
 
   const cookieStore = await cookies()
-  cookieStore.set(ACTIVE_LOCAL_COOKIE, local.id, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 60 * 60 * 24 * 365,
-  })
+  cookieStore.set(ACTIVE_LOCAL_COOKIE, local.id, ACTIVE_LOCAL_COOKIE_OPTIONS)
+
+  // Las sedes en revisión o rechazadas no deben sacar al dueño del panel:
+  // con varias sedes necesita poder volver a una operativa desde "Sedes".
+  if (local.estado === 'pendiente_aprobacion' || local.estado === 'rechazado') {
+    redirect('/panel/sedes')
+  }
+
+  // Un local ya aprobado y con suscripción activa necesita configuración, no
+  // volver a la pantalla de contratación.
+  if (
+    local.estado === 'aprobado_pendiente_pago'
+    && context.subscription?.estado_facturacion === 'activa'
+  ) {
+    redirect('/panel/configuracion')
+  }
 
   redirect(resolveLocalDestination(local))
 }

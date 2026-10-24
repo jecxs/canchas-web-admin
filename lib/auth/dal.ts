@@ -19,6 +19,14 @@ import {
 
 export const ACTIVE_LOCAL_COOKIE = 'grassly_active_local'
 
+export const ACTIVE_LOCAL_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: process.env.NODE_ENV === 'production',
+  path: '/',
+  maxAge: 60 * 60 * 24 * 365,
+}
+
 export const getAccessContext = cache(
   async (): Promise<AccessContext | null> => {
     const supabase = await createClient()
@@ -189,6 +197,12 @@ export async function requireOwnerLocal(states: readonly LocalState[]) {
 
   if (!local) {
     if (activeLocal) {
+      const hasAnotherOperationalLocal = context.locals.some(
+        (candidate) => candidate.id !== activeLocal.id && canOperateLocal(candidate, context.subscription),
+      )
+      if (hasAnotherOperationalLocal) {
+        redirect('/panel/sedes')
+      }
       redirect(resolveLocalDestination(activeLocal))
     }
 
@@ -208,7 +222,16 @@ export async function requireOperationalOwnerLocal() {
   }
 
   if (activeLocal) {
-    redirect(resolvePostLoginDestination(context))
+    // Si la sede guardada no es operativa pero otra sí lo es, no redirigimos a
+    // /panel (bucle). Llevamos al listado de sedes para que el dueño elija.
+    const hasAnotherOperationalLocal = context.locals.some(
+      (local) => local.id !== activeLocal.id && canOperateLocal(local, context.subscription),
+    )
+    if (hasAnotherOperationalLocal) {
+      redirect('/panel/sedes')
+    }
+
+    redirect(resolveLocalDestination(activeLocal))
   }
   redirect(resolvePostLoginDestination(context))
 }
