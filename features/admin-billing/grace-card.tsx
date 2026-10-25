@@ -3,7 +3,8 @@
 import { useActionState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { initialGraceState, setOwnerGraceAction } from './grace-action'
+import { setOwnerGraceAction } from './grace-action'
+import { initialGraceState } from './grace-state'
 
 export function GraceCard({ ownerId, currentDays, contractedDays }: {
   ownerId: string; currentDays: number | null; contractedDays: number

@@ -3,9 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { isSuperAdmin } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
-
-export type GraceState = { success: boolean; message: string }
-export const initialGraceState: GraceState = { success: false, message: '' }
+import type { GraceState } from './grace-state'
 
 export async function setOwnerGraceAction(_previous: GraceState, formData: FormData): Promise<GraceState> {
   if (!await isSuperAdmin()) return { success: false, message: 'No tienes permiso.' }

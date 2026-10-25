@@ -3,13 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { isSuperAdmin } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
-
-export type SubscriptionPriceState = {
-  success: boolean
-  message?: string
-}
-
-export const initialSubscriptionPriceState: SubscriptionPriceState = { success: false }
+import type { SubscriptionPriceState } from './action-state'
 
 function numberFrom(formData: FormData, key: string) {
   const raw = String(formData.get(key) ?? '').trim()
