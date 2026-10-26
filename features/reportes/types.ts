@@ -1,3 +1,5 @@
+import type { MercadoPagoTotals } from '../caja/mercadopago-settlements'
+
 export type ReportTab = 'financiero' | 'operativo' | 'auditoria'
 
 export type ReportGranularity = 'dia' | 'semana' | 'mes'
@@ -41,6 +43,7 @@ export type IncomeReport = {
     reservations: number
     averageTicket: number
   }
+  mercadoPago: MercadoPagoTotals
   kpis: {
     income: ReportKpi
     outstanding: ReportKpi
@@ -184,3 +187,4 @@ export type AuditReport = {
   extensionsByChargeStatus: AuditBreakdownItem[]
   incidents: AuditIncident[]
 }
+

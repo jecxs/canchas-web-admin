@@ -106,6 +106,15 @@ export function ReportesDashboard({ data }: { data: IncomeReport }) {
         </div>
       </section>
 
+      {data.mercadoPago.bruto > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-border px-4 py-3 text-sm">
+          <strong>Mercado Pago</strong>
+          <span>Bruto <b>{formatMoney(data.mercadoPago.bruto, 2)}</b></span>
+          <span>Deducciones <b>{data.mercadoPago.deducciones === null ? 'Pendiente' : `−${formatMoney(data.mercadoPago.deducciones, 2)}`}</b></span>
+          <span>Recibido <b>{data.mercadoPago.netoRecibido === null ? 'Pendiente' : formatMoney(data.mercadoPago.netoRecibido, 2)}</b></span>
+        </div>
+      ) : null}
+
       <section className="rp-block rp-panels">
         <div className="rp-panel">
           <h3 className="rp-h3">Cobrado por cancha</h3>

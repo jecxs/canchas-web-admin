@@ -83,6 +83,7 @@ export default async function AdminLocalConfigPage({
                 localId={local.id}
                 logo={editor.settings.logo}
                 photos={editor.photos}
+                courts={editor.courts.map((court) => ({ id: court.id, name: court.name }))}
                 allowVisibility
               />
             </EditGuard>

@@ -1,6 +1,9 @@
 import Link from 'next/link'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Download04Icon } from '@hugeicons/core-free-icons'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SubscriptionCheckoutCard } from '@/features/billing/subscription-checkout-card'
 import { SubscriptionSeatsCard } from '@/features/billing/subscription-seats-card'
@@ -79,7 +82,19 @@ export default async function SubscriptionPage() {
       ) : null}
 
       <Card>
-        <CardHeader><CardTitle>Historial de cobros</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle>Historial de cobros</CardTitle>
+            {subscription ? (
+              <Button asChild variant="outline" size="sm">
+                <a href="/panel/suscripcion/resumen" download title="Descargar resumen de suscripción en PDF">
+                  <HugeiconsIcon icon={Download04Icon} strokeWidth={2} />
+                  Descargar PDF
+                </a>
+              </Button>
+            ) : null}
+          </div>
+        </CardHeader>
         <CardContent>
           {invoices.length ? (
             <ul className="divide-y">

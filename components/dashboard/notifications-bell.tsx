@@ -148,10 +148,9 @@ export function NotificationsBell({
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
   const [nowMs, setNowMs] = useState(0)
   const [view, setView] = useState<'all' | 'unread'>('all')
-  const [scope, setScope] = useState<NotificationScope>(() => {
-    if (typeof window === 'undefined') return 'all'
-    return window.localStorage.getItem(NOTIFICATION_SCOPE_KEY) === 'active' ? 'active' : 'all'
-  })
+  // El primer render debe ser idéntico en servidor y cliente. La preferencia
+  // guardada se aplica después de la hidratación para evitar mismatches.
+  const [scope, setScope] = useState<NotificationScope>('all')
   const [hasMore, setHasMore] = useState(initialNotifications.length === 20)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   // Evita repetir un aviso si Realtime y la reconciliación detectan la misma fila.
@@ -185,6 +184,14 @@ export function NotificationsBell({
     () => view === 'unread' ? scopedItems.filter((item) => !item.readAt) : scopedItems,
     [scopedItems, view],
   )
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(NOTIFICATION_SCOPE_KEY)
+    if (stored !== 'active') return
+
+    const frame = window.requestAnimationFrame(() => setScope('active'))
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
 
   function changeScope(next: NotificationScope) {
     setScope(next)

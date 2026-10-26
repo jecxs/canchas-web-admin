@@ -3709,6 +3709,10 @@ export type Database = {
         Args: { p_local_id: string; p_storage_path: string }
         Returns: string
       }
+      registrar_foto_cancha_local: {
+        Args: { p_cancha_id: string; p_local_id: string; p_storage_path: string }
+        Returns: string
+      }
       registrar_movimiento_pago_reserva_dueno: {
         Args: {
           p_medio?: string

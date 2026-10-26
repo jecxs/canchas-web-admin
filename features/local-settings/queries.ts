@@ -2,7 +2,7 @@ import 'server-only'
 
 import { requireConfigurableOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
-import type { BenefitCatalogItem, LocalBenefit, LocalPhoto, LocalSettings, ScheduleRow } from './types'
+import type { BenefitCatalogItem, LocalBenefit, LocalPhoto, LocalSettings, PhotoCourtOption, ScheduleRow } from './types'
 import type { LocalPaymentMethod, PaymentMethodType } from '@/features/payments/types'
 
 function parseMinimumAdvancePercentage(value: unknown) {
@@ -13,7 +13,7 @@ function parseMinimumAdvancePercentage(value: unknown) {
 export async function getLocalSettings() {
   const { context, local } = await requireConfigurableOwnerLocal()
   const supabase = await createClient()
-  const [{ data: settings, error: settingsError }, { data: schedules, error: schedulesError }, { data: photos, error: photosError }, { data: benefitCatalog, error: benefitCatalogError }, { data: benefits, error: benefitsError }, { data: paymentMethods, error: paymentMethodsError }, { data: minimumAdvancePercentage, error: minimumAdvancePercentageError }] = await Promise.all([
+  const [{ data: settings, error: settingsError }, { data: schedules, error: schedulesError }, { data: photos, error: photosError }, { data: courts, error: courtsError }, { data: benefitCatalog, error: benefitCatalogError }, { data: benefits, error: benefitsError }, { data: paymentMethods, error: paymentMethodsError }, { data: minimumAdvancePercentage, error: minimumAdvancePercentageError }] = await Promise.all([
     supabase
       .from('locales')
       .select('id,nombre,descripcion,ruc,telefono_contacto_principal,telefono_contacto_secundario,direccion,latitud,longitud,porcentaje_adelanto,medios_pago_adelanto,politica_reembolso,logo,publicado')
@@ -26,9 +26,14 @@ export async function getLocalSettings() {
       .order('dia_semana'),
     supabase
       .from('fotos')
-      .select('id,storage_path,orden')
+      .select('id,storage_path,orden,cancha_id,oculta')
       .eq('local_id', local.id)
       .order('orden'),
+    supabase
+      .from('canchas')
+      .select('id,nombre')
+      .eq('local_id', local.id)
+      .order('created_at'),
     supabase
       .from('beneficios_catalogo')
       .select('id,slug,nombre,categoria,icon_key,orden')
@@ -48,8 +53,8 @@ export async function getLocalSettings() {
   ])
 
   const parsedMinimumAdvancePercentage = parseMinimumAdvancePercentage(minimumAdvancePercentage)
-  if (settingsError || schedulesError || photosError || benefitCatalogError || benefitsError || paymentMethodsError || minimumAdvancePercentageError || !settings || parsedMinimumAdvancePercentage === null) {
-    console.error('[local-settings:read]', { code: settingsError?.code ?? schedulesError?.code ?? photosError?.code ?? benefitCatalogError?.code ?? benefitsError?.code ?? paymentMethodsError?.code ?? minimumAdvancePercentageError?.code })
+  if (settingsError || schedulesError || photosError || courtsError || benefitCatalogError || benefitsError || paymentMethodsError || minimumAdvancePercentageError || !settings || parsedMinimumAdvancePercentage === null) {
+    console.error('[local-settings:read]', { code: settingsError?.code ?? schedulesError?.code ?? photosError?.code ?? courtsError?.code ?? benefitCatalogError?.code ?? benefitsError?.code ?? paymentMethodsError?.code ?? minimumAdvancePercentageError?.code })
     throw new Error('No se pudo cargar la configuración del local.')
   }
 
@@ -59,6 +64,7 @@ export async function getLocalSettings() {
     settings: settings as LocalSettings,
     schedules: (schedules ?? []) as ScheduleRow[],
     photos: (photos ?? []) as LocalPhoto[],
+    photoCourts: (courts ?? []).map((court) => ({ id: court.id, name: court.nombre })) as PhotoCourtOption[],
     benefitCatalog: (benefitCatalog ?? []) as BenefitCatalogItem[],
     benefits: (benefits ?? []) as LocalBenefit[],
     paymentMethods: (paymentMethods ?? []).map((method): LocalPaymentMethod => ({

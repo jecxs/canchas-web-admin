@@ -60,6 +60,16 @@ export const ownerDataNavigationItem: DashboardNavigationItem = {
   icon: Download04Icon,
 }
 
+export function getDashboardNavigation(role: DashboardRole, localsCount: number) {
+  const navigation = dashboardNavigation[role]
+
+  // La vista de sedes solo aporta valor cuando hay más de una. Con una sola
+  // sede, el dueño ya está dentro de ella y el acceso sería redundante.
+  return role === 'owner' && localsCount <= 1
+    ? navigation.filter((item) => item.href !== '/panel/sedes')
+    : navigation
+}
+
 export function isNavigationItemActive(
   pathname: string,
   item: DashboardNavigationItem,

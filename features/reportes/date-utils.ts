@@ -114,6 +114,9 @@ export function formatMethodLabel(raw: string | null | undefined) {
       return 'Efectivo'
     case 'comprobante':
       return 'Comprobante'
+    case 'mercadopago':
+    case 'mercado pago':
+      return 'Mercado Pago'
     case 'otro':
       return 'Otro'
     case '':

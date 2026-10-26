@@ -10,7 +10,7 @@ import { ScheduleSettingsForm } from '@/features/local-settings/schedule-setting
 import { SettingsSectionNav } from '@/features/local-settings/settings-section-nav'
 
 export default async function OwnerSettingsPage() {
-  const { local, settings, schedules, photos, benefitCatalog, benefits, paymentMethods, minimumAdvancePercentage } = await getLocalSettings()
+  const { local, settings, schedules, photos, photoCourts, benefitCatalog, benefits, paymentMethods, minimumAdvancePercentage } = await getLocalSettings()
   const needsInitialLocation = local.estado === 'aprobado_pendiente_pago'
 
   return (
@@ -37,7 +37,7 @@ export default async function OwnerSettingsPage() {
             </Alert>
           ) : (
             <>
-              <LocalMediaManager localId={settings.id} logo={settings.logo} photos={photos} />
+              <LocalMediaManager localId={settings.id} logo={settings.logo} photos={photos} courts={photoCourts} />
               <ScheduleSettingsForm localId={settings.id} schedules={schedules} />
               <BenefitsSettingsForm localId={settings.id} catalog={benefitCatalog} benefits={benefits} />
               <CommercialSettingsForm settings={settings} paymentMethods={paymentMethods} minimumAdvancePercentage={minimumAdvancePercentage} />

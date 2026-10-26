@@ -156,7 +156,7 @@ export function ClientPicker({ localId, state, onBlockedChange, initial = null }
           <PopoverAnchor asChild>
             <div className="relative"><HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => { setQuery(event.target.value); setResultsOpen(true) }} onFocus={() => setResultsOpen(true)} placeholder="Busca por nombre o celular" className="pl-10" /></div>
           </PopoverAnchor>
-          <PopoverContent align="start" side="bottom" className="w-[var(--radix-popover-trigger-width)] min-w-72 p-1.5">
+          <PopoverContent align="start" side="bottom" onOpenAutoFocus={(event) => event.preventDefault()} className="w-[var(--radix-popover-trigger-width)] min-w-72 p-1.5">
             <p className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[.12em] text-muted-foreground">{query.trim() ? 'Resultados' : 'Últimos clientes'}</p>
             <div className="max-h-64 space-y-1 overflow-y-auto">
               {loading ? <p className="px-2.5 py-3 text-xs text-muted-foreground">Buscando clientes…</p> : results.length ? results.map((option) => (
