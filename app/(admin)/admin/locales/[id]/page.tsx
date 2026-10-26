@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { localStatePresentation } from '@/components/dashboard/status'
 import { LocalLogo } from '@/components/dashboard/entity-media'
-import { LocalModerationPanel } from '@/features/admin-locales/local-moderation-panel'
+import { LocalModerationPanel, LocalModerationSection } from '@/features/admin-locales/local-moderation-panel'
 import { AdminLocalChecklist } from '@/features/admin-locales/admin-local-checklist'
 import { AdminLocalCourts } from '@/features/admin-locales/admin-local-courts'
 import { LockSection } from '@/components/dashboard/edit-guard'
@@ -93,6 +93,8 @@ const auditActionLabels: Record<string, string> = {
   trial_local_otorgado: 'Periodo de prueba otorgado',
   local_publicado: 'Local publicado en la app',
   local_despublicado: 'Local retirado del catálogo',
+  moderacion_aplicada: 'Medida administrativa aplicada',
+  moderacion_levantada: 'Medida administrativa levantada',
 }
 
 function formatDate(value: string, withTime = false) {
@@ -124,7 +126,7 @@ export default async function AdminLocalDetailPage({
   return (
     <div className="mx-auto w-full max-w-6xl">
       <SetBreadcrumb label={local.name} />
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="eyebrow">Ficha del local</p>
@@ -149,6 +151,14 @@ export default async function AdminLocalDetailPage({
         </div>
 
         {ownerCard ? <OwnerCard owner={ownerCard} /> : null}
+      </div>
+
+      <div className="mt-6">
+        <LocalModerationSection
+          localId={local.id}
+          state={local.state}
+          moderation={local.moderation}
+        />
       </div>
 
       {local.rejectionReason ? (

@@ -14,6 +14,7 @@ export type CourtItem = {
   surface: string | null
   active: boolean
   sports: CourtSport[]
+  photos?: { id: string; storagePath: string }[]
 }
 
 export type CourtActionState = SettingsActionState

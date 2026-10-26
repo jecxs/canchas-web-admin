@@ -64,7 +64,7 @@ export const scheduleSettingsSchema = z.object({
   schedules: z.array(z.object({
     dia: z.number().int().min(0).max(6),
     apertura: z.string().regex(/^(0\d|1\d|2[0-3]):00$/, 'Usa horas completas.'),
-    cierre: z.string().regex(/^(0\d|1\d|2[0-3]):00$/, 'Usa horas completas.'),
+    cierre: z.string().regex(/^(0\d|1\d|2[0-3]):00$|^23:30$/, 'El cierre puede ser a la hora o a las 23:30.'),
   }).refine((item) => item.cierre > item.apertura, {
     path: ['cierre'],
     message: 'La hora de cierre debe ser posterior a la apertura.',

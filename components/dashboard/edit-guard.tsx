@@ -275,7 +275,7 @@ export function EditGuard({ title, children }: { title?: string; children: React
   return (
     <GuardContext.Provider value={value}>
       <div ref={containerRef} key={formKey}>
-        <fieldset disabled={!editing} className="contents">
+        <fieldset disabled={!editing} className={cn('contents', !editing && 'cursor-not-allowed')}>
           {children}
         </fieldset>
       </div>
@@ -351,8 +351,8 @@ export function LockSection({ children }: { children: ReactNode }) {
   }
 
   return (
-    <GuardContext.Provider value={value}>
-      <fieldset disabled={!editing} className="contents">
+      <GuardContext.Provider value={value}>
+      <fieldset disabled={!editing} className={cn('contents', !editing && 'cursor-not-allowed')}>
         {children}
       </fieldset>
     </GuardContext.Provider>

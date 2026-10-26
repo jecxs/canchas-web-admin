@@ -2,9 +2,11 @@ import type { IconSvgElement } from '@hugeicons/react'
 import {
   Building03Icon,
   Calendar03Icon,
+  Cashier02Icon,
   ChartLineData01Icon,
   CreditCardIcon,
   DashboardSquare01Icon,
+  Download04Icon,
   Invoice03Icon,
   Money03Icon,
   Settings02Icon,
@@ -23,13 +25,16 @@ export type DashboardNavigationItem = {
 
 const ownerNavigation = [
   { title: 'Resumen', href: '/panel', icon: DashboardSquare01Icon, exact: true },
+  { title: 'Sedes', href: '/panel/sedes', icon: Store01Icon },
   { title: 'Agenda', href: '/panel/agenda', icon: Calendar03Icon },
   { title: 'Reservas', href: '/panel/reservas', icon: Invoice03Icon },
   { title: 'Canchas', href: '/panel/canchas', icon: Building03Icon },
   { title: 'Tarifas', href: '/panel/tarifas', icon: Money03Icon },
   { title: 'Clientes', href: '/panel/clientes', icon: UserGroupIcon },
+  { title: 'Caja', href: '/panel/caja', icon: Cashier02Icon },
   { title: 'Reportes', href: '/panel/reportes', icon: ChartLineData01Icon },
   { title: 'Configuración', href: '/panel/configuracion', icon: Settings02Icon },
+  { title: 'Facturación', href: '/panel/suscripcion', icon: CreditCardIcon },
 ] satisfies DashboardNavigationItem[]
 
 const adminNavigation = [
@@ -46,6 +51,24 @@ export const dashboardNavigation = {
   owner: ownerNavigation,
   admin: adminNavigation,
 } satisfies Record<DashboardRole, DashboardNavigationItem[]>
+
+// Módulo de respaldo visible solo cuando el panel operativo está restringido
+// (moderación o facturación), para que el dueño no pierda acceso a sus datos.
+export const ownerDataNavigationItem: DashboardNavigationItem = {
+  title: 'Mis datos',
+  href: '/panel/mis-datos',
+  icon: Download04Icon,
+}
+
+export function getDashboardNavigation(role: DashboardRole, localsCount: number) {
+  const navigation = dashboardNavigation[role]
+
+  // La vista de sedes solo aporta valor cuando hay más de una. Con una sola
+  // sede, el dueño ya está dentro de ella y el acceso sería redundante.
+  return role === 'owner' && localsCount <= 1
+    ? navigation.filter((item) => item.href !== '/panel/sedes')
+    : navigation
+}
 
 export function isNavigationItemActive(
   pathname: string,
@@ -65,6 +88,8 @@ export function getDashboardPageLabel(pathname: string, role: DashboardRole) {
   if (pathname.endsWith('/perfil')) return 'Mi perfil'
   if (pathname.endsWith('/ayuda')) return 'Ayuda'
   if (pathname.endsWith('/suscripcion')) return 'Suscripción'
+  if (pathname.endsWith('/mis-datos')) return 'Mis datos'
+  if (pathname.endsWith('/estado-local')) return 'Estado del local'
   if (pathname.endsWith('/suspendido')) return 'Acceso suspendido'
   if (pathname.endsWith('/sin-local')) return 'Sin local'
 
@@ -86,6 +111,7 @@ const entityFallbackLabels: Record<string, string> = {
 
 const subPageLabels: Record<string, string> = {
   configuracion: 'Configuración',
+  nueva: 'Nueva sede',
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

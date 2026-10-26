@@ -3,7 +3,7 @@
 import 'server-only'
 
 import { revalidatePath } from 'next/cache'
-import { authorizeLocalWrite, getAccessContext } from '@/lib/auth/dal'
+import { authorizeLocalConfiguration, authorizeLocalWrite, getAccessContext } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { getMinimumAdvanceValidationMessage } from './advance-policy'
 import {
@@ -43,6 +43,9 @@ function databaseFailure(error: { code?: string } | null, scope: string): Settin
 function saved(localId: string): SettingsActionState {
   revalidatePath('/panel')
   revalidatePath('/panel/configuracion')
+  // El aviso de adelanto vive en el layout del panel; sin revalidarlo, el
+  // bloqueo seguiría visible después de corregir el porcentaje.
+  revalidatePath('/panel', 'layout')
   revalidatePath('/admin/locales')
   revalidatePath(`/admin/locales/${localId}`)
   return { success: true, message: messages.saved }
@@ -65,7 +68,7 @@ export async function saveGeneralSettingsAction(
   }
   const validation = generalSettingsSchema.safeParse(raw)
   if (!validation.success) return validationFailure(validation.error)
-  if (!await authorizeLocalWrite(validation.data.localId)) return { success: false, message: messages.denied }
+  if (!await authorizeLocalConfiguration(validation.data.localId)) return { success: false, message: messages.denied }
 
   const supabase = await createClient()
   const { error } = await supabase.rpc('actualizar_datos_generales_local', {

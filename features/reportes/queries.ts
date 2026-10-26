@@ -3,6 +3,7 @@ import 'server-only'
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import type { Enums } from '@/types/database.types'
+import { getMercadoPagoSettlements, summarizeMercadoPago } from '../caja/mercadopago-settlements'
 import {
   defaultRange,
   formatMethodLabel,
@@ -165,6 +166,7 @@ export async function getIncomeReport(input: {
     end,
     today,
     totals: { income: 0, outstanding: 0, reservations: 0, averageTicket: 0 },
+    mercadoPago: { bruto: 0, deducciones: 0, netoRecibido: 0, pendientes: 0 },
     kpis: {
       income: computeKpi(0, 0, true),
       outstanding: computeKpi(0, 0, false),
@@ -202,6 +204,7 @@ export async function getIncomeReport(input: {
     { data: movementRows, error: movementsError },
     rows,
     { data: extensionRows, error: extensionsError },
+    settlements,
   ] = await Promise.all([
     reader.rpc('obtener_cobros_reporte_local', {
       p_local_id: local.id,
@@ -215,6 +218,7 @@ export async function getIncomeReport(input: {
       .in('reservas.cancha_id', courtIds)
       .gte('created_at', prevStartIso)
       .lte('created_at', endIso),
+    getMercadoPagoSettlements(supabase, local.id, start, end),
   ])
 
   if (movementsError) {
@@ -291,6 +295,18 @@ export async function getIncomeReport(input: {
   const methodCash = new Map<string, CountTotals>()
   let collected = 0
   let collectedPrev = 0
+
+  const mercadoPago = summarizeMercadoPago(
+    movements
+      .filter((movement) => !refundedIds.has(movement.reserva_id) && movement.fecha >= start && movement.fecha <= end)
+      .map((movement) => ({
+        movimiento_id: movement.movimiento_id,
+        monto: movement.amount,
+        medio: movement.method,
+        tipo: movement.tipo,
+      })),
+    settlements,
+  )
 
   for (const movement of movements) {
     if (refundedIds.has(movement.reserva_id)) continue
@@ -406,6 +422,7 @@ export async function getIncomeReport(input: {
 
   return {
     ...base,
+    mercadoPago,
     totals: {
       income: collected,
       outstanding,

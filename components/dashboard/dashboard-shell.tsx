@@ -23,7 +23,7 @@ export async function DashboardShell({
       defaultOpen={defaultOpen}
       className={role === 'admin' ? 'theme-admin' : undefined}
     >
-      <AppSidebar role={role} activeLocal={activeLocal} subscription={subscription} />
+      <AppSidebar role={role} localsCount={locals.length} activeLocal={activeLocal} subscription={subscription} />
       <SidebarInset className="h-svh min-h-0 overflow-hidden bg-background md:h-[calc(100svh-1rem)] md:rounded-2xl">
         <DashboardHeader role={role} user={user} locals={locals} activeLocal={activeLocal} initialNotifications={notifications} />
         <DashboardContent>{children}</DashboardContent>

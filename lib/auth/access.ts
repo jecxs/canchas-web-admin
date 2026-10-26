@@ -12,7 +12,17 @@ export type SubscriptionSummary = Pick<
   | 'fecha_proximo_cobro'
   | 'monto'
   | 'sedes_extra_contratadas'
+  | 'estado_facturacion'
+  | 'gracia_hasta'
 >
+
+export type LocalModeration = {
+  id: string
+  type: 'advertencia' | 'pausa_reservas' | 'suspension_temporal' | 'retiro_definitivo'
+  reason: string
+  startsAt: string
+  endsAt: string | null
+}
 
 export type LocalSummary = Pick<
   Tables<'locales'>,
@@ -25,8 +35,12 @@ export type LocalSummary = Pick<
   | 'motivo_rechazo'
   | 'publicado'
   | 'publicado_at'
+  | 'porcentaje_adelanto'
   | 'created_at'
->
+  | 'suspendido_por_facturacion'
+> & {
+  moderation?: LocalModeration | null
+}
 
 export type LocalState = Enums<'estado_local'>
 
@@ -41,7 +55,9 @@ export type AccessContext = {
 export type AppDestination =
   | '/admin'
   | '/panel'
+  | '/panel/configuracion'
   | '/panel/suscripcion'
+  | '/panel/estado-local'
   | '/panel/suspendido'
   | '/panel/sin-local'
   | '/estado-solicitud'
@@ -55,6 +71,58 @@ export const OPERATIONAL_LOCAL_STATES = [
 
 export function isOperationalLocalState(state: LocalState) {
   return (OPERATIONAL_LOCAL_STATES as readonly LocalState[]).includes(state)
+}
+
+// Un local aprobado que puede contratar Billing. Incluye estados heredados
+// (trial/activo/en_gracia) que quedaron sin suscripción tras activar el cobro.
+export const SUBSCRIBABLE_LOCAL_STATES = [
+  'aprobado_pendiente_pago',
+  'trial',
+  'activo',
+  'en_gracia',
+] as const satisfies readonly LocalState[]
+
+export function isSubscribableLocalState(state: LocalState) {
+  return (SUBSCRIBABLE_LOCAL_STATES as readonly LocalState[]).includes(state)
+}
+
+export function hasActiveSubscription(
+  subscription: SubscriptionSummary | null | undefined,
+) {
+  return subscription?.estado_facturacion === 'activa'
+}
+
+export function moderationBlocksOperation(moderation: LocalModeration | null | undefined) {
+  return moderation?.type === 'suspension_temporal' || moderation?.type === 'retiro_definitivo'
+}
+
+export function canOperateLocal(
+  local: LocalSummary,
+  subscription: SubscriptionSummary | null,
+) {
+  if (moderationBlocksOperation(local.moderation)) return false
+  if (local.estado === 'trial') {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date())
+    const part = (type: string) => parts.find((item) => item.type === type)?.value ?? ''
+    const today = `${part('year')}-${part('month')}-${part('day')}`
+    return Boolean(local.fecha_fin_trial && local.fecha_fin_trial >= today)
+  }
+  if (local.estado !== 'activo' && local.estado !== 'en_gracia') return false
+  if (subscription?.estado_facturacion === 'activa') return true
+  return subscription?.estado_facturacion === 'en_gracia'
+    && Boolean(subscription.gracia_hasta && Date.parse(subscription.gracia_hasta) > Date.now())
+}
+
+export function canConfigurePaidPendingLocal(
+  context: AccessContext,
+  local: LocalSummary | null | undefined,
+) {
+  return (
+    local?.estado === 'aprobado_pendiente_pago' &&
+    hasActiveSubscription(context.subscription)
+  )
 }
 
 export function findLocalWithState(
@@ -77,13 +145,17 @@ export function resolveActiveLocal(
   }
 
   return (
-    locals.find((local) => isOperationalLocalState(local.estado)) ??
+    locals.find((local) => isOperationalLocalState(local.estado) && !moderationBlocksOperation(local.moderation)) ??
     locals[0] ??
     null
   )
 }
 
-export function resolveLocalDestination(state: LocalState): AppDestination {
+export function resolveLocalDestination(localOrState: LocalSummary | LocalState): AppDestination {
+  if (typeof localOrState !== 'string' && moderationBlocksOperation(localOrState.moderation)) {
+    return '/panel/suspendido'
+  }
+  const state = typeof localOrState === 'string' ? localOrState : localOrState.estado
   if (isOperationalLocalState(state)) {
     return '/panel'
   }
@@ -107,8 +179,23 @@ export function resolvePostLoginDestination(
   }
 
   if (context.profile.rol === 'dueno') {
-    if (findLocalWithState(context, OPERATIONAL_LOCAL_STATES)) {
+    if (context.locals.some((local) => canOperateLocal(local, context.subscription))) {
       return '/panel'
+    }
+
+    if (context.locals.some((local) => moderationBlocksOperation(local.moderation))) {
+      return '/panel/suspendido'
+    }
+
+    if (findLocalWithState(context, OPERATIONAL_LOCAL_STATES)) {
+      return '/panel/suscripcion'
+    }
+
+    if (
+      hasActiveSubscription(context.subscription) &&
+      findLocalWithState(context, ['aprobado_pendiente_pago'])
+    ) {
+      return '/panel/configuracion'
     }
 
     if (findLocalWithState(context, ['aprobado_pendiente_pago'])) {

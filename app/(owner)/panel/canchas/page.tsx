@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CourtEditor } from '@/features/courts/court-editor'
 import { getCourtsConfiguration } from '@/features/courts/queries'
 import { CourtStatusAction } from '@/features/courts/court-status-action'
+import { CourtPhotoManager } from '@/features/courts/court-photo-manager'
 import { SportIcon } from '@/features/courts/sport-icon'
 
 export default async function OwnerCourtsPage() {
-  const { local, courts, sports } = await getCourtsConfiguration()
+  const { local, courts, sports, photoCount } = await getCourtsConfiguration()
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -54,6 +55,7 @@ export default async function OwnerCourtsPage() {
                       </div>
                     ))}
                   </div>
+                  <CourtPhotoManager localId={local.id} court={court} photoCount={photoCount} />
                   <div className="mt-5 flex flex-wrap gap-2 border-t pt-5"><CourtEditor localId={local.id} sports={sports} court={court} /><CourtStatusAction localId={local.id} courtId={court.id} active={court.active} courtName={court.name} /></div>
                 </CardContent>
               </Card>

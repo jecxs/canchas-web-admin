@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { GuardActions } from '@/components/dashboard/edit-guard'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { saveGeneralSettingsAction } from './actions'
 import { useSettingsFormFeedback } from './form-feedback'
+import { MapLocationPicker, type LocationPatch } from './map-location-picker'
 import { initialSettingsActionState, type LocalSettings } from './types'
 
 function errors(messages?: string[]) {
@@ -17,6 +18,16 @@ function errors(messages?: string[]) {
 export function GeneralSettingsForm({ settings }: { settings: LocalSettings }) {
   const [state, action, pending] = useActionState(saveGeneralSettingsAction, initialSettingsActionState)
   useSettingsFormFeedback(state)
+
+  const [address, setAddress] = useState(settings.direccion)
+  const [latitude, setLatitude] = useState<number | null>(settings.latitud)
+  const [longitude, setLongitude] = useState<number | null>(settings.longitud)
+
+  function handleLocationChange(patch: LocationPatch) {
+    if (typeof patch.latitude === 'number') setLatitude(patch.latitude)
+    if (typeof patch.longitude === 'number') setLongitude(patch.longitude)
+    if (typeof patch.address === 'string') setAddress(patch.address)
+  }
 
   return (
     <Card id="datos-generales" className="scroll-mt-24">
@@ -60,19 +71,24 @@ export function GeneralSettingsForm({ settings }: { settings: LocalSettings }) {
             </div>
             <Field data-invalid={Boolean(state.fieldErrors?.address)}>
               <FieldLabel htmlFor="address">Dirección</FieldLabel>
-              <Input id="address" name="address" defaultValue={settings.direccion} maxLength={250} required />
+              <Input id="address" name="address" value={address} onChange={(event) => setAddress(event.target.value)} maxLength={250} required />
+              <FieldDescription>Se completa automáticamente al elegir la zona en el mapa; puedes ajustarla si hace falta.</FieldDescription>
               <FieldError errors={errors(state.fieldErrors?.address)} />
+            </Field>
+            <Field>
+              <FieldLabel>Ubicación en el mapa</FieldLabel>
+              <MapLocationPicker latitude={latitude} longitude={longitude} onLocationChange={handleLocationChange} />
+              <FieldDescription>Mueve el pin sobre la puerta del local para fijar las coordenadas exactas.</FieldDescription>
             </Field>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field data-invalid={Boolean(state.fieldErrors?.latitude)}>
                 <FieldLabel htmlFor="latitude">Latitud</FieldLabel>
-                <Input id="latitude" name="latitude" type="number" step="any" min={-90} max={90} defaultValue={settings.latitud ?? ''} required placeholder="-13.1631" />
-                <FieldDescription>Valor decimal; el selector con mapa se añadirá después.</FieldDescription>
+                <Input id="latitude" name="latitude" value={latitude ?? ''} readOnly tabIndex={-1} aria-readonly className="bg-muted/40" />
                 <FieldError errors={errors(state.fieldErrors?.latitude)} />
               </Field>
               <Field data-invalid={Boolean(state.fieldErrors?.longitude)}>
                 <FieldLabel htmlFor="longitude">Longitud</FieldLabel>
-                <Input id="longitude" name="longitude" type="number" step="any" min={-180} max={180} defaultValue={settings.longitud ?? ''} required placeholder="-74.2236" />
+                <Input id="longitude" name="longitude" value={longitude ?? ''} readOnly tabIndex={-1} aria-readonly className="bg-muted/40" />
                 <FieldError errors={errors(state.fieldErrors?.longitude)} />
               </Field>
             </div>

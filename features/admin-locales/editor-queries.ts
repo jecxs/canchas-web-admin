@@ -55,7 +55,7 @@ export async function getAdminLocalEditor(localId: string): Promise<AdminLocalEd
       .order('dia_semana'),
     supabase
       .from('fotos')
-      .select('id,storage_path,orden,oculta')
+      .select('id,storage_path,orden,oculta,cancha_id')
       .eq('local_id', localId)
       .order('orden'),
     supabase

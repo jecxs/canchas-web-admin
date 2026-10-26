@@ -42,7 +42,7 @@ export type AdminOwnerPayment = {
   id: string
   status: string
   amount: number
-  paidAt: string
+  paidAt: string | null
   reference: string | null
 }
 
@@ -52,6 +52,9 @@ export type AdminOwnerSubscription = {
   amount: number
   nextChargeAt: string | null
   extraSedes: number
+  graceDays: number
+  graceOverrideDays: number | null
+  graceUntil: string | null
   payments: AdminOwnerPayment[]
 }
 

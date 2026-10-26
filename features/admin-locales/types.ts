@@ -107,6 +107,21 @@ export type AdminLocalSubscription = {
   payments: AdminLocalPayment[]
 }
 
+export type LocalModerationType =
+  | 'advertencia'
+  | 'pausa_reservas'
+  | 'suspension_temporal'
+  | 'retiro_definitivo'
+
+export type AdminLocalModeration = {
+  id: string
+  type: LocalModerationType
+  reason: string
+  startsAt: string
+  endsAt: string | null
+  createdAt: string
+}
+
 export type AdminLocalDetail = {
   id: string
   name: string
@@ -143,6 +158,7 @@ export type AdminLocalDetail = {
   photos: AdminLocalPhoto[]
   benefits: AdminLocalBenefit[]
   subscription: AdminLocalSubscription | null
+  moderation: AdminLocalModeration | null
   checklist: PublicationChecklist | null
   reviews: AdminLocalReview[]
 }

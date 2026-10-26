@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { cn } from '@/lib/utils'
 
 const sections = [
@@ -19,6 +19,7 @@ export function SettingsSectionNav({ courtsHref = '/panel/canchas' }: { courtsHr
   const [activeSection, setActiveSection] = useState<SectionId>('datos-generales')
 
   useEffect(() => {
+    const scrollRoot = document.querySelector<HTMLElement>('[data-slot="dashboard-content"]')
     const elements = sections
       .map(({ id }) => document.getElementById(id))
       .filter((element): element is HTMLElement => element !== null)
@@ -33,12 +34,27 @@ export function SettingsSectionNav({ courtsHref = '/panel/canchas' }: { courtsHr
           setActiveSection(visibleEntry.target.id as SectionId)
         }
       },
-      { rootMargin: '-80px 0px -65% 0px', threshold: 0 },
+      { root: scrollRoot, rootMargin: '-24px 0px -65% 0px', threshold: 0 },
     )
 
     elements.forEach((element) => observer.observe(element))
     return () => observer.disconnect()
   }, [])
+
+  function scrollToSection(event: MouseEvent<HTMLAnchorElement>, id: SectionId) {
+    event.preventDefault()
+    const target = document.getElementById(id)
+    const scrollRoot = document.querySelector<HTMLElement>('[data-slot="dashboard-content"]')
+    if (!target || !scrollRoot) return
+
+    const top = scrollRoot.scrollTop
+      + target.getBoundingClientRect().top
+      - scrollRoot.getBoundingClientRect().top
+      - 24
+    scrollRoot.scrollTo({ top, behavior: 'smooth' })
+    window.history.replaceState(null, '', `#${id}`)
+    setActiveSection(id)
+  }
 
   return (
     <nav
@@ -53,7 +69,7 @@ export function SettingsSectionNav({ courtsHref = '/panel/canchas' }: { courtsHr
             key={id}
             href={`#${id}`}
             aria-current={isActive ? 'location' : undefined}
-            onClick={() => setActiveSection(id)}
+            onClick={(event) => scrollToSection(event, id)}
             className={cn(
               'shrink-0 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors lg:block',
               isActive

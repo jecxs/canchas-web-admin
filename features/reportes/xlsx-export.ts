@@ -1,6 +1,7 @@
 import 'server-only'
 
 import ExcelJS from 'exceljs'
+import { getMercadoPagoSettlements } from '../caja/mercadopago-settlements'
 import { createClient } from '@/utils/supabase/server'
 import { formatMethodLabel, parseRange, shiftDate } from './date-utils'
 import { getOperativeReport } from './operative-queries'
@@ -37,7 +38,7 @@ type Column = {
 
 type Kpi = {
   label: string
-  value: number
+  value: number | string
   previous?: number
   changePct?: number | null
   format: string
@@ -158,7 +159,7 @@ function addSummarySheet(
       kpi.previous ?? null,
       kpi.changePct === undefined || kpi.changePct === null ? null : kpi.changePct / 100,
     ])
-    row.getCell(2).numFmt = kpi.format
+    if (typeof kpi.value === 'number') row.getCell(2).numFmt = kpi.format
     if (kpi.previous !== undefined) row.getCell(3).numFmt = kpi.format
     if (kpi.changePct !== undefined) row.getCell(4).numFmt = PERCENT_FORMAT
   }
@@ -230,6 +231,7 @@ async function fetchIncomeDetail(localId: string, start: string, end: string) {
   ])
   const courtNames = new Map((courtsResult.data ?? []).map((court) => [court.id, court.nombre]))
   const sportNames = new Map((sportsResult.data ?? []).map((sport) => [sport.id, sport.nombre]))
+  const settlements = await getMercadoPagoSettlements(supabase, localId, start, end)
 
   return rows.map<CellValue[]>((row) => [
     toDate(row.fecha),
@@ -239,6 +241,8 @@ async function fetchIncomeDetail(localId: string, start: string, end: string) {
     row.tipo,
     formatMethodLabel(row.medio),
     Number(row.monto) || 0,
+    settlements.get(row.movimiento_id)?.deducciones ?? null,
+    settlements.get(row.movimiento_id)?.netoRecibido ?? null,
     row.notas ?? '',
   ])
 }
@@ -313,6 +317,7 @@ async function fetchOperativeDetail(localId: string, start: string, end: string)
 
 const FINANCIAL_DEFINITIONS = [
   'Ingresos cobrados: movimientos de caja (adelanto + saldo − reembolso) agrupados por fecha de pago dentro del rango.',
+  'Mercado Pago: bruto pagado por el cliente, deducciones y recibido informado por el proveedor.',
   'Cancelaciones: si una reserva confirmada se cancela con devolución aprobada, sus cobros no se cuentan como ingreso.',
   'Saldos por cobrar: reservas confirmadas o completadas del rango menos el cobrado acumulado de cada reserva.',
   'Reservas: reservas en estado confirmada o completada, agrupadas por su fecha de inicio.',
@@ -393,6 +398,9 @@ export async function buildIncomeWorkbook(input: ExportInput) {
       ],
       [
         { label: 'Ingresos cobrados', value: report.kpis.income.value, previous: report.kpis.income.previous, changePct: report.kpis.income.changePct, format: MONEY_FORMAT },
+        { label: 'Mercado Pago · bruto', value: report.mercadoPago.bruto, format: MONEY_FORMAT },
+        { label: 'Mercado Pago · deducciones', value: report.mercadoPago.deducciones ?? 'Pendiente', format: MONEY_FORMAT },
+        { label: 'Mercado Pago · recibido', value: report.mercadoPago.netoRecibido ?? 'Pendiente', format: MONEY_FORMAT },
         { label: 'Saldos por cobrar', value: report.kpis.outstanding.value, previous: report.kpis.outstanding.previous, changePct: report.kpis.outstanding.changePct, format: MONEY_FORMAT },
         { label: 'Reservas', value: report.kpis.reservations.value, previous: report.kpis.reservations.previous, changePct: report.kpis.reservations.changePct, format: INTEGER_FORMAT },
         { label: 'Ticket promedio', value: report.kpis.averageTicket.value, previous: report.kpis.averageTicket.previous, changePct: report.kpis.averageTicket.changePct, format: MONEY_FORMAT },
@@ -478,6 +486,8 @@ export async function buildIncomeWorkbook(input: ExportInput) {
         { header: 'Tipo', width: 12 },
         { header: 'Método', width: 16 },
         { header: 'Monto (S/)', width: 16, format: MONEY_FORMAT, align: 'right' },
+        { header: 'Deducciones MP (S/)', width: 22, format: MONEY_FORMAT, align: 'right' },
+        { header: 'Recibido MP (S/)', width: 20, format: MONEY_FORMAT, align: 'right' },
         { header: 'Notas', width: 40 },
       ],
       detail,

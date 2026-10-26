@@ -5,17 +5,27 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import {
+  canConfigurePaidPendingLocal,
+  canOperateLocal,
   findLocalWithState,
-  isOperationalLocalState,
-  OPERATIONAL_LOCAL_STATES,
+  moderationBlocksOperation,
   resolveActiveLocal,
   resolveLocalDestination,
   resolvePostLoginDestination,
   type AccessContext,
+  type LocalModeration,
   type LocalState,
 } from './access'
 
 export const ACTIVE_LOCAL_COOKIE = 'grassly_active_local'
+
+export const ACTIVE_LOCAL_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: process.env.NODE_ENV === 'production',
+  path: '/',
+  maxAge: 60 * 60 * 24 * 365,
+}
 
 export const getAccessContext = cache(
   async (): Promise<AccessContext | null> => {
@@ -32,6 +42,7 @@ export const getAccessContext = cache(
       { data: profile, error: profileError },
       { data: locals, error: localsError },
       { data: subscription, error: subscriptionError },
+      { data: moderations, error: moderationsError },
     ] =
       await Promise.all([
         supabase
@@ -42,15 +53,16 @@ export const getAccessContext = cache(
         supabase
           .from('locales')
           .select(
-            'id,nombre,direccion,ruc,estado,fecha_fin_trial,motivo_rechazo,publicado,publicado_at,created_at',
+            'id,nombre,direccion,ruc,estado,fecha_fin_trial,motivo_rechazo,publicado,publicado_at,porcentaje_adelanto,created_at,suspendido_por_facturacion',
           )
           .eq('dueno_id', userId)
           .order('created_at', { ascending: false }),
         supabase
           .from('suscripciones')
-          .select('id,estado,fecha_proximo_cobro,monto,sedes_extra_contratadas')
+          .select('id,estado,estado_facturacion,gracia_hasta,fecha_proximo_cobro,monto,sedes_extra_contratadas')
           .eq('dueno_id', userId)
           .maybeSingle(),
+        supabase.rpc('moderacion_listar_activas_propietario'),
       ])
 
     if (profileError) {
@@ -69,6 +81,11 @@ export const getAccessContext = cache(
       throw new Error('No se pudo cargar la información de la cuenta.')
     }
 
+    if (moderationsError) {
+      console.error('[auth-dal:moderations]', { code: moderationsError.code })
+      throw new Error('No se pudo cargar el estado administrativo de los locales.')
+    }
+
     if (!profile) {
       throw new Error('La sesión no tiene un perfil de Grassly asociado.')
     }
@@ -81,7 +98,21 @@ export const getAccessContext = cache(
       avatarUrl:
         typeof avatarCandidate === 'string' ? avatarCandidate : null,
       profile,
-      locals: locals ?? [],
+      locals: (locals ?? []).map((local) => {
+        const moderation = moderations?.find((item) => item.local_id === local.id)
+        return {
+          ...local,
+          moderation: moderation
+            ? {
+                id: moderation.id,
+                type: moderation.tipo as LocalModeration['type'],
+                reason: moderation.motivo,
+                startsAt: moderation.vigente_desde,
+                endsAt: moderation.vigente_hasta,
+              }
+            : null,
+        }
+      }),
       subscription,
     }
   },
@@ -123,6 +154,13 @@ export async function requireOwner() {
   return context
 }
 
+// Comprobación de rol para server actions de administración. Devuelve `false`
+// tanto si no hay sesión como si el usuario no es superadministrador.
+export async function isSuperAdmin() {
+  const context = await getAccessContext()
+  return context?.profile.rol === 'super_admin'
+}
+
 // Autoriza escrituras operativas de un local: su dueño (con local operativo) o
 // cualquier superadministrador. Las RPC de la base validan la misma regla.
 export async function authorizeLocalWrite(localId: string) {
@@ -130,18 +168,42 @@ export async function authorizeLocalWrite(localId: string) {
   if (!context) return false
   if (context.profile.rol === 'super_admin') return true
   return context.locals.some(
-    (local) => local.id === localId && isOperationalLocalState(local.estado),
+    (local) => local.id === localId && canOperateLocal(local, context.subscription),
+  )
+}
+
+// Permiso transitorio y deliberadamente estrecho: después de cobrar, un local
+// aún sin coordenadas puede abrir solo su configuración general. La base vuelve
+// a comprobar el entitlement antes de promoverlo a operativo.
+export async function authorizeLocalConfiguration(localId: string) {
+  const context = await getAccessContext()
+  if (!context) return false
+  if (context.profile.rol === 'super_admin') return true
+  const local = context.locals.find((candidate) => candidate.id === localId)
+  return Boolean(
+    local &&
+      (canOperateLocal(local, context.subscription) ||
+        canConfigurePaidPendingLocal(context, local)),
   )
 }
 
 export async function requireOwnerLocal(states: readonly LocalState[]) {
   const { context, activeLocal } = await getOwnerShellContext()
   const local =
-    activeLocal && states.includes(activeLocal.estado) ? activeLocal : null
+    activeLocal && (
+      states.includes(activeLocal.estado)
+      || (states.includes('suspendido') && moderationBlocksOperation(activeLocal.moderation))
+    ) ? activeLocal : null
 
   if (!local) {
     if (activeLocal) {
-      redirect(resolveLocalDestination(activeLocal.estado))
+      const hasAnotherOperationalLocal = context.locals.some(
+        (candidate) => candidate.id !== activeLocal.id && canOperateLocal(candidate, context.subscription),
+      )
+      if (hasAnotherOperationalLocal) {
+        redirect('/panel/sedes')
+      }
+      redirect(resolveLocalDestination(activeLocal))
     }
 
     redirect(resolvePostLoginDestination(context))
@@ -149,8 +211,45 @@ export async function requireOwnerLocal(states: readonly LocalState[]) {
   return { context, local }
 }
 
-export function requireOperationalOwnerLocal() {
-  return requireOwnerLocal(OPERATIONAL_LOCAL_STATES)
+export async function requireOperationalOwnerLocal() {
+  const { context, activeLocal } = await getOwnerShellContext()
+  if (activeLocal && canOperateLocal(activeLocal, context.subscription)) {
+    return { context, local: activeLocal }
+  }
+
+  if (canConfigurePaidPendingLocal(context, activeLocal)) {
+    redirect('/panel/configuracion')
+  }
+
+  if (activeLocal) {
+    // Si la sede guardada no es operativa pero otra sí lo es, no redirigimos a
+    // /panel (bucle). Llevamos al listado de sedes para que el dueño elija.
+    const hasAnotherOperationalLocal = context.locals.some(
+      (local) => local.id !== activeLocal.id && canOperateLocal(local, context.subscription),
+    )
+    if (hasAnotherOperationalLocal) {
+      redirect('/panel/sedes')
+    }
+
+    redirect(resolveLocalDestination(activeLocal))
+  }
+  redirect(resolvePostLoginDestination(context))
+}
+
+export async function requireConfigurableOwnerLocal() {
+  const { context, activeLocal } = await getOwnerShellContext()
+  if (
+    activeLocal &&
+    (canOperateLocal(activeLocal, context.subscription) ||
+      canConfigurePaidPendingLocal(context, activeLocal))
+  ) {
+    return { context, local: activeLocal }
+  }
+
+  if (activeLocal) {
+    redirect(resolvePostLoginDestination(context))
+  }
+  redirect(resolvePostLoginDestination(context))
 }
 
 export async function getOwnerShellContext() {

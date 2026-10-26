@@ -23,21 +23,29 @@ const days = [
 ] as const
 
 const hourSlots = [
-  ...Array.from({ length: 17 }, (_, index) => index + 6),
+  ...Array.from({ length: 18 }, (_, index) => index + 6),
+  23.5,
   ...Array.from({ length: 6 }, (_, hour) => hour),
 ]
+const boardHourColumns = 'repeat(17, minmax(18px, 1fr)) repeat(2, minmax(12px, 0.5fr)) repeat(6, minmax(18px, 1fr))'
 const hours = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, '0')}:00`)
 type DayRange = [number, number]
 type DragState = { day: number; start: number } | null
 type OpenDays = Record<number, boolean>
 
 function hourFromTime(value: string | undefined, fallback: number) {
+  if (value?.startsWith('23:30')) return 23.5
   const hour = Number(value?.slice(0, 2))
   return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : fallback
 }
 
 function formatHour(hour: number) {
+  if (hour === 23.5) return '23:30'
   return `${String(hour).padStart(2, '0')}:00`
+}
+
+function slotEnd(hour: number) {
+  return hour === 23 || hour === 23.5 ? hour + 0.5 : hour + 1
 }
 
 function initialRanges(schedules: ScheduleRow[]) {
@@ -93,9 +101,17 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
     setRanges((current) => ({ ...current, [activeDay]: [current[activeDay][0], closing] }))
   }
 
+  function selectHalfHourClosing(day: number) {
+    if (!editable) return
+    setActiveDay(day)
+    setRanges((current) => ({ ...current, [day]: [current[day][0], 23.5] }))
+    setOpenDays((current) => ({ ...current, [day]: true }))
+  }
+
   function startPainting(event: ReactPointerEvent<HTMLButtonElement>, day: number, hour: number) {
     if (!editable) return
     setActiveDay(day)
+    if (hour === 23) selectHalfHourClosing(day)
     if (event.pointerType === 'touch') return
     event.preventDefault()
     setDragging({ day, start: hour })
@@ -111,7 +127,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
     if ((dragging.start < 6) !== (hour < 6)) return
 
     const opening = Math.min(dragging.start, hour)
-    const closing = Math.max(dragging.start, hour) + 1
+    const closing = slotEnd(Math.max(dragging.start, hour))
     setRanges((current) => ({ ...current, [day]: [opening, closing] }))
     setOpenDays((current) => ({ ...current, [day]: true }))
   }
@@ -140,7 +156,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
             <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3.5">
               <div>
                 <p className="text-sm font-bold">Tablero semanal</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Haz clic en un día para editarlo. En escritorio, arrastra sobre sus horas para dibujar el rango.</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Haz clic en un día para editarlo. En escritorio, arrastra hasta el medio bloque tras las 23 para cerrar a las 23:30.</p>
               </div>
               <span className="rounded-full bg-[#e8f4c8] px-3 py-1 text-xs font-bold text-[#35520d]">
                 {countOpenDays(openDays)} {countOpenDays(openDays) === 1 ? 'día abierto' : 'días abiertos'}
@@ -149,12 +165,12 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
 
             <div className="overflow-x-auto p-3 sm:p-4">
               <div className="min-w-[800px] select-none" onPointerLeave={() => setDragging(null)} onPointerUp={() => setDragging(null)}>
-                <div className="grid grid-cols-[112px_repeat(23,minmax(18px,1fr))] gap-1 px-1 pb-2">
+                <div className="grid gap-1 px-1 pb-2" style={{ gridTemplateColumns: `112px ${boardHourColumns}` }}>
                   <span className="mr-2 border-r pr-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Día</span>
-                  <div className="col-span-23 grid h-6 grid-cols-[repeat(23,minmax(18px,1fr))] gap-1">
+                  <div className="col-span-[25] grid h-6 gap-1" style={{ gridTemplateColumns: boardHourColumns }}>
                     {hourSlots.map((hour, index) => (
                       <span key={hour} className="relative">
-                        {hour % 3 === 0 ? (
+                        {(hour % 3 === 0 || hour === 23) ? (
                           <span
                             className={cn(
                               'absolute left-0 top-0 text-[9px] font-semibold tabular-nums text-muted-foreground',
@@ -166,7 +182,7 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                           </span>
                         ) : null}
                         {index === hourSlots.length - 1 ? <span className="absolute right-0 top-0 text-[9px] font-semibold tabular-nums text-muted-foreground">06</span> : null}
-                        {hour % 3 === 0 ? <span aria-hidden="true" className={cn('absolute bottom-0 left-0 h-1.5 border-l border-border', hour === 0 && 'border-foreground/30')} /> : null}
+                        {(hour % 3 === 0 || hour === 23) ? <span aria-hidden="true" className={cn('absolute bottom-0 left-0 h-1.5 border-l border-border', hour === 0 && 'border-foreground/30')} /> : null}
                         {index === hourSlots.length - 1 ? <span aria-hidden="true" className="absolute bottom-0 right-0 h-1.5 border-r border-border" /> : null}
                       </span>
                     ))}
@@ -183,9 +199,10 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                       <div
                         key={day.label}
                         className={cn(
-                          'grid grid-cols-[112px_repeat(23,minmax(18px,1fr))] gap-1 rounded-xl p-1 transition-colors',
+                          'grid gap-1 rounded-xl p-1 transition-colors',
                           isActive ? 'bg-foreground/[.06] ring-1 ring-foreground/15' : 'hover:bg-muted/60',
                         )}
+                        style={{ gridTemplateColumns: `112px ${boardHourColumns}` }}
                       >
                         <div className="mr-2 flex min-w-0 items-center gap-2 border-r border-border/80 pr-3">
                           <button type="button" onClick={() => setActiveDay(dayIndex)} className="min-w-0 flex-1 rounded-md text-left text-xs font-extrabold outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -209,16 +226,18 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
 
                         {hourSlots.map((hour) => {
                           const isInsideRange = isOpen && hour >= opening && hour < closing
-                          const isEdge = isInsideRange && (hour === opening || hour === closing - 1)
+                          const isEdge = isInsideRange && (hour === opening || slotEnd(hour) === closing)
+                          const isLastHalfHour = hour === 23
+                          const isUnavailableHalfHour = hour === 23.5
                           return (
                             <button
                               key={hour}
                               type="button"
-                              tabIndex={-1}
-                              disabled={!editable}
-                              aria-label={`${day.label}, ${formatHour(hour)} a ${formatHour(hour + 1)}${isInsideRange ? ', abierto' : ', cerrado'}`}
-                              title={`${formatHour(hour)}–${formatHour(hour + 1)}`}
-                              onClick={() => setActiveDay(dayIndex)}
+                              tabIndex={isLastHalfHour ? 0 : -1}
+                              disabled={!editable || isUnavailableHalfHour}
+                              aria-label={isLastHalfHour ? `${day.label}, cerrar a las 23:30` : `${day.label}, ${formatHour(hour)} a ${isUnavailableHalfHour ? '00:00' : formatHour(slotEnd(hour))}${isInsideRange ? ', abierto' : ', cerrado'}`}
+                              title={isLastHalfHour ? 'Cerrar a las 23:30' : `${formatHour(hour)}–${isUnavailableHalfHour ? '00:00' : formatHour(slotEnd(hour))}`}
+                              onClick={() => isLastHalfHour ? selectHalfHourClosing(dayIndex) : setActiveDay(dayIndex)}
                               onPointerDown={(event) => startPainting(event, dayIndex, hour)}
                               onPointerEnter={(event) => paintUntil(event, dayIndex, hour)}
                               className={cn(
@@ -228,6 +247,8 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                                   : 'bg-muted/70 hover:bg-muted-foreground/20',
                                 isEdge && 'ring-1 ring-[#688f18]/35',
                                 !isOpen && 'bg-muted/35',
+                                isLastHalfHour && 'rounded-r-sm border-r-foreground/25',
+                                isUnavailableHalfHour && 'rounded-l-sm bg-muted/35',
                               )}
                             />
                           )
@@ -273,10 +294,13 @@ export function ScheduleSettingsForm({ localId, schedules }: { localId: string; 
                       const value = activeRange[0] + index + 1
                       return <option key={hour} value={value}>{hour}</option>
                     })}
+                    {activeRange[0] < 23 ? <option value={23.5}>23:30</option> : null}
                   </select>
                 </label>
                 <span className="rounded-full bg-[#e8f4c8] px-3 py-2 text-center text-xs font-black whitespace-nowrap text-[#35520d]">
-                  {activeRange[1] - activeRange[0]} h abiertas
+                  {activeRange[1] === 23.5
+                    ? `${Math.floor(activeRange[1] - activeRange[0])} h 30 min abiertas`
+                    : `${activeRange[1] - activeRange[0]} h abiertas`}
                 </span>
               </div>
             ) : (

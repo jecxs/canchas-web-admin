@@ -14,6 +14,7 @@ import { localStatePresentation } from '@/components/dashboard/status'
 import { SetBreadcrumb } from '@/components/dashboard/set-breadcrumb'
 import { EntityAvatar, LocalLogo } from '@/components/dashboard/entity-media'
 import { getAdminOwnerDetail } from '@/features/admin-owners/queries'
+import { GraceCard } from '@/features/admin-billing/grace-card'
 
 const subscriptionLabels: Record<string, { label: string; tone: 'success' | 'warning' | 'destructive' | 'neutral' | 'info' }> = {
   sin_metodo_pago: { label: 'Método de pago pendiente', tone: 'info' },
@@ -149,7 +150,9 @@ export default async function AdminOwnerDetailPage({
                 <DataItem label="Monto mensual" value={formatMoney(subscription.amount)} />
                 <DataItem label="Próximo cobro" value={formatDate(subscription.nextChargeAt)} />
                 <DataItem label="Sedes extra" value={String(subscription.extraSedes)} />
+                <DataItem label="Gracia hasta" value={formatDate(subscription.graceUntil)} />
               </dl>
+              <GraceCard ownerId={owner.id} currentDays={subscription.graceOverrideDays} contractedDays={subscription.graceDays} />
               <Separator />
               <div>
                 <p className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground">Pagos registrados</p>
