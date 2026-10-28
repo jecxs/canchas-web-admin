@@ -41,10 +41,22 @@ function ChartTooltip({ active, payload }: TooltipProps) {
   return (
     <div className="rounded-xl border border-border/80 bg-popover px-3 py-2 shadow-md">
       <p className="text-xs text-muted-foreground">Día {datum.label}</p>
-      <p className="mt-1 text-sm font-black">{formatMoney(datum.income)}</p>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">
-        {datum.movements} cobro{datum.movements === 1 ? '' : 's'}
-      </p>
+      <div className="mt-1 space-y-1">
+        <div className="flex items-center justify-between gap-4 text-[11px]">
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <span className="size-2 rounded-full bg-primary" />
+            Cobrado
+          </span>
+          <span className="font-black">{formatMoney(datum.income)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 text-[11px]">
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <span className="size-2 rounded-full bg-plum" />
+            Por cobrar
+          </span>
+          <span className="font-black text-plum">{formatMoney(datum.outstanding)}</span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -87,7 +99,8 @@ export function OwnerMonthChart({
             tick={{ fill: axis, fontSize: 10 }}
           />
           <Tooltip cursor={{ fill: cursor }} content={<ChartTooltip />} />
-          <Bar dataKey="income" radius={[5, 5, 0, 0]} maxBarSize={26} fill="var(--primary)" />
+          <Bar dataKey="income" stackId="money" radius={[0, 0, 0, 0]} maxBarSize={26} fill="var(--primary)" />
+          <Bar dataKey="outstanding" stackId="money" radius={[5, 5, 0, 0]} maxBarSize={26} fill="var(--plum)" />
         </BarChart>
       </ResponsiveContainer>
     </div>

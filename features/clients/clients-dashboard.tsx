@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
@@ -105,20 +105,32 @@ function agendaBookingHref(client: ClientSummary) {
   return `/panel/agenda?${params.toString()}`
 }
 
+function fetchClientHistory(localId: string, client: ClientSummary) {
+  const supabase = createClient()
+  return supabase.rpc('obtener_reservas_cliente_local_dueno', {
+    p_local_id: localId,
+    p_cliente_id: client.clienteId ?? undefined,
+    p_telefono: client.clienteId ? undefined : client.phone ?? undefined,
+    p_limite: 50,
+  })
+}
+
 function QuickFilter({ active, label, count, onClick, tone = 'default' }: { active: boolean; label: string; count: number; onClick: () => void; tone?: 'default' | 'warning' | 'success' }) {
   const palette = tone === 'warning' ? 'hover:border-warning/50' : tone === 'success' ? 'hover:border-success/50' : 'hover:border-primary/60'
   return <button type="button" onClick={onClick} className={cn('flex min-w-35 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition-colors', active ? 'border-secondary bg-secondary text-secondary-foreground shadow-sm' : `bg-card ${palette}`)}><span className={cn('grid size-8 place-items-center rounded-xl text-xs font-black', active ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground')}>{count}</span><span><span className="block text-[10px] font-extrabold uppercase tracking-[.1em] opacity-65">{label}</span><span className="mt-0.5 block text-xs font-bold">En esta página</span></span></button>
 }
 
-export function ClientsDashboard({ data }: { data: ClientsData }) {
+export function ClientsDashboard({ data, initialClientId }: { data: ClientsData; initialClientId?: string | null }) {
   const router = useRouter()
   const pathname = usePathname()
   const [isRefreshing, startRefresh] = useTransition()
   const [query, setQuery] = useState(data.filters.query)
   const [segment, setSegment] = useState<Segment>('all')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialClientId ?? null)
   const [history, setHistory] = useState<Record<string, ClientReservation[]>>({})
-  const [historyStatus, setHistoryStatus] = useState<Record<string, 'loading' | 'error'>>({})
+  const [historyStatus, setHistoryStatus] = useState<Record<string, 'loading' | 'error'>>(
+    initialClientId ? { [initialClientId]: 'loading' } : {},
+  )
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase.channel(`clients:${data.localId}`)
@@ -129,26 +141,42 @@ export function ClientsDashboard({ data }: { data: ClientsData }) {
 
   const selected = data.clients.find((client) => client.id === selectedId) ?? null
 
-  function selectClient(client: ClientSummary) {
-    setSelectedId(client.id)
+  const loadHistory = useCallback((client: ClientSummary) => {
     if (history[client.id] || historyStatus[client.id] === 'loading') return
     setHistoryStatus((prev) => ({ ...prev, [client.id]: 'loading' }))
-    const supabase = createClient()
-    supabase.rpc('obtener_reservas_cliente_local_dueno', {
-      p_local_id: data.localId,
-      p_cliente_id: client.clienteId ?? undefined,
-      p_telefono: client.clienteId ? undefined : client.phone ?? undefined,
-      p_limite: 50,
-    }).then(({ data: rows, error }) => {
-      if (error) {
-        console.error('[clients:history]', { code: error.code, message: error.message })
+    fetchClientHistory(data.localId, client).then((result) => {
+      if (result.error) {
+        console.error('[clients:history]', { code: result.error.code, message: result.error.message })
         setHistoryStatus((prev) => ({ ...prev, [client.id]: 'error' }))
         return
       }
-      setHistory((prev) => ({ ...prev, [client.id]: (rows ?? []).map(mapReservation) }))
+      setHistory((prev) => ({ ...prev, [client.id]: (result.data ?? []).map(mapReservation) }))
       setHistoryStatus((prev) => { const next = { ...prev }; delete next[client.id]; return next })
     })
-  }
+  }, [data.localId, history, historyStatus])
+
+  const selectClient = useCallback((client: ClientSummary) => {
+    setSelectedId(client.id)
+    loadHistory(client)
+  }, [loadHistory])
+
+  const initialSelectionApplied = useRef(false)
+
+  useEffect(() => {
+    if (initialSelectionApplied.current || !initialClientId) return
+    const client = data.clients.find((item) => item.id === initialClientId)
+    if (!client) return
+    initialSelectionApplied.current = true
+    fetchClientHistory(data.localId, client).then((result) => {
+      if (result.error) {
+        console.error('[clients:history]', { code: result.error.code, message: result.error.message })
+        setHistoryStatus((prev) => ({ ...prev, [client.id]: 'error' }))
+        return
+      }
+      setHistory((prev) => ({ ...prev, [client.id]: (result.data ?? []).map(mapReservation) }))
+      setHistoryStatus((prev) => { const next = { ...prev }; delete next[client.id]; return next })
+    })
+  }, [data.clients, data.localId, initialClientId])
 
   const counts = useMemo(() => {
     const currentMonth = monthKey()

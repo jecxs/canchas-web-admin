@@ -28,10 +28,21 @@ export type DashboardNextDay = {
   pendingValidation: number
 }
 
+export type DashboardClient = {
+  key: string
+  name: string
+  phone: string | null
+  reservations: number
+  lastReservationAt: string
+  reservationId: string | null
+  clientId: string | null
+}
+
 export type DashboardMonthPoint = {
   date: string
   label: string
   income: number
+  outstanding: number
   movements: number
 }
 
@@ -39,8 +50,11 @@ export type OwnerDashboardData = {
   localId: string
   localName: string
   today: string
+  courts: Array<{ id: string; name: string; active: boolean }>
   todaySummary: {
     reservations: number
+    remainingReservations: number
+    remainingHours: number
     confirmed: number
     pendingValidation: number
     pendingPayment: number
@@ -56,6 +70,9 @@ export type OwnerDashboardData = {
   }
   pendingValidations: DashboardReservation[]
   pendingValidationCount: number
+  todayClients: DashboardClient[]
+  frequentClients: DashboardClient[]
+  nextByCourt: Record<string, DashboardReservation>
   nextDays: DashboardNextDay[]
   month: {
     label: string

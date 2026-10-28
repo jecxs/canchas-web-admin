@@ -477,6 +477,74 @@
   padding-top: 0;
 }
 
+@keyframes owner-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.owner-marquee {
+  animation: owner-marquee linear infinite;
+  will-change: transform;
+}
+
+@keyframes owner-float {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(8px, -10px, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(-6px, 8px, 0) scale(1.02);
+  }
+}
+
+.owner-blob {
+  animation: owner-float 14s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.owner-blob-slow {
+  animation: owner-float 18s ease-in-out infinite alternate-reverse;
+  will-change: transform;
+}
+
+@keyframes owner-shake {
+  0%,
+  55%,
+  100% {
+    transform: rotate(0deg);
+  }
+  8% {
+    transform: rotate(-12deg);
+  }
+  16% {
+    transform: rotate(10deg);
+  }
+  24% {
+    transform: rotate(-8deg);
+  }
+  32% {
+    transform: rotate(6deg);
+  }
+  40% {
+    transform: rotate(-3deg);
+  }
+  48% {
+    transform: rotate(2deg);
+  }
+}
+
+.owner-shake {
+  animation: owner-shake 1s ease-in-out infinite;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

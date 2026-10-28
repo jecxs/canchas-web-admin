@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { getCajaReport } from '@/features/caja/queries'
 import { getIncomeReport } from '@/features/reportes/queries'
 import {
+  limaDate,
   parseRange,
   shiftDate,
   startOfMonth,
@@ -13,6 +14,7 @@ import {
 import { getDayOfWeek, timeToMinutes } from '@/features/agenda/date-utils'
 import type { ReservationChannel, ReservationStatus } from '@/features/reservations/types'
 import type {
+  DashboardClient,
   DashboardMonthPoint,
   DashboardReservation,
   OwnerDashboardData,
@@ -30,6 +32,8 @@ const OCCUPYING_STATES = new Set<ReservationStatus>([
   'completada',
   'no_show',
 ])
+
+const BILLABLE_STATES = new Set<ReservationStatus>(['confirmada', 'completada'])
 
 const NON_BOOKED_STATES = new Set<ReservationStatus>([
   'cancelada_cliente',
@@ -357,14 +361,31 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
   const todayRows = agendaByDate.get(today) ?? []
   const allAgendaRows = nextDates.flatMap((date) => agendaByDate.get(date) ?? [])
   const now = Date.now()
-  const nextRpcReservation = [...allAgendaRows]
-    .filter((row) => new Date(row.fin).getTime() > now)
-    .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())[0]
+  const futureRows = [...allAgendaRows]
+    .filter((row) => row.estado === 'confirmada' && new Date(row.inicio).getTime() > now)
+    .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
+
+  const nextByCourt: Record<string, DashboardReservation> = {}
+  for (const row of futureRows) {
+    if (nextByCourt[row.cancha_id]) continue
+    nextByCourt[row.cancha_id] = mapAgendaReservation(row, courtNames, sportNames)
+  }
+
+  const nextRpcReservation = futureRows[0] ?? null
 
   const todayWindowStart = new Date(`${today}T00:00:00-05:00`).getTime()
   const tomorrowWindowStart = new Date(`${tomorrow}T00:00:00-05:00`).getTime()
   const todayAvailableHours = hoursForDate(today, schedules, activeCourts)
   const todaySoldHours = todayRows.reduce(
+    (total, row) => total + overlapHours(row.inicio, row.fin, todayWindowStart, tomorrowWindowStart),
+    0,
+  )
+  const remainingTodayRows = todayRows.filter((row) => {
+    if (NON_BOOKED_STATES.has(row.estado) || row.estado === 'completada') return false
+    return new Date(row.inicio).getTime() > now
+  })
+  const remainingTodayReservations = remainingTodayRows.length
+  const remainingTodayHours = remainingTodayRows.reduce(
     (total, row) => total + overlapHours(row.inicio, row.fin, todayWindowStart, tomorrowWindowStart),
     0,
   )
@@ -433,6 +454,20 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
     return { row, startMs: new Date(start).getTime(), startIso: start, endIso: end }
   })
 
+  const paymentSummaryByReservation = new Map<string, number>()
+  if (monthRows.length) {
+    const { data: summaries, error } = await supabase.rpc('obtener_resumen_pagos_reservas_dueno', {
+      p_local_id: local.id,
+      p_reserva_ids: monthRows.map((row) => row.id),
+    })
+    if (error) {
+      console.warn('[owner-dashboard:payment-summary]', { code: error.code })
+    }
+    for (const summary of summaries ?? []) {
+      paymentSummaryByReservation.set(summary.reserva_id, normalizeMoney(summary.saldo_pendiente))
+    }
+  }
+
   const monthOccupyingRows = monthRowsWithDates.filter(
     ({ row, startMs }) =>
       startMs >= monthWindowStart &&
@@ -457,15 +492,111 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
   const appReservations = monthBookedRows.filter(({ row }) => row.canal_origen === 'app').length
   const manualReservations = monthBookedRows.length - appReservations
 
-  const clientReservationCount = new Map<string, number>()
-  for (const { row, startMs } of monthRowsWithDates) {
-    if (startMs < last14WindowStart || startMs >= tomorrowWindowStart) continue
-    if (NON_BOOKED_STATES.has(row.estado)) continue
-    const key = row.cliente_id ?? row.cliente_sin_cuenta_telefono?.trim()
-    if (!key) continue
-    clientReservationCount.set(key, (clientReservationCount.get(key) ?? 0) + 1)
+  const last14Rows = monthRowsWithDates.filter(
+    ({ row, startMs }) =>
+      startMs >= last14WindowStart &&
+      startMs < tomorrowWindowStart &&
+      !NON_BOOKED_STATES.has(row.estado),
+  )
+
+  const clientDetails = new Map<string, { name: string; phone: string }>()
+  if (last14Rows.length) {
+    const { data: customers, error } = await supabase.rpc('obtener_clientes_reservas_dueno', {
+      p_local_id: local.id,
+      p_reserva_ids: last14Rows.map(({ row }) => row.id),
+    })
+    if (error) {
+      console.warn('[owner-dashboard:clients]', { code: error.code })
+    }
+    for (const customer of customers ?? []) {
+      clientDetails.set(customer.reserva_id, {
+        name: customer.cliente_nombre?.trim() ?? '',
+        phone: customer.cliente_telefono?.trim() ?? '',
+      })
+    }
   }
-  const recurringClients = [...clientReservationCount.values()].filter((count) => count >= 2).length
+
+  const clientAggregates = new Map<string, DashboardClient>()
+  for (const { row, startIso } of last14Rows) {
+    const details = clientDetails.get(row.id)
+    const phone = details?.phone || row.cliente_sin_cuenta_telefono?.trim() || ''
+    const name = details?.name || (phone ? `Cliente ${phone.slice(-4)}` : 'Cliente')
+    const key = row.cliente_id ?? (phone || row.id)
+    const clientId = row.cliente_id ?? (phone ? `ext:${phone}` : null)
+    const current = clientAggregates.get(key)
+    if (current) {
+      current.reservations += 1
+      if (new Date(startIso).getTime() > new Date(current.lastReservationAt).getTime()) {
+        current.lastReservationAt = startIso
+      }
+    } else {
+      clientAggregates.set(key, {
+        key,
+        name,
+        phone: phone || null,
+        reservations: 1,
+        lastReservationAt: startIso,
+        reservationId: null,
+        clientId,
+      })
+    }
+  }
+
+  const frequentClients = [...clientAggregates.values()]
+    .filter((client) => client.reservations >= 2)
+    .sort(
+      (a, b) =>
+        b.reservations - a.reservations ||
+        new Date(b.lastReservationAt).getTime() - new Date(a.lastReservationAt).getTime(),
+    )
+    .slice(0, 8)
+  const recurringClients = [...clientAggregates.values()].filter(
+    (client) => client.reservations >= 2,
+  ).length
+
+  const todayClientAggregates = new Map<string, DashboardClient>()
+  for (const row of todayRows) {
+    if (NON_BOOKED_STATES.has(row.estado)) continue
+    const phone = row.cliente_telefono?.trim() || ''
+    const name = row.cliente_nombre?.trim() || (phone ? `Cliente ${phone.slice(-4)}` : 'Cliente')
+    const key = phone || name
+    const current = todayClientAggregates.get(key)
+    if (current) {
+      current.reservations += 1
+      if (new Date(row.inicio).getTime() > new Date(current.lastReservationAt).getTime()) {
+        current.lastReservationAt = row.inicio
+        current.reservationId = row.reserva_id
+      }
+    } else {
+      todayClientAggregates.set(key, {
+        key,
+        name,
+        phone: phone || null,
+        reservations: 1,
+        lastReservationAt: row.inicio,
+        reservationId: row.reserva_id,
+        clientId: phone ? `ext:${phone}` : null,
+      })
+    }
+  }
+
+  const todayClients = [...todayClientAggregates.values()]
+    .sort(
+      (a, b) =>
+        new Date(a.lastReservationAt).getTime() - new Date(b.lastReservationAt).getTime(),
+    )
+    .slice(0, 8)
+
+  const outstandingByDate = new Map<string, number>()
+  for (const { row, startMs, startIso } of monthRowsWithDates) {
+    if (!Number.isFinite(startMs)) continue
+    if (startMs < monthWindowStart || startMs >= tomorrowWindowStart) continue
+    if (!BILLABLE_STATES.has(row.estado)) continue
+    const outstanding = paymentSummaryByReservation.get(row.id) ?? normalizeMoney(row.monto_total)
+    if (outstanding <= 0) continue
+    const date = limaDate(startIso)
+    outstandingByDate.set(date, (outstandingByDate.get(date) ?? 0) + outstanding)
+  }
 
   const daily: DashboardMonthPoint[] = income.daily.map((point) => ({
     date: point.date,
@@ -474,6 +605,7 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
       day: 'numeric',
     }).format(new Date(`${point.date}T12:00:00-05:00`)),
     income: point.income,
+    outstanding: outstandingByDate.get(point.date) ?? 0,
     movements: point.movements,
   }))
 
@@ -489,8 +621,15 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
     localId: local.id,
     localName: local.nombre,
     today,
+    courts: courts.map((court) => ({
+      id: court.id,
+      name: court.nombre,
+      active: court.activa,
+    })),
     todaySummary: {
       reservations: todayRows.length,
+      remainingReservations: remainingTodayReservations,
+      remainingHours: remainingTodayHours,
       confirmed: todayRows.filter((row) => row.estado === 'confirmada').length,
       pendingValidation: todayRows.filter((row) => row.estado === 'pendiente_validacion').length,
       pendingPayment: todayRows.filter((row) =>
@@ -510,6 +649,9 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
     },
     pendingValidations,
     pendingValidationCount: pendingResult.count,
+    todayClients,
+    frequentClients,
+    nextByCourt,
     nextDays,
     month: {
       label: formatMonthLabel(today),

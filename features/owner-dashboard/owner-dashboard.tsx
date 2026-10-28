@@ -1,32 +1,30 @@
 import Link from 'next/link'
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Alert02Icon,
   ArrowRight01Icon,
-  Calendar03Icon,
   CalendarAdd01Icon,
-  ChartLineData01Icon,
   CheckmarkCircle01Icon,
   Clock01Icon,
-  Invoice03Icon,
-  Money03Icon,
-  PercentIcon,
-  Wallet03Icon,
 } from '@hugeicons/core-free-icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { getSubscriptionPresentation, localStatePresentation } from '@/components/dashboard/status'
 import { PublicationChecklistCard } from '@/features/local-publication/publication-checklist-card'
 import { cn } from '@/lib/utils'
 import type { LocalSummary, SubscriptionSummary } from '@/lib/auth/access'
 import type { PublicationChecklist } from '@/features/local-publication/types'
+import { AutoMarquee } from '@/components/dashboard/auto-marquee'
+import { ClientsSpotlight } from './clients-spotlight'
+import { CourtRotationPause } from './court-rotation-pause'
+import { CourtsCarousel } from './courts-carousel'
+import { CourtsSyncProvider } from './courts-sync'
+import { NextTurnCard } from './next-turn-card'
 import { OwnerMonthChart } from './month-chart'
-import type { DashboardNextDay, DashboardReservation, OwnerDashboardData } from './types'
+import type { DashboardReservation, OwnerDashboardData } from './types'
 
 const LIMA = 'America/Lima'
 
-type KpiTone = 'lime' | 'plum' | 'dark' | 'warning'
 type NoticeTone = 'info' | 'warning' | 'destructive'
 
 type OwnerDashboardProps = {
@@ -35,13 +33,6 @@ type OwnerDashboardProps = {
   local: LocalSummary
   subscription: SubscriptionSummary | null
   checklist: PublicationChecklist
-}
-
-const KPI_TONE: Record<KpiTone, string> = {
-  lime: 'bg-primary/20 text-primary-foreground',
-  plum: 'bg-plum/12 text-plum',
-  dark: 'bg-foreground/8 text-foreground',
-  warning: 'bg-warning/25 text-warning-foreground',
 }
 
 const NOTICE_TONE: Record<NoticeTone, string> = {
@@ -66,15 +57,6 @@ function percent(value: number) {
 function hours(value: number) {
   const rounded = Math.round(value * 10) / 10
   return `${rounded} h`
-}
-
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat('es-PE', {
-    timeZone: LIMA,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(value))
 }
 
 function formatDateTime(value: string) {
@@ -111,12 +93,6 @@ function greeting() {
   return 'Buenas noches'
 }
 
-function daysUntil(today: string, target: string) {
-  const diff = Date.parse(`${target.slice(0, 10)}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)
-  if (!Number.isFinite(diff)) return 0
-  return Math.max(0, Math.ceil(diff / 86_400_000))
-}
-
 function waitingLabel(value: string | null) {
   if (!value) return 'Sin comprobante'
   const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60_000))
@@ -129,12 +105,10 @@ function waitingLabel(value: string | null) {
 function buildNotice({
   local,
   subscription,
-  trialDays,
   checklist,
 }: {
   local: LocalSummary
   subscription: SubscriptionSummary | null
-  trialDays: number | null
   checklist: PublicationChecklist
 }) {
   if (local.moderation) {
@@ -144,16 +118,6 @@ function buildNotice({
       message: local.moderation.reason,
       href: '/panel/estado-local',
       cta: 'Ver detalle',
-    }
-  }
-
-  if (local.estado === 'trial' && trialDays !== null) {
-    return {
-      tone: trialDays <= 3 ? ('warning' as const) : ('info' as const),
-      title: trialDays === 0 ? 'Tu periodo de prueba vence hoy' : `Te quedan ${trialDays} días de prueba`,
-      message: 'Activa tu suscripción para mantener el panel, las reservas y tu visibilidad en la app.',
-      href: '/panel/suscripcion',
-      cta: 'Ver plan',
     }
   }
 
@@ -186,7 +150,7 @@ function buildNotice({
       message: checklist.ready
         ? 'Ya cumples los requisitos. Publícalo para empezar a recibir reservas desde la app.'
         : 'Completa los requisitos de publicación para aparecer en la app y recibir reservas.',
-      href: '#publicacion',
+      href: checklist.ready ? '#publicacion' : '/panel/configuracion',
       cta: checklist.ready ? 'Publicar local' : 'Completar ficha',
     }
   }
@@ -194,76 +158,11 @@ function buildNotice({
   return null
 }
 
-function Metric({
-  label,
-  value,
-  hint,
-  icon,
-  tone,
-  href,
-}: {
-  label: string
-  value: string
-  hint: string
-  icon: IconSvgElement
-  tone: KpiTone
-  href: string
-}) {
-  return (
-    <Link href={href} className="group flex min-w-0 items-start gap-3">
-      <span className={cn('grid size-9 shrink-0 place-items-center rounded-xl transition-transform group-hover:-translate-y-0.5', KPI_TONE[tone])}>
-        <HugeiconsIcon icon={icon} strokeWidth={2} className="size-4.5" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-[10px] font-extrabold uppercase tracking-[.14em] text-muted-foreground">{label}</p>
-        <p className="mt-1 font-display text-3xl font-black leading-none tabular-nums">{value}</p>
-        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{hint}</p>
-      </div>
-    </Link>
-  )
-}
-
-function StatCell({
-  label,
-  value,
-  hint,
-  dark = false,
-}: {
-  label: string
-  value: string
-  hint: string
-  dark?: boolean
-}) {
-  return (
-    <div className="px-4 py-3">
-      <p
-        className={cn(
-          'text-[10px] font-extrabold uppercase tracking-[.12em]',
-          dark ? 'text-white/45' : 'text-muted-foreground',
-        )}
-      >
-        {label}
-      </p>
-      <p
-        className={cn(
-          'mt-1 font-display text-2xl font-black leading-none tabular-nums',
-          dark ? 'text-white' : 'text-foreground',
-        )}
-      >
-        {value}
-      </p>
-      <p className={cn('mt-1 text-[11px] leading-4', dark ? 'text-white/40' : 'text-muted-foreground')}>
-        {hint}
-      </p>
-    </div>
-  )
-}
-
 function PendingRow({ reservation }: { reservation: DashboardReservation }) {
   return (
     <Link
       href={`/panel/agenda?date=${dateKey(reservation.start)}&reservation=${reservation.id}`}
-      className="flex items-start gap-3 py-3.5 transition-colors hover:bg-muted/40"
+      className="flex items-start gap-3 rounded-xl border border-border/70 bg-card px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:bg-primary/10 hover:shadow-sm active:translate-y-0"
     >
       <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning/20 text-warning-foreground">
         <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4" />
@@ -311,52 +210,25 @@ function Donut({
     .join(', ')
 
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
+    <div className="relative shrink-0 animate-in zoom-in-95 duration-700" style={{ width: size, height: size }}>
       <div
         aria-hidden="true"
         className="absolute inset-0 rounded-full"
-        style={{ background: `conic-gradient(from -90deg, ${gradient})` }}
+        style={{
+          background: `conic-gradient(from -90deg, ${gradient})`,
+          WebkitMaskImage:
+            'radial-gradient(farthest-side, transparent calc(100% - 14px), #000 calc(100% - 14px))',
+          maskImage:
+            'radial-gradient(farthest-side, transparent calc(100% - 14px), #000 calc(100% - 14px))',
+        }}
       />
-      <div className="absolute inset-[15%] grid place-items-center rounded-full bg-plum text-center">
+      <div className="absolute inset-0 grid place-items-center text-center">
         <div>
           <p className="font-display text-xl font-black leading-none text-white tabular-nums">{center}</p>
           <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[.12em] text-white/45">{centerLabel}</p>
         </div>
       </div>
     </div>
-  )
-}
-
-function NextDayCard({ day }: { day: DashboardNextDay }) {
-  return (
-    <Link
-      href={`/panel/agenda?date=${day.date}`}
-      className={cn(
-        'rounded-xl border p-3 transition-colors',
-        day.isToday
-          ? 'border-primary bg-primary/15'
-          : 'border-white/10 bg-white/[.05] hover:bg-white/10',
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className={cn(
-            'text-[10px] font-extrabold uppercase tracking-[.12em]',
-            day.isToday ? 'text-primary' : 'text-white/45',
-          )}
-        >
-          {day.weekday}
-        </span>
-        {day.pendingValidation > 0 ? (
-          <span className="size-1.5 rounded-full bg-warning" title={`${day.pendingValidation} por validar`} />
-        ) : null}
-      </div>
-      <p className="mt-1 font-display text-3xl font-black leading-none text-white tabular-nums">
-        {day.dayNumber}
-      </p>
-      <p className="mt-2 text-xs font-bold text-white/85">{day.reservations} reservas</p>
-      <p className="text-[11px] text-white/45">{hours(day.soldHours)} vendidas</p>
-    </Link>
   )
 }
 
@@ -368,131 +240,204 @@ export function OwnerDashboard({
   checklist,
 }: OwnerDashboardProps) {
   const firstName = ownerName.trim().split(/\s+/)[0] || ownerName
-  const state = localStatePresentation[local.estado]
-  const subscriptionState = getSubscriptionPresentation(subscription)
-  const trialDays =
-    local.estado === 'trial' && local.fecha_fin_trial
-      ? daysUntil(data.today, local.fecha_fin_trial)
-      : null
-  const notice = buildNotice({ local, subscription, trialDays, checklist })
-  const next = data.todaySummary.nextReservation
-  const showChecklist = !local.publicado || !checklist.ready
+  const notice = buildNotice({ local, subscription, checklist })
+  const activeCourts = data.courts.filter((court) => court.active)
 
   return (
     <div className="w-full" data-owner-dashboard>
-      <section className="sticky top-0 z-0 -mx-4 min-h-[360px] overflow-hidden rounded-b-[2rem] bg-secondary text-secondary-foreground shadow-floating md:-mx-6 lg:-mx-8">
+      <section className="relative z-0 -mx-4 overflow-hidden rounded-b-[2rem] bg-secondary text-secondary-foreground shadow-floating md:-mx-6 lg:-mx-8 2xl:sticky 2xl:top-0">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-primary/25 blur-3xl"
+          className="owner-blob pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-primary/25 blur-3xl"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-32 left-1/3 size-80 rounded-full bg-plum/35 blur-3xl"
+          className="owner-blob-slow pointer-events-none absolute -bottom-32 left-1/3 size-80 rounded-full bg-plum/35 blur-3xl"
         />
 
-        <div className="relative grid gap-7 px-6 pt-5 pb-14 sm:px-8 sm:pt-6 sm:pb-16 lg:px-12 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-          <div className="flex flex-col justify-between gap-6">
+        <CourtsSyncProvider courts={activeCourts}>
+          <div className="relative grid gap-4 px-6 pt-5 pb-3 sm:px-8 sm:pt-6 sm:pb-4 lg:px-8 min-[1200px]:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] 2xl:px-12 2xl:pb-5">
+          <div className="order-1 flex flex-col gap-3 duration-500 fill-mode-both animate-in fade-in slide-in-from-bottom-2">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="bg-primary text-primary-foreground">{state.label}</Badge>
-                <Badge className="border-white/15 bg-white/10 text-white">
-                  {local.publicado ? 'Publicado en la app' : 'No publicado'}
-                </Badge>
-                {subscription ? (
-                  <Badge className="border-white/15 bg-white/10 text-white/75">{subscriptionState.label}</Badge>
-                ) : null}
-              </div>
-
-              <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[.18em] text-primary">
-                Resumen del negocio
-              </p>
-              <h1 className="mt-2 font-display text-4xl font-black leading-[.92] tracking-tight sm:text-5xl lg:text-6xl">
+              <p className="text-base font-bold text-white/65 sm:text-xl">
                 {greeting()}, {firstName}
+              </p>
+              <h1 className="mt-1 font-display text-4xl font-black leading-[.92] tracking-tight text-white sm:text-5xl 2xl:text-6xl">
+                <AutoMarquee>Bienvenido a {local.nombre}</AutoMarquee>
               </h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-secondary-foreground/70">
-                {local.nombre} · {local.direccion}
+              <p className="mt-2 max-w-xl text-sm leading-6 text-secondary-foreground/70">
+                {local.direccion}
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
-                <Link href="/panel/agenda">
-                  <HugeiconsIcon icon={CalendarAdd01Icon} strokeWidth={2} />
-                  Nueva reserva
-                </Link>
-              </Button>
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href="/panel/reservas?status=pendiente_validacion">
-                  <HugeiconsIcon icon={Invoice03Icon} strokeWidth={2} />
-                  Validar pagos
-                </Link>
-              </Button>
-              <Button
-                asChild
-                size="sm"
-                variant="ghost"
-                className="text-white/75 hover:bg-white/10 hover:text-white"
-              >
-                <Link href="/panel/reportes">
-                  Ver reportes
-                  <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} />
-                </Link>
-              </Button>
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+              <div id="publicacion" className="w-full min-w-0 scroll-mt-24 sm:w-3/5">
+                <PublicationChecklistCard
+                  localId={local.id}
+                  localName={local.nombre}
+                  published={local.publicado}
+                  checklist={checklist}
+                />
+              </div>
+
+              <CourtRotationPause className="group relative w-full min-w-0 sm:flex-1">
+                <Card className="relative flex h-full w-full min-w-0 flex-row rounded-xl border border-white/10 bg-white/[.06] p-3 text-white transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-plum/40 group-hover:bg-plum/10 group-hover:shadow-md">
+                  <Link
+                    href="/panel/canchas"
+                    aria-label="Ir al módulo de canchas"
+                    className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60"
+                  />
+                  <CourtsCarousel>
+                    <Button
+                      asChild
+                      size="sm"
+                      className="relative z-10 w-full overflow-hidden whitespace-nowrap"
+                    >
+                      <Link href="/panel/agenda">
+                        <HugeiconsIcon icon={CalendarAdd01Icon} strokeWidth={2} />
+                        <AutoMarquee
+                          className="min-w-0 flex-1"
+                          gapClassName="pr-6"
+                          gapPx={24}
+                          centerWhenFits
+                        >
+                          Nueva reserva
+                        </AutoMarquee>
+                      </Link>
+                    </Button>
+                  </CourtsCarousel>
+                </Card>
+              </CourtRotationPause>
             </div>
           </div>
 
-          <div className="grid content-start gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-primary">Próximo turno</p>
-                <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4 text-white/55" />
-              </div>
-              {next ? (
-                <>
-                  <p className="mt-3 font-display text-3xl font-black leading-none">{formatTime(next.start)}</p>
-                  <p className="mt-2 text-sm font-bold">
-                    {next.courtName} · {next.sportName}
-                  </p>
-                  <p className="mt-1 text-xs text-white/60">
-                    {formatDateTime(next.start)} · {next.customerName}
-                  </p>
-                </>
-              ) : (
-                <p className="mt-3 text-sm text-white/65">No tienes reservas próximas.</p>
-              )}
+          <div className="order-2 flex h-full flex-col gap-2 delay-100 duration-500 fill-mode-both animate-in fade-in slide-in-from-bottom-2">
+            <NextTurnCard
+              nextByCourt={data.nextByCourt}
+              fallbackNext={data.todaySummary.nextReservation}
+            />
+
+            <div className="mt-auto grid grid-cols-2 gap-2">
               <Link
-                href={next ? `/panel/agenda?date=${dateKey(next.start)}` : '/panel/agenda'}
-                className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+                href={`/panel/agenda?date=${data.today}`}
+                className="group rounded-2xl border border-white/10 bg-white/[.06] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-plum/40 hover:bg-plum/10 hover:shadow-md 2xl:p-4"
               >
-                Abrir agenda
-                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
+                <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-primary transition-colors group-hover:text-plum">Reservas hoy</p>
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  <div>
+                    <p className="text-[8px] font-extrabold uppercase tracking-[.12em] text-white/45 2xl:text-[9px]">Total</p>
+                    <p className="mt-0.5 font-display text-xl font-black leading-none tabular-nums 2xl:text-2xl">
+                      {data.todaySummary.reservations}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-extrabold uppercase tracking-[.12em] text-white/45 2xl:text-[9px]">Faltante</p>
+                    <p className="mt-0.5 font-display text-xl font-black leading-none tabular-nums 2xl:text-2xl">
+                      {data.todaySummary.remainingReservations}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+              <Link
+                href={`/panel/agenda?date=${data.today}`}
+                className="group rounded-2xl border border-white/10 bg-white/[.06] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-plum/40 hover:bg-plum/10 hover:shadow-md 2xl:p-4"
+              >
+                <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-primary transition-colors group-hover:text-plum">Ocupación hoy</p>
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  <div>
+                    <p className="text-[8px] font-extrabold uppercase tracking-[.12em] text-white/45 2xl:text-[9px]">Total</p>
+                    <p className="mt-0.5 font-display text-xl font-black leading-none tabular-nums 2xl:text-2xl">
+                      {percent(data.todaySummary.occupancyRate)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-extrabold uppercase tracking-[.12em] text-white/45 2xl:text-[9px]">Faltante</p>
+                    <p className="mt-0.5 font-display text-xl font-black leading-none tabular-nums 2xl:text-2xl">
+                      {percent(
+                        data.todaySummary.availableHours > 0
+                          ? (data.todaySummary.remainingHours / data.todaySummary.availableHours) * 100
+                          : 0,
+                      )}
+                    </p>
+                  </div>
+                </div>
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4">
-                <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-white/45">Reservas hoy</p>
-                <p className="mt-2 font-display text-3xl font-black leading-none tabular-nums">
-                  {data.todaySummary.reservations}
-                </p>
+          </div>
+
+          <div className="order-3">
+            <Link href="/panel/reportes?tab=operativo" className="group block h-full rounded-2xl">
+              <Card className="h-full gap-0 rounded-2xl border border-white/10 bg-white/[.06] p-0 text-white backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-plum/40 group-hover:bg-plum/10 group-hover:shadow-md">
+                <div className="flex h-full flex-col p-3 2xl:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-extrabold uppercase tracking-[.14em] text-primary transition-colors duration-300 group-hover:text-plum">
+                      Actividad del mes
+                    </p>
+                    <span className="shrink-0 text-[10px] font-bold text-plum opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                      Ver detalle
+                    </span>
+                  </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="flex flex-col items-center rounded-xl bg-white/[.04] p-2.5 2xl:p-3">
+                    <p className="mt-2 mb-2 text-[11px] font-bold text-white/80">Ocupación del mes</p>
+                    <Donut
+                      size={82}
+                      segments={[
+                        { label: 'Ocupado', value: data.month.occupancyRate, color: 'var(--primary)' },
+                        {
+                          label: 'Libre',
+                          value: Math.max(0, 100 - data.month.occupancyRate),
+                          color: 'rgba(255,255,255,.16)',
+                        },
+                      ]}
+                      center={percent(data.month.occupancyRate)}
+                      centerLabel=""
+                    />
+
+                    <p className="text-[9px] text-white/70">
+                      {hours(data.month.soldHours)} de {hours(data.month.availableHours)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col items-center rounded-xl bg-white/[.04] p-2.5 2xl:p-3">
+                    <p className="mt-2 mb-2 text-[11px] font-bold text-white/80">Reservas del mes</p>
+                    <Donut
+                      size={82}
+                      segments={[
+                        { label: 'App', value: data.month.appReservations, color: 'var(--primary)' },
+                        {
+                          label: 'Manual',
+                          value: data.month.manualReservations,
+                          color: 'rgba(255,255,255,.4)',
+                        },
+                      ]}
+                      center={String(data.month.appReservations + data.month.manualReservations)}
+                      centerLabel=""
+                    />
+
+                    <div className="mt-0.5 flex items-center gap-2 text-[9px] text-white/70">
+                      <span className="flex items-center gap-1">
+                        <span className="size-1.5 rounded-full bg-primary" />
+                        App {data.month.appReservations}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="size-1.5 rounded-full bg-white/70" />
+                        Manual {data.month.manualReservations}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4">
-                <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-white/45">Ocupación</p>
-                <p className="mt-2 font-display text-3xl font-black leading-none tabular-nums">
-                  {percent(data.todaySummary.occupancyRate)}
-                </p>
-              </div>
-            </div>
+            </Card>
+            </Link>
           </div>
         </div>
+        </CourtsSyncProvider>
       </section>
 
-      <div className="relative z-10 -mx-4 -mt-10 rounded-t-[2rem] bg-background px-4 pb-12 pt-7 shadow-[0_-24px_50px_-32px_rgba(0,0,0,0.45)] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+      <div className="relative z-10 -mx-4 rounded-t-[2rem] bg-white px-4 pb-12 pt-5 duration-500 fill-mode-both animate-in fade-in md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
         <div className="space-y-7">
           {notice ? (
             <div
@@ -514,69 +459,20 @@ export function OwnerDashboard({
             </div>
           ) : null}
 
-          <section className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-border/70 pb-6 sm:grid-cols-3 xl:grid-cols-5">
-            <Metric
-              label="Reservas de hoy"
-              value={String(data.todaySummary.reservations)}
-              hint={`${data.todaySummary.confirmed} confirmadas · ${data.todaySummary.pendingValidation} por validar`}
-              icon={Calendar03Icon}
-              tone="lime"
-              href="/panel/agenda"
-            />
-            <Metric
-              label="Ocupación de hoy"
-              value={percent(data.todaySummary.occupancyRate)}
-              hint={`${hours(data.todaySummary.soldHours)} vendidas de ${hours(data.todaySummary.availableHours)}`}
-              icon={PercentIcon}
-              tone="dark"
-              href="/panel/agenda"
-            />
-            <Metric
-              label="Cobrado hoy"
-              value={money(data.todaySummary.collected)}
-              hint={`${data.todaySummary.collectedCount} cobros · neto ${money(data.todaySummary.collectedNet)}`}
-              icon={Money03Icon}
-              tone="lime"
-              href="/panel/caja"
-            />
-            <Metric
-              label="Por cobrar hoy"
-              value={money(data.todaySummary.outstanding)}
-              hint="Saldo pendiente de las reservas de hoy"
-              icon={Wallet03Icon}
-              tone="plum"
-              href="/panel/reservas"
-            />
-            <Metric
-              label="Por validar"
-              value={String(data.pendingValidationCount)}
-              hint={
-                data.unreadNotifications > 0
-                  ? `${data.unreadNotifications} avisos sin leer`
-                  : 'Comprobantes esperando revisión'
-              }
-              icon={Invoice03Icon}
-              tone="warning"
-              href="/panel/reservas?status=pendiente_validacion"
-            />
-          </section>
-
-          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <section className="grid gap-4 min-[1200px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             <Card
-              className="gap-0 overflow-hidden rounded-2xl border-plum/15 py-0"
-              style={{
-                backgroundImage:
-                  'radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--plum) 9%, transparent), transparent 38%)',
-              }}
+              className="gap-0 overflow-hidden rounded-2xl border border-foreground/15 bg-lime-50/30 py-0 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary hover:shadow-lg"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-plum/[.04] px-5 py-4">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-muted-foreground">
-                    Ingresos de {data.month.label}
-                  </p>
-                  <h2 className="mt-1 text-lg font-black tracking-tight">Cómo va el mes</h2>
-                </div>
-                <Button asChild variant="outline" size="sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 pb-2">
+                <h1 className="text-xl font-extrabold uppercase text-plum">
+                  Ingresos de este mes
+                </h1>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="border-plum/40 bg-plum text-white hover:bg-plum/90 hover:text-white"
+                >
                   <Link href="/panel/reportes">
                     Ver reportes
                     <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} />
@@ -584,243 +480,127 @@ export function OwnerDashboard({
                 </Button>
               </div>
 
-              <div className="grid gap-4 px-5 py-5 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">Cobrado real</p>
-                  <p className="mt-1 font-display text-4xl font-black leading-none tabular-nums">
-                    {money(data.month.collected)}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+              <div className="grid gap-5 px-5 pb-5 pt-3 sm:grid-cols-2">
+                <div className="text-center">
+                  <div className="flex items-stretch justify-center">
+                    <div className="min-w-0 flex-1 px-2 2xl:px-3">
+                      <p className="text-[11px] font-semibold text-muted-foreground">Cobrado en el mes</p>
+                      <p className="mt-1 whitespace-nowrap font-display text-2xl font-black leading-none tabular-nums sm:text-3xl 2xl:text-4xl">
+                        {money(data.month.collected)}
+                      </p>
+                    </div>
+                    <span aria-hidden="true" className="w-px self-stretch bg-border/70" />
+                    <div className="min-w-0 flex-1 px-2 2xl:px-3">
+                      <p className="text-[11px] font-semibold text-muted-foreground">Cobrado hoy</p>
+                      <p className="mt-1 whitespace-nowrap font-display text-2xl font-black leading-none tabular-nums sm:text-3xl 2xl:text-4xl">
+                        {money(data.todaySummary.collected)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
                     adelantos, saldos y extensiones registrados en caja
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">Por cobrar</p>
-                  <p className="mt-1 font-display text-4xl font-black leading-none text-plum tabular-nums">
-                    {money(data.month.outstanding)}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+
+                <div className="text-center">
+                  <div className="flex items-stretch justify-center">
+                    <div className="min-w-0 flex-1 px-2 2xl:px-3">
+                      <p className="text-[11px] font-semibold text-muted-foreground">Por cobrar del mes</p>
+                      <p className="mt-1 whitespace-nowrap font-display text-2xl font-black leading-none text-plum tabular-nums sm:text-3xl 2xl:text-4xl">
+                        {money(data.month.outstanding)}
+                      </p>
+                    </div>
+                    <span aria-hidden="true" className="w-px self-stretch bg-border/70" />
+                    <div className="min-w-0 flex-1 px-2 2xl:px-3">
+                      <p className="text-[11px] font-semibold text-muted-foreground">Por cobrar hoy</p>
+                      <p className="mt-1 whitespace-nowrap font-display text-2xl font-black leading-none text-plum tabular-nums sm:text-3xl 2xl:text-4xl">
+                        {money(data.todaySummary.outstanding)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
                     saldo pendiente de reservas confirmadas y completadas
                   </p>
                 </div>
               </div>
 
-              <div className="px-5 pb-3">
-                <OwnerMonthChart data={data.month.daily} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-px border-t bg-plum/10 sm:grid-cols-4">
-                <StatCell
-                  label="Reservas"
-                  value={String(data.month.reservations)}
-                  hint="confirmadas y completadas"
-                />
-                <StatCell
-                  label="Ticket promedio"
-                  value={money(data.month.averageTicket)}
-                  hint="por reserva cobrada"
-                />
-                <StatCell
-                  label="Inasistencias"
-                  value={String(data.month.noShowCount)}
-                  hint={`${percent(data.month.noShowRate)} de las jugadas · no se presentaron`}
-                />
-                <StatCell
-                  label="Recurrentes"
-                  value={String(data.month.recurringClients)}
-                  hint="clientes con 2+ reservas en 14 días"
-                />
-              </div>
-            </Card>
-
-            <section className="flex flex-col border-t border-border/60 pt-6 xl:border-t-0 xl:border-l xl:pl-6 xl:pt-0">
-              <div className="flex items-start justify-between gap-3 border-b pb-3">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-muted-foreground">
-                    Bandeja operativa
-                  </p>
-                  <h2 className="mt-1 text-lg font-black tracking-tight">Requiere tu atención</h2>
-                </div>
-                <Badge variant={data.pendingValidationCount > 0 ? 'warning' : 'success'}>
-                  {data.pendingValidationCount > 0
-                    ? `${data.pendingValidationCount} por validar`
-                    : 'Todo al día'}
-                </Badge>
-              </div>
-
-              <div className="divide-y divide-border/60">
-                {data.pendingValidations.length ? (
-                  data.pendingValidations.map((reservation) => (
-                    <PendingRow key={reservation.id} reservation={reservation} />
-                  ))
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <span className="grid size-11 place-items-center rounded-2xl bg-success/18 text-success-foreground">
-                      <HugeiconsIcon icon={CheckmarkCircle01Icon} strokeWidth={2} className="size-5" />
+              <div className="px-5 pb-5">
+                <div className="rounded-xl border border-border/70 bg-card p-3 shadow-sm">
+                  <div className="flex items-center justify-end gap-3 pb-1 text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <span className="size-2 rounded-full bg-primary" />
+                      Cobrado
                     </span>
-                    <p className="mt-3 text-sm font-bold">No hay comprobantes por validar</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Cuando un cliente suba su comprobante aparecerá aquí.
-                    </p>
+                    <span className="flex items-center gap-1">
+                      <span className="size-2 rounded-full bg-plum" />
+                      Por cobrar
+                    </span>
                   </div>
-                )}
-              </div>
-
-              <div className="mt-4">
-                <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link href="/panel/reservas?status=pendiente_validacion">
-                    Revisar todos los comprobantes
-                    <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} />
-                  </Link>
-                </Button>
-              </div>
-            </section>
-          </section>
-
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-            <Card
-              className="gap-0 overflow-hidden rounded-2xl border-0 bg-secondary py-0 text-secondary-foreground shadow-md"
-              style={{
-                backgroundImage:
-                  'radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 38%), radial-gradient(circle at 100% 100%, color-mix(in oklab, var(--plum) 22%, transparent), transparent 42%)',
-              }}
-            >
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[.04] px-5 py-4">
-                <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-white/50">
-                    Planificación
-                  </p>
-                  <h2 className="mt-1 text-lg font-black tracking-tight text-white">Próximos 7 días</h2>
+                  <OwnerMonthChart data={data.month.daily} />
                 </div>
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="text-white/70 hover:bg-white/10 hover:text-white"
-                >
-                  <Link href="/panel/agenda?view=week">
-                    Ver semana
-                    <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} />
-                  </Link>
-                </Button>
               </div>
-              <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4 xl:grid-cols-7">
-                {data.nextDays.map((day) => (
-                  <NextDayCard key={day.date} day={day} />
-                ))}
-              </div>
+
             </Card>
 
-            <Card className="relative gap-0 overflow-hidden rounded-2xl border-0 bg-plum py-5 text-white shadow-md">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-primary/25 blur-2xl"
-              />
-              <div className="relative px-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-white/55">
-                      Actividad del mes
-                    </p>
-                    <h2 className="mt-1 text-lg font-black tracking-tight">Ocupación y origen</h2>
+            <div className="flex flex-col gap-4">
+              <Card className="flex h-72 flex-col gap-0 overflow-hidden rounded-2xl border border-foreground/15 bg-lime-50/30 py-0 shadow-sm backdrop-blur-sm">
+                <div className="flex shrink-0 items-start justify-between gap-3 px-4 pt-4 pb-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className="owner-shake grid size-6 shrink-0 place-items-center text-orange-500"
+                    >
+                      <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-5" />
+                    </span>
+                    <h1 className="text-xl font-extrabold uppercase text-plum">Requiere tu atención</h1>
                   </div>
-                  <Link
-                    href="/panel/reportes?tab=operativo"
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline"
-                  >
-                    Ver detalle
-                    <HugeiconsIcon icon={ChartLineData01Icon} strokeWidth={2} className="size-3" />
-                  </Link>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <div className="flex flex-col items-center rounded-xl bg-white/[.06] p-3">
-                    <Donut
-                      size={96}
-                      segments={[
-                        { label: 'Ocupado', value: data.month.occupancyRate, color: 'var(--primary)' },
-                        {
-                          label: 'Libre',
-                          value: Math.max(0, 100 - data.month.occupancyRate),
-                          color: 'rgba(255,255,255,.16)',
-                        },
-                      ]}
-                      center={percent(data.month.occupancyRate)}
-                      centerLabel="ocupación"
-                    />
-                    <p className="mt-2 text-xs font-bold text-white/80">Ocupación</p>
-                    <p className="text-[10px] text-white/45">
-                      {hours(data.month.soldHours)} de {hours(data.month.availableHours)}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col items-center rounded-xl bg-white/[.06] p-3">
-                    <Donut
-                      size={96}
-                      segments={[
-                        { label: 'App', value: data.month.appReservations, color: 'var(--primary)' },
-                        {
-                          label: 'Manual',
-                          value: data.month.manualReservations,
-                          color: 'rgba(255,255,255,.4)',
-                        },
-                      ]}
-                      center={String(data.month.appReservations + data.month.manualReservations)}
-                      centerLabel="reservas"
-                    />
-                    <p className="mt-2 text-xs font-bold text-white/80">Origen</p>
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-white/45">
-                      <span className="flex items-center gap-1">
-                        <span className="size-1.5 rounded-full bg-primary" />
-                        App {data.month.appReservations}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="size-1.5 rounded-full bg-white/40" />
-                        Manual {data.month.manualReservations}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-[11px] text-white/50">
-                  <span>
-                    Recurrentes: <strong className="font-bold text-white">{data.month.recurringClients}</strong>
-                  </span>
-                  <span>2+ reservas en 14 días</span>
-                </div>
-              </div>
-            </Card>
-          </section>
-
-          {showChecklist ? (
-            <section id="publicacion" className="scroll-mt-20 space-y-3">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <p className="eyebrow">Publicación</p>
-                  <h2 className="mt-1 text-xl font-black tracking-tight">
-                    {local.publicado ? 'Revisa la información de tu local' : 'Completa tu local para recibir reservas'}
-                  </h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={checklist.ready ? 'info' : 'neutral'}>
-                    {checklist.ready ? 'Listo para publicar' : 'Faltan requisitos'}
+                  <Badge variant={data.pendingValidationCount > 0 ? 'warning' : 'success'}>
+                    {data.pendingValidationCount > 0
+                      ? `${data.pendingValidationCount} por validar`
+                      : 'Todo al día'}
                   </Badge>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href="/panel/configuracion">
-                      Configurar
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+                  {data.pendingValidations.length ? (
+                    data.pendingValidations.map((reservation) => (
+                      <PendingRow key={reservation.id} reservation={reservation} />
+                    ))
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center px-4 py-8 text-center">
+                      <span className="grid size-11 place-items-center rounded-2xl bg-success/18 text-success-foreground">
+                        <HugeiconsIcon icon={CheckmarkCircle01Icon} strokeWidth={2} className="size-5" />
+                      </span>
+                      <p className="mt-3 text-sm font-bold">No hay comprobantes por validar</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Cuando un cliente suba su comprobante aparecerá aquí.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="shrink-0 px-4 pb-4 pt-1">
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-plum/40 bg-plum text-white hover:bg-plum/90 hover:text-white"
+                  >
+                    <Link href="/panel/reservas?status=pendiente_validacion">
+                      Revisar todos los comprobantes
                       <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} />
                     </Link>
                   </Button>
                 </div>
-              </div>
-              <PublicationChecklistCard
-                localId={local.id}
-                localName={local.nombre}
-                published={local.publicado}
-                checklist={checklist}
+              </Card>
+
+              <ClientsSpotlight
+                todayClients={data.todayClients}
+                frequentClients={data.frequentClients}
               />
-            </section>
-          ) : null}
+            </div>
+          </section>
+
         </div>
       </div>
     </div>
