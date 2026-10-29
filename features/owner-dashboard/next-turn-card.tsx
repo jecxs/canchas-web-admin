@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Clock01Icon } from '@hugeicons/core-free-icons'
+import { ClientAvatar } from '@/components/dashboard/client-avatar'
 import { cn } from '@/lib/utils'
 import { useCourtsSync } from './courts-sync'
 import type { DashboardReservation } from './types'
@@ -62,7 +63,7 @@ export function NextTurnCard({
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className="group rounded-2xl border border-white/10 bg-white/[.06] p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-plum/40 hover:bg-plum/10 hover:shadow-md active:translate-y-0"
+      className="group rounded-2xl border border-white/10 bg-white/[.06] p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-plum/40 hover:bg-plum/10 hover:shadow-md active:translate-y-0 2xl:p-5"
     >
       <div
         key={next?.id ?? activeCourtId ?? 'empty'}
@@ -98,9 +99,18 @@ export function NextTurnCard({
               <span className="font-display text-3xl font-black leading-none">{formatTime(next.start)}</span>
               <span className="text-sm font-bold text-white/50">– {formatTime(next.end)}</span>
             </p>
-            <p className="mt-1 text-xs text-white/60">
-              {formatDateTime(next.start)} · {next.customerName}
-            </p>
+            <div className="mt-1.5 flex items-center gap-2">
+              <ClientAvatar
+                src={next.customerAvatarUrl}
+                name={next.customerName}
+                size="sm"
+                className="size-6 ring-1 ring-white/20"
+                fallbackClassName="bg-white/15 text-white"
+              />
+              <p className="min-w-0 truncate text-xs text-white/60">
+                {formatDateTime(next.start)} · {next.customerName}
+              </p>
+            </div>
           </>
         ) : (
           <>

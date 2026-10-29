@@ -6,6 +6,7 @@ export type DashboardReservation = {
   courtName: string
   sportName: string
   customerName: string
+  customerAvatarUrl: string | null
   start: string
   end: string
   status: ReservationStatus
@@ -32,6 +33,7 @@ export type DashboardClient = {
   key: string
   name: string
   phone: string | null
+  avatarUrl: string | null
   reservations: number
   lastReservationAt: string
   reservationId: string | null

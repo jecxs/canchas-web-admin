@@ -44,6 +44,7 @@ export async function getClientsData(filters: ClientsFilters): Promise<ClientsDa
     clienteId: client.cliente_id,
     name: client.nombre,
     phone: client.telefono,
+    avatarUrl: client.avatar_url ?? null,
     isAccount: client.es_cuenta,
     totalReservations: Number(client.total_reservas),
     confirmed: Number(client.confirmadas),

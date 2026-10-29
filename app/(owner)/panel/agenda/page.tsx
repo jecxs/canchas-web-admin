@@ -4,7 +4,7 @@ import { getRollingAgendaDates, getTodayInLima, getWeekStart, isValidAgendaDate 
 import { getAgendaData, getAgendaWeekData } from '@/features/agenda/queries'
 import { normalizeAgendaSportId } from '@/features/agenda/sport-filter'
 
-type AgendaSearchParams = Promise<{ date?: string; sport?: string; view?: string; court?: string; reservation?: string; newClient?: string; clientId?: string; clientName?: string; clientPhone?: string; clientAccount?: string; clientCount?: string }>
+type AgendaSearchParams = Promise<{ date?: string; sport?: string; view?: string; court?: string; reservation?: string; newClient?: string; clientId?: string; clientName?: string; clientPhone?: string; clientAvatar?: string; clientAccount?: string; clientCount?: string }>
 
 export default async function OwnerAgendaPage({ searchParams }: { searchParams: AgendaSearchParams }) {
   const params = await searchParams
@@ -18,6 +18,7 @@ export default async function OwnerAgendaPage({ searchParams }: { searchParams: 
         clienteId: params.clientId || null,
         name: params.clientName,
         phone: params.clientPhone || null,
+        avatarUrl: params.clientAvatar || null,
         isAccount: params.clientAccount === '1',
         totalReservations: Number.parseInt(params.clientCount ?? '0', 10) || 0,
       }
