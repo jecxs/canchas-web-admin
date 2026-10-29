@@ -20,7 +20,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { dashboardNavigation, isNavigationItemActive } from './navigation'
+import { getDashboardNavigation, isNavigationItemActive, ownerDataNavigationItem } from './navigation'
 import { getSubscriptionPresentation, localStatePresentation } from './status'
 import type { DashboardRole } from './types'
 import type { LocalSummary, SubscriptionSummary } from '@/lib/auth/access'
@@ -28,19 +28,27 @@ import { canOperateLocal } from '@/lib/auth/access'
 
 type AppSidebarProps = {
   role: DashboardRole
+  localsCount: number
   activeLocal: LocalSummary | null
   subscription: SubscriptionSummary | null
 }
 
-export function AppSidebar({ role, activeLocal, subscription }: AppSidebarProps) {
+export function AppSidebar({ role, localsCount, activeLocal, subscription }: AppSidebarProps) {
   const pathname = usePathname()
   const { setOpenMobile } = useSidebar()
   const localState = activeLocal ? localStatePresentation[activeLocal.estado] : null
   const subscriptionState = getSubscriptionPresentation(subscription)
   const isOperational = activeLocal ? canOperateLocal(activeLocal, subscription) : false
+  const canConfigurePaidLocal =
+    activeLocal?.estado === 'aprobado_pendiente_pago'
+    && subscription?.estado_facturacion === 'activa'
+  const restrictedNavigation = canConfigurePaidLocal
+    ? ['/panel', '/panel/sedes', '/panel/configuracion', '/panel/suscripcion']
+    : ['/panel', '/panel/sedes', '/panel/suscripcion']
+  const visibleNavigation = getDashboardNavigation(role, localsCount)
   const navigation = role === 'owner' && !isOperational
-    ? dashboardNavigation.owner.filter((item) => item.href === '/panel' || item.href === '/panel/suscripcion')
-    : dashboardNavigation[role]
+    ? [...visibleNavigation.filter((item) => restrictedNavigation.includes(item.href)), ownerDataNavigationItem]
+    : visibleNavigation
   const homeHref = role === 'admin' ? '/admin' : '/panel'
   const helpHref = role === 'admin' ? '/admin/ayuda' : '/panel/ayuda'
 
@@ -49,7 +57,7 @@ export function AppSidebar({ role, activeLocal, subscription }: AppSidebarProps)
       <SidebarHeader className="p-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip="Grassly" className="h-12 rounded-xl hover:bg-sidebar-foreground/8 data-[active=true]:bg-transparent">
+            <SidebarMenuButton asChild size="lg" tooltip="Grassly" className="h-12 rounded-xl hover:bg-sidebar-foreground/8 hover:text-sidebar-foreground data-[active=true]:bg-transparent">
               <Link href={homeHref} onClick={() => setOpenMobile(false)}>
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-sidebar-primary">
                   <span className="size-2.5 rounded-full bg-sidebar-primary-foreground" />
@@ -68,21 +76,26 @@ export function AppSidebar({ role, activeLocal, subscription }: AppSidebarProps)
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
-              {navigation.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isNavigationItemActive(pathname, item)}
-                    tooltip={item.title}
-                    className="h-10 rounded-xl px-3 font-semibold hover:bg-sidebar-foreground/8 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground"
-                  >
-                    <Link href={item.href} onClick={() => setOpenMobile(false)}>
-                      <HugeiconsIcon icon={item.icon} strokeWidth={2} />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navigation.map((item) => {
+                const isActive = isNavigationItemActive(pathname, item)
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                      className={`h-10 rounded-xl px-3 font-semibold ${isActive
+                        ? 'hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground'
+                        : 'hover:bg-sidebar-foreground/8 hover:text-sidebar-foreground'}`}
+                    >
+                      <Link href={item.href} onClick={() => setOpenMobile(false)}>
+                        <HugeiconsIcon icon={item.icon} strokeWidth={2} />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -103,7 +116,7 @@ export function AppSidebar({ role, activeLocal, subscription }: AppSidebarProps)
       <SidebarFooter className="border-t border-sidebar-border p-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Ayuda" className="h-10 rounded-xl px-3 font-semibold hover:bg-sidebar-foreground/8">
+            <SidebarMenuButton asChild tooltip="Ayuda" className="h-10 rounded-xl px-3 font-semibold hover:bg-sidebar-foreground/8 hover:text-sidebar-foreground">
               <Link href={helpHref} onClick={() => setOpenMobile(false)}>
                 <HugeiconsIcon icon={HelpCircleIcon} strokeWidth={2} />
                 <span>Ayuda</span>

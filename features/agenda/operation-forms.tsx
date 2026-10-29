@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,8 +33,10 @@ function Feedback({ state }: { state: AgendaActionState }) {
 }
 
 export function useAgendaFeedback(state: AgendaActionState, onSuccess: () => void) {
+  const processedState = useRef<AgendaActionState | null>(null)
   useEffect(() => {
-    if (!state.message) return
+    if (!state.message || processedState.current === state) return
+    processedState.current = state
     if (state.success) {
       notify.success({ description: state.message })
       onSuccess()

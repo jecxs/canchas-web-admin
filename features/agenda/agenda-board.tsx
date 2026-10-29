@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent, ty
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, MoneyReceive01Icon, ArrowLeft01Icon, ArrowRight01Icon, Calendar03Icon, CheckmarkCircle01Icon, Clock01Icon, FilterHorizontalIcon, MoreHorizontalIcon, Cancel01Icon, Maximize02Icon, Minimize02Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, MoneyReceive01Icon, ArrowLeft01Icon, ArrowRight01Icon, Calendar03Icon, CalendarRemove01Icon, CheckmarkCircle01Icon, Clock01Icon, FilterHorizontalIcon, MoreHorizontalIcon, Cancel01Icon, Maximize02Icon, Minimize02Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -502,6 +502,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
   }
 
   function changeView(nextView: 'day' | 'week') {
+    document.cookie = `grassly_agenda_view=${nextView}; Path=/panel; Max-Age=31536000; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`
     setBoardTransition('refresh')
     startTransition(() => router.push(buildAgendaUrl(pathname, getTodayInLima(), selectedSportId, nextView, selectedCourt?.id)))
   }
@@ -637,7 +638,7 @@ export function AgendaBoard({ data, selectedSportId = '', view = 'day', weekData
       <div className="flex flex-wrap justify-end gap-2 pt-2">
         {!selectedOccupation && court && <><Button type="button" variant="outline" onClick={() => setOperation('maintenance')}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} /> Bloquear</Button><Button type="button" onClick={() => setOperation('manual')}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Registrar reserva</Button></>}
         {reservation?.reservationId && status === 'pendiente_validacion' && !hasStarted && <><Button type="button" variant="destructive" onClick={() => setOperation('reject')}><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} /> Rechazar</Button><Button type="button" onClick={() => setOperation('confirm')}><HugeiconsIcon icon={CheckmarkCircle01Icon} strokeWidth={2} /> Confirmar reserva</Button></>}
-        {reservation?.reservationId && ['pendiente_validacion', 'confirmada', 'pendiente_pago'].includes(status ?? '') && <Button type="button" variant="outline" onClick={() => setOperation('cancel')}><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} /> Cancelar</Button>}
+        {reservation?.reservationId && ['pendiente_validacion', 'confirmada', 'pendiente_pago'].includes(status ?? '') && <Button type="button" variant="outline" onClick={() => setOperation('cancel')}><HugeiconsIcon icon={CalendarRemove01Icon} strokeWidth={2} /> Cancelar reserva</Button>}
         {reservation?.reservationId && status === 'confirmada' && isInProgress && <Button type="button" variant="destructive" onClick={() => setOperation('no-show')}>No se presentó</Button>}
         {reservation?.reservationId && (status === 'confirmada' || status === 'completada') && <Button type="button" variant="outline" onClick={() => setOperation('payment')}>Registrar cobro</Button>}
         {reservation?.reservationId && (status === 'confirmada' || status === 'completada') && <><Button type="button" variant="outline" onClick={() => setOperation('extend')}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} /> Autorizar +30 min</Button>{reservation.isException && <Button type="button" onClick={() => setOperation('encajada')}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Registrar encajada</Button>}</>}

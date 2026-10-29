@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { EditGuard, GuardActions, useEditGuard } from '@/components/dashboard/edit-guard'
 import { cn } from '@/lib/utils'
-import { initialSubscriptionPriceState, publishSubscriptionPriceAction } from './actions'
+import { initialSubscriptionPriceState } from './action-state'
+import { publishSubscriptionPriceAction } from './actions'
 import type { SubscriptionPriceVersion } from './queries'
 
 function money(value: number) {

@@ -170,11 +170,11 @@ export async function applyLocalModerationAction(
     p_local_id: validation.data.localId,
     p_tipo: validation.data.type,
     p_motivo: validation.data.reason,
-    p_notas_internas: validation.data.internalNotes || null,
+    p_notas_internas: validation.data.internalNotes || undefined,
     // El panel opera en Perú; datetime-local no incluye zona horaria.
     p_vigente_hasta: validation.data.endsAt
       ? new Date(`${validation.data.endsAt}:00-05:00`).toISOString()
-      : null,
+      : undefined,
   })
 
   if (error) {
@@ -204,7 +204,7 @@ export async function liftLocalModerationAction(
   const supabase = await createClient()
   const { error } = await supabase.rpc('moderacion_levantar_medida', {
     p_local_id: validation.data.localId,
-    p_motivo: validation.data.reason || null,
+    p_motivo: validation.data.reason || undefined,
   })
 
   if (error) {

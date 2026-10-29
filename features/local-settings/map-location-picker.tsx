@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useEditGuard } from '@/components/dashboard/edit-guard'
 import { cn } from '@/lib/utils'
-import { MAPBOX_ACCESS_TOKEN as ACCESS_TOKEN, type GeocodeFeature } from './map-geocoding'
+import { MAPBOX_ACCESS_TOKEN as ACCESS_TOKEN, readGeocodeAddress, reverseGeocodeAddress, type GeocodeFeature } from './map-geocoding'
 
 const DEFAULT_CENTER = { longitude: -77.0428, latitude: -12.0464 }
 const MARKER_COLOR = '#f97316'
@@ -19,15 +19,20 @@ type MapboxModule = typeof import('mapbox-gl')['default']
 export type LocationPatch = {
   latitude?: number
   longitude?: number
+  address?: string
 }
 
 export function MapLocationPicker({
   latitude,
   longitude,
+  defaultCenter,
+  autoFillAddress = false,
   onLocationChange,
 }: {
   latitude: number | null
   longitude: number | null
+  defaultCenter?: { latitude: number; longitude: number }
+  autoFillAddress?: boolean
   onLocationChange: (patch: LocationPatch) => void
 }) {
   const guard = useEditGuard()
@@ -39,6 +44,7 @@ export function MapLocationPicker({
   const mapboxRef = useRef<MapboxModule | null>(null)
   const onChangeRef = useRef(onLocationChange)
   const interactiveRef = useRef(interactive)
+  const addressRequestRef = useRef(0)
 
   const initial = useRef({ latitude, longitude })
   const [ready, setReady] = useState(false)
@@ -64,6 +70,13 @@ export function MapLocationPicker({
     map.getCanvas().style.cursor = interactive ? '' : 'default'
   }, [interactive, ready])
 
+  const updateAddress = useCallback(async (lng: number, lat: number, suggested?: string) => {
+    if (!autoFillAddress) return
+    const request = ++addressRequestRef.current
+    const address = suggested || await reverseGeocodeAddress(lng, lat)
+    if (address && request === addressRequestRef.current) onChangeRef.current({ address })
+  }, [autoFillAddress])
+
   const placeMarker = useCallback((map: MapboxMap, mapboxgl: MapboxModule, lng: number, lat: number) => {
     if (!markerRef.current) {
       const marker = new mapboxgl.Marker({ color: MARKER_COLOR, draggable: interactiveRef.current })
@@ -72,12 +85,13 @@ export function MapLocationPicker({
       marker.on('dragend', () => {
         const position = marker.getLngLat()
         onChangeRef.current({ latitude: position.lat, longitude: position.lng })
+        void updateAddress(position.lng, position.lat)
       })
       markerRef.current = marker
       return
     }
     markerRef.current.setLngLat([lng, lat])
-  }, [])
+  }, [updateAddress])
 
   useEffect(() => {
     if (!ACCESS_TOKEN || !containerRef.current) return
@@ -94,8 +108,8 @@ export function MapLocationPicker({
         mapboxgl.accessToken = ACCESS_TOKEN
         mapboxRef.current = mapboxgl
 
-        const startLat = initial.current.latitude ?? DEFAULT_CENTER.latitude
-        const startLng = initial.current.longitude ?? DEFAULT_CENTER.longitude
+        const startLat = initial.current.latitude ?? defaultCenter?.latitude ?? DEFAULT_CENTER.latitude
+        const startLng = initial.current.longitude ?? defaultCenter?.longitude ?? DEFAULT_CENTER.longitude
         const hasPoint =
           typeof initial.current.latitude === 'number' && typeof initial.current.longitude === 'number'
 
@@ -120,6 +134,7 @@ export function MapLocationPicker({
           if (!interactiveRef.current) return
           placeMarker(map, mapboxgl, event.lngLat.lng, event.lngLat.lat)
           onChangeRef.current({ latitude: event.lngLat.lat, longitude: event.lngLat.lng })
+          void updateAddress(event.lngLat.lng, event.lngLat.lat)
         })
 
         map.on('load', () => {
@@ -144,7 +159,7 @@ export function MapLocationPicker({
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [placeMarker])
+  }, [defaultCenter?.latitude, defaultCenter?.longitude, placeMarker, updateAddress])
 
   async function handleSearch() {
     const value = query.trim()
@@ -174,6 +189,7 @@ export function MapLocationPicker({
       map.flyTo({ center: [lng, lat], zoom: 16 })
       if (mapboxRef.current) placeMarker(map, mapboxRef.current, lng, lat)
       onChangeRef.current({ latitude: lat, longitude: lng })
+      void updateAddress(lng, lat, readGeocodeAddress(feature))
     } catch {
       setSearchError('No se pudo buscar la zona. Inténtalo de nuevo.')
     } finally {

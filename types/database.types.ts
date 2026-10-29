@@ -1183,6 +1183,76 @@ export type Database = {
           },
         ]
       }
+      moderaciones_locales: {
+        Row: {
+          creada_at: string
+          creada_por: string
+          estado: string
+          id: string
+          levantada_at: string | null
+          levantada_por: string | null
+          local_id: string
+          motivo: string
+          motivo_levantamiento: string | null
+          notas_internas: string | null
+          tipo: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          creada_at?: string
+          creada_por: string
+          estado?: string
+          id?: string
+          levantada_at?: string | null
+          levantada_por?: string | null
+          local_id: string
+          motivo: string
+          motivo_levantamiento?: string | null
+          notas_internas?: string | null
+          tipo: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          creada_at?: string
+          creada_por?: string
+          estado?: string
+          id?: string
+          levantada_at?: string | null
+          levantada_por?: string | null
+          local_id?: string
+          motivo?: string
+          motivo_levantamiento?: string | null
+          notas_internas?: string | null
+          tipo?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderaciones_locales_creada_por_fkey"
+            columns: ["creada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderaciones_locales_levantada_por_fkey"
+            columns: ["levantada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderaciones_locales_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movimientos_pago_reserva: {
         Row: {
           created_at: string
@@ -2244,6 +2314,17 @@ export type Database = {
           sedes_incluidas: number
         }[]
       }
+      billing_obtener_resumen_sedes: {
+        Args: never
+        Returns: {
+          asientos_disponibles: number
+          max_sedes: number
+          puede_crear_sede: boolean
+          sedes_extra_contratadas: number
+          sedes_incluidas: number
+          sedes_usadas: number
+        }[]
+      }
       billing_obtener_precios_suscripcion_admin: {
         Args: never
         Returns: {
@@ -2646,6 +2727,22 @@ export type Database = {
           reserva_id: string
         }[]
       }
+      crear_sede_adicional: {
+        Args: {
+          p_descripcion: string
+          p_direccion: string
+          p_latitud: number
+          p_longitud: number
+          p_nombre: string
+          p_ruc: string
+          p_telefono_principal: string
+          p_telefono_secundario: string
+        }
+        Returns: {
+          estado: Database["public"]["Enums"]["estado_local"]
+          local_id: string
+        }[]
+      }
       desregistrar_push_token_cliente: {
         Args: { p_token: string }
         Returns: undefined
@@ -2916,46 +3013,13 @@ export type Database = {
         Args: { p_notificacion_id?: string }
         Returns: number
       }
+      marcar_notificaciones_leidas_dueno_local: {
+        Args: { p_local_id: string }
+        Returns: number
+      }
       marcar_reserva_no_show_dueno: {
         Args: { p_motivo?: string; p_reserva_id: string }
         Returns: undefined
-      }
-      moderacion_aplicar_medida: {
-        Args: {
-          p_local_id: string
-          p_motivo: string
-          p_notas_internas?: string | null
-          p_tipo: string
-          p_vigente_hasta?: string | null
-        }
-        Returns: string
-      }
-      moderacion_levantar_medida: {
-        Args: { p_local_id: string; p_motivo?: string | null }
-        Returns: boolean
-      }
-      moderacion_listar_activas_propietario: {
-        Args: never
-        Returns: {
-          creada_at: string
-          id: string
-          local_id: string
-          motivo: string
-          tipo: string
-          vigente_desde: string
-          vigente_hasta: string | null
-        }[]
-      }
-      moderacion_obtener_activa: {
-        Args: { p_local_id: string }
-        Returns: {
-          creada_at: string
-          id: string
-          motivo: string
-          tipo: string
-          vigente_desde: string
-          vigente_hasta: string | null
-        }[]
       }
       mercadopago_autorizar_conciliador_cron: {
         Args: { p_secret: string }
@@ -3068,6 +3132,51 @@ export type Database = {
         Returns: {
           expira_en: string
           reserva_id: string
+        }[]
+      }
+      moderacion_aplicar_medida: {
+        Args: {
+          p_local_id: string
+          p_motivo: string
+          p_notas_internas?: string
+          p_tipo: string
+          p_vigente_hasta?: string
+        }
+        Returns: string
+      }
+      moderacion_bloquea_operacion: {
+        Args: { p_local_id: string }
+        Returns: boolean
+      }
+      moderacion_bloquea_reservas: {
+        Args: { p_local_id: string }
+        Returns: boolean
+      }
+      moderacion_levantar_medida: {
+        Args: { p_local_id: string; p_motivo?: string }
+        Returns: boolean
+      }
+      moderacion_listar_activas_propietario: {
+        Args: never
+        Returns: {
+          creada_at: string
+          id: string
+          local_id: string
+          motivo: string
+          tipo: string
+          vigente_desde: string
+          vigente_hasta: string
+        }[]
+      }
+      moderacion_obtener_activa: {
+        Args: { p_local_id: string }
+        Returns: {
+          creada_at: string
+          id: string
+          motivo: string
+          tipo: string
+          vigente_desde: string
+          vigente_hasta: string
         }[]
       }
       obtener_beneficios_publicos_local: {
@@ -3431,6 +3540,33 @@ export type Database = {
           reserva_id: string
         }[]
       }
+      obtener_reservas_export_dueno: {
+        Args: { p_desde?: string; p_hasta?: string; p_local_id: string }
+        Returns: {
+          canal: string
+          cancelada_at: string
+          cancha: string
+          cliente: string
+          created_at: string
+          deporte: string
+          estado: string
+          extension_monto: number
+          fin: string
+          inicio: string
+          monto_adelanto: number
+          monto_cobrado: number
+          monto_reembolsado: number
+          monto_total: number
+          motivo_cancelacion: string
+          motivo_rechazo: string
+          notas: string
+          reembolso_resultado: string
+          reserva_id: string
+          saldo_pendiente: number
+          telefono: string
+          tiene_comprobante: boolean
+        }[]
+      }
       obtener_reservas_local: {
         Args: {
           p_deporte_id?: string
@@ -3571,6 +3707,10 @@ export type Database = {
       }
       registrar_foto_local: {
         Args: { p_local_id: string; p_storage_path: string }
+        Returns: string
+      }
+      registrar_foto_cancha_local: {
+        Args: { p_cancha_id: string; p_local_id: string; p_storage_path: string }
         Returns: string
       }
       registrar_movimiento_pago_reserva_dueno: {

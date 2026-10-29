@@ -3,6 +3,7 @@ import 'server-only'
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { isIsoDate, todayLima } from '../reportes/date-utils'
+import { getMercadoPagoSettlements, summarizeMercadoPago } from './mercadopago-settlements'
 import type { CajaMedioTipo, CajaMovement, CajaReport } from './types'
 
 const MEDIO_LABELS: Record<CajaMedioTipo, string> = {
@@ -28,11 +29,14 @@ export async function getCajaReport(input: {
   let end = isIsoDate(input.end) ? input.end : today
   if (start > end) [start, end] = [end, start]
 
-  const { data, error } = await supabase.rpc('obtener_caja_local', {
-    p_local_id: local.id,
-    p_desde: start,
-    p_hasta: end,
-  })
+  const [{ data, error }, settlements] = await Promise.all([
+    supabase.rpc('obtener_caja_local', {
+      p_local_id: local.id,
+      p_desde: start,
+      p_hasta: end,
+    }),
+    getMercadoPagoSettlements(supabase, local.id, start, end),
+  ])
 
   if (error) {
     console.error('[caja:rpc]', { code: error.code, message: error.message })
@@ -42,6 +46,8 @@ export async function getCajaReport(input: {
   const movements = ((data ?? []) as CajaMovement[]).map((movement) => ({
     ...movement,
     monto: Number(movement.monto) || 0,
+    deducciones: settlements.get(movement.movimiento_id)?.deducciones ?? null,
+    netoRecibido: settlements.get(movement.movimiento_id)?.netoRecibido ?? null,
   }))
 
   const byMethodMap = new Map<string, { amount: number; count: number }>()
@@ -82,6 +88,16 @@ export async function getCajaReport(input: {
     }))
     .sort((a, b) => b.amount - a.amount)
 
+  const mercadoPago = summarizeMercadoPago(
+    movements.map((movement) => ({
+      movimiento_id: movement.movimiento_id,
+      monto: movement.monto,
+      medio: movement.medio_tipo,
+      tipo: movement.tipo,
+    })),
+    settlements,
+  )
+
   return {
     localId: local.id,
     localName: local.nombre,
@@ -89,6 +105,7 @@ export async function getCajaReport(input: {
     end,
     today,
     totals: { collected, mercadopago, comprobante, reembolsos, neto: collected - reembolsos, count },
+    mercadoPago,
     byMethod,
     movements,
   }

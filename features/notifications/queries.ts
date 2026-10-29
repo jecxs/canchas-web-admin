@@ -13,6 +13,7 @@ export type OwnerNotification = {
   createdAt: string
   type: string
   reservationId: string | null
+  localId: string | null
 }
 
 export async function getOwnerNotifications({ limit = 20, before }: { limit?: number; before?: string } = {}): Promise<OwnerNotification[]> {
@@ -20,7 +21,7 @@ export async function getOwnerNotifications({ limit = 20, before }: { limit?: nu
   const supabase = await createClient()
   let query = supabase
     .from('notificaciones')
-    .select('id,destinatario_id,reserva_id,titulo,mensaje,href,leida_at,created_at,tipo')
+    .select('id,destinatario_id,reserva_id,local_id,titulo,mensaje,href,leida_at,created_at,tipo')
     .eq('destinatario_id', context.userId)
     .in('tipo', ['reserva_pendiente_validacion', 'moderacion_local'])
     .order('created_at', { ascending: false })
@@ -43,5 +44,6 @@ export async function getOwnerNotifications({ limit = 20, before }: { limit?: nu
     createdAt: item.created_at,
     type: item.tipo,
     reservationId: item.reserva_id,
+    localId: item.local_id,
   }))
 }

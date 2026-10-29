@@ -69,7 +69,15 @@ export function DashboardHeader({ role, user, locals, activeLocal, initialNotifi
       <div className="ml-auto flex min-w-0 items-center gap-2">
         {role === 'owner' ? <LocalSwitcher locals={locals} activeLocal={activeLocal} /> : null}
         {role === 'owner' ? <LocalModerationIndicator moderation={activeLocal?.moderation} /> : null}
-        {role === 'owner' ? <NotificationsBell recipientId={user.id} initialNotifications={initialNotifications} /> : null}
+        {role === 'owner' ? (
+          <NotificationsBell
+            recipientId={user.id}
+            locals={locals}
+            activeLocalId={activeLocal?.id ?? null}
+            activeLocalName={activeLocal?.nombre ?? null}
+            initialNotifications={initialNotifications}
+          />
+        ) : null}
         <UserMenu user={user} />
       </div>
     </header>

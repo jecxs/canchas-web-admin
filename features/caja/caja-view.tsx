@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -92,15 +93,27 @@ export function CajaView({ data }: { data: CajaReport }) {
             {data.localName} · {rangeLabel(data.start, data.end)}
           </p>
         </div>
-        <PeriodPicker start={data.start} end={data.end} />
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodPicker start={data.start} end={data.end} />
+          <a
+            href="https://www.mercadopago.com.pe/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-[#FFE600] px-3 text-sm font-bold text-[#191919] transition-colors hover:bg-[#f5da00]"
+            aria-label="Abrir mi cuenta de Mercado Pago"
+          >
+            <Image src="/mplogo.png" width={22} height={16} alt="" />
+            Ver Mercado Pago
+          </a>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Neto del periodo</p>
+            <p className="text-sm text-muted-foreground">Cobrado menos reembolsos</p>
             <p className="mt-2 text-2xl font-black">{money(data.totals.neto)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">ingresos menos reembolsos</p>
+            <p className="mt-1 text-xs text-muted-foreground">antes de deducciones</p>
           </CardContent>
         </Card>
         <Card>
@@ -112,9 +125,18 @@ export function CajaView({ data }: { data: CajaReport }) {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Mercado Pago</p>
-            <p className="mt-2 text-2xl font-black">{money(data.totals.mercadopago)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">cobros online</p>
+            <p className="text-sm text-muted-foreground">Mercado Pago · bruto</p>
+            <p className="mt-2 text-2xl font-black">{money(data.mercadoPago.bruto)}</p>
+            <div className="mt-3 space-y-1 border-t pt-2 text-xs">
+              <div className="flex justify-between gap-2 text-muted-foreground">
+                <span>Deducciones</span>
+                <span>{data.mercadoPago.deducciones === null ? 'Pendiente' : `−${money(data.mercadoPago.deducciones)}`}</span>
+              </div>
+              <div className="flex justify-between gap-2 font-bold">
+                <span>Recibido</span>
+                <span>{data.mercadoPago.netoRecibido === null ? 'Pendiente' : money(data.mercadoPago.netoRecibido)}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -194,6 +216,13 @@ export function CajaView({ data }: { data: CajaReport }) {
                       </td>
                       <td className={cn('py-3 text-right font-semibold whitespace-nowrap', movement.monto < 0 && 'text-destructive')}>
                         {money(movement.monto)}
+                        {movement.medio_tipo === 'mercadopago' && movement.tipo === 'adelanto' ? (
+                          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                            {movement.netoRecibido === null || movement.netoRecibido === undefined || movement.deducciones === null || movement.deducciones === undefined
+                              ? 'Recibido pendiente'
+                              : `−${money(movement.deducciones)} · Recibido ${money(movement.netoRecibido)}`}
+                          </span>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

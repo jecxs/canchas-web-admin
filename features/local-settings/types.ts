@@ -24,9 +24,11 @@ export type ScheduleRow = Pick<
   'dia_semana' | 'hora_apertura' | 'hora_cierre'
 >
 
-export type LocalPhoto = Pick<Tables<'fotos'>, 'id' | 'storage_path' | 'orden'> & {
+export type LocalPhoto = Pick<Tables<'fotos'>, 'id' | 'storage_path' | 'orden' | 'cancha_id'> & {
   oculta?: boolean
 }
+
+export type PhotoCourtOption = { id: string; name: string }
 
 export type BenefitCatalogItem = Pick<
   Tables<'beneficios_catalogo'>,

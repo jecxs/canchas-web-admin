@@ -19,6 +19,8 @@ export type CajaMovement = {
   created_at: string
   tipo: 'adelanto' | 'saldo' | 'reembolso'
   monto: number
+  deducciones?: number | null
+  netoRecibido?: number | null
   medio_tipo: CajaMedioTipo
   referencia: string | null
   notas: string | null
@@ -45,6 +47,9 @@ export type CajaReport = {
     neto: number
     count: number
   }
+  mercadoPago: MercadoPagoTotals
   byMethod: CajaMethodItem[]
   movements: CajaMovement[]
 }
+import type { MercadoPagoTotals } from './mercadopago-settlements'
+

@@ -9,6 +9,7 @@ import { createClient } from '@/utils/supabase/server'
 import type { SettingsActionState } from './types'
 
 const pathSchema = z.object({ localId: z.uuid(), path: z.string().min(40).max(300) })
+const galleryPathSchema = pathSchema.extend({ courtId: z.uuid().nullable().optional() })
 const photoSchema = z.object({ localId: z.uuid(), photoId: z.uuid() })
 const orderSchema = z.object({ localId: z.uuid(), photoIds: z.array(z.uuid()).max(12) })
 const visibilitySchema = z.object({ localId: z.uuid(), photoId: z.uuid(), hidden: z.boolean() })
@@ -16,6 +17,7 @@ const visibilitySchema = z.object({ localId: z.uuid(), photoId: z.uuid(), hidden
 function done(localId: string): SettingsActionState {
   revalidatePath('/panel')
   revalidatePath('/panel/configuracion')
+  revalidatePath('/panel/canchas')
   revalidatePath('/admin/locales')
   revalidatePath(`/admin/locales/${localId}`)
   return { success: true, message: 'Cambios guardados' }
@@ -41,13 +43,19 @@ export async function registerLogoPath(input: unknown): Promise<SettingsActionSt
 }
 
 export async function registerGalleryPath(input: unknown): Promise<SettingsActionState> {
-  const validation = pathSchema.safeParse(input)
+  const validation = galleryPathSchema.safeParse(input)
   if (!validation.success || !await authorizeLocalWrite(validation.data.localId)) return { success: false, message: 'No tienes permiso para realizar esta acción' }
   const supabase = await createClient()
-  const { error } = await supabase.rpc('registrar_foto_local', {
-    p_local_id: validation.data.localId,
-    p_storage_path: validation.data.path,
-  })
+  const { error } = validation.data.courtId
+    ? await supabase.rpc('registrar_foto_cancha_local', {
+        p_local_id: validation.data.localId,
+        p_cancha_id: validation.data.courtId,
+        p_storage_path: validation.data.path,
+      })
+    : await supabase.rpc('registrar_foto_local', {
+        p_local_id: validation.data.localId,
+        p_storage_path: validation.data.path,
+      })
   if (error) {
     console.error('[local-media:gallery]', { code: error.code })
     return { success: false, message: error.code === '23514' ? 'Revisa los campos indicados' : 'No se pudo completar la operación' }

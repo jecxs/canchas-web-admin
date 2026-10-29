@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { AgendaBoard } from '@/features/agenda/agenda-board'
 import { getRollingAgendaDates, getTodayInLima, getWeekStart, isValidAgendaDate } from '@/features/agenda/date-utils'
 import { getAgendaData, getAgendaWeekData } from '@/features/agenda/queries'
@@ -7,7 +8,11 @@ type AgendaSearchParams = Promise<{ date?: string; sport?: string; view?: string
 
 export default async function OwnerAgendaPage({ searchParams }: { searchParams: AgendaSearchParams }) {
   const params = await searchParams
-  const view = params.view === 'week' ? 'week' : 'day'
+  const cookieStore = await cookies()
+  const savedView = cookieStore.get('grassly_agenda_view')?.value
+  const view = params.view === 'week' || params.view === 'day'
+    ? params.view
+    : savedView === 'week' ? 'week' : 'day'
   const newClient = params.newClient === '1' && params.clientName
     ? {
         clienteId: params.clientId || null,
