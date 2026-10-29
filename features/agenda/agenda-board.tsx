@@ -15,9 +15,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
+  MoneyReceive01Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
   Calendar03Icon,
+  CalendarRemove01Icon,
   CheckmarkCircle01Icon,
   Clock01Icon,
   FilterHorizontalIcon,
@@ -58,7 +60,6 @@ import {
 } from "@/components/ui/sheet";
 import { notify } from "@/lib/notifications/notify";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/format";
 import { createClient } from "@/utils/supabase/client";
 import {
   formatAgendaDate,
@@ -84,17 +85,6 @@ import {
   RejectReservationForm,
   RescheduleReservationForm,
 } from "./operation-forms";
-import {
-  ChargeBadge,
-  chargeStateLabel,
-  resolveChargeState,
-  type ChargeState,
-} from "./charge-badge";
-import {
-  maintenanceDesign,
-  reservationStatusDesign,
-  reservationStatusLabel,
-} from "./status";
 import type { PickedClient } from "@/features/clients/client-picker";
 import type { AgendaCourt, AgendaData, AgendaOccupation } from "./types";
 
@@ -239,12 +229,88 @@ function occupationLabel(occupation?: AgendaOccupation) {
   return occupation.isException ? "Extensión autorizada" : "Reserva registrada";
 }
 
+function reservationStatusLabel(status?: string) {
+  switch (status) {
+    case "pendiente_validacion":
+      return "Por validar";
+    case "pendiente_pago":
+      return "Pendiente de pago";
+    case "checkout_online":
+      return "Pago online pendiente";
+    case "pago_en_proceso":
+      return "Pago en proceso";
+    case "confirmada":
+      return "Confirmada";
+    case "completada":
+      return "Completada";
+    default:
+      return "Reserva";
+  }
+}
+
+function reservationTone(status?: string) {
+  switch (status) {
+    case "pendiente_validacion":
+      return "border-warning bg-warning text-warning-foreground";
+    case "pendiente_pago":
+      return "border-info bg-info text-info-foreground";
+    case "checkout_online":
+      return "border-info bg-info text-info-foreground";
+    case "pago_en_proceso":
+      return "border-warning bg-warning text-warning-foreground";
+    case "completada":
+      return "border-success bg-success text-success-foreground";
+    case "confirmada":
+      return "border-primary bg-primary text-primary-foreground";
+    default:
+      return "border-secondary bg-secondary text-secondary-foreground";
+  }
+}
+
+function statusDot(status?: string) {
+  switch (status) {
+    case "pendiente_validacion":
+      return "bg-warning";
+    case "pendiente_pago":
+      return "bg-info";
+    case "checkout_online":
+      return "bg-info";
+    case "pago_en_proceso":
+      return "bg-warning";
+    case "completada":
+      return "bg-success";
+    case "confirmada":
+      return "bg-primary";
+    default:
+      return "bg-secondary";
+  }
+}
+
+function reservationStatusBadgeTone(status?: string) {
+  switch (status) {
+    case "pendiente_validacion":
+      return "bg-warning text-warning-foreground";
+    case "pendiente_pago":
+      return "bg-info text-info-foreground";
+    case "checkout_online":
+      return "bg-info text-info-foreground";
+    case "pago_en_proceso":
+      return "bg-warning text-warning-foreground";
+    case "completada":
+      return "bg-success text-success-foreground";
+    case "confirmada":
+      return "bg-primary text-primary-foreground";
+    default:
+      return "bg-secondary text-secondary-foreground";
+  }
+}
+
 function isImageProof(path?: string | null) {
   return Boolean(path && /\.(png|jpe?g|webp|gif)$/i.test(path));
 }
 
-function money(value?: number) {
-  return typeof value === "number" ? formatMoney(value) : null;
+function formatAmount(amount?: number) {
+  return typeof amount === "number" ? `S/ ${amount.toFixed(2)}` : null;
 }
 
 function buildAgendaUrl(
@@ -270,73 +336,6 @@ function weekSlots(weekData: AgendaData[]) {
   return Array.from(values)
     .sort((a, b) => a - b)
     .map((start) => ({ start, end: start + 60, label: minutesToTime(start) }));
-}
-
-// Tarjeta de la reserva: nombre del cliente como jerarquía principal, estado y
-// cobro como señales secundarias. Se mantiene `pointer-events-none` para que la
-// celda (botón) siga resolviendo clic, foco y arrastre.
-function ReservationCard({
-  occupation,
-  top,
-  durationMinutes,
-  highlighted,
-  charge,
-}: {
-  occupation: AgendaOccupation;
-  top: number;
-  durationMinutes: number;
-  highlighted: boolean;
-  charge: ChargeState | null;
-}) {
-  const isMaintenance = occupation.type === "mantenimiento";
-  const design = isMaintenance
-    ? maintenanceDesign
-    : reservationStatusDesign(occupation.reservationStatus);
-  const customer = occupation.customerName?.trim();
-  const primary = isMaintenance
-    ? maintenanceDesign.label
-    : customer || reservationStatusLabel(occupation.reservationStatus);
-  const statusBits = isMaintenance
-    ? []
-    : [
-        customer ? reservationStatusLabel(occupation.reservationStatus) : null,
-        occupation.isException ? "+30 min" : null,
-      ].filter(Boolean);
-  const statusLine = isMaintenance
-    ? "Horario bloqueado"
-    : statusBits.join(" · ");
-  const timeRange = `${isoToLocalTime(occupation.start)} – ${isoToLocalTime(occupation.end)}`;
-
-  return (
-    <span
-      data-reservation-id={occupation.reservationId}
-      className={cn(
-        "pointer-events-none absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] leading-tight shadow-sm transition-colors duration-300",
-        design.card,
-        highlighted &&
-          "animate-[pulse_1.1s_ease-in-out_5] ring-4 ring-primary/50 ring-offset-2 ring-offset-background",
-      )}
-      style={{
-        top: `calc(${top}% + 0.375rem)`,
-        height: `calc(${durationMinutes / 15}rem - 0.75rem)`,
-      }}
-    >
-      <span className="flex items-center justify-between gap-1">
-        <span className="min-w-0 flex-1 truncate font-extrabold">
-          {primary}
-        </span>
-        {!isMaintenance && (
-          <ChargeBadge state={charge} showAmount={durationMinutes >= 60} />
-        )}
-      </span>
-      <span className="mt-0.5 flex items-center justify-between gap-1 text-[10px] font-semibold opacity-80">
-        <span className="min-w-0 truncate">{statusLine}</span>
-        {durationMinutes > 60 && (
-          <span className="shrink-0 tabular-nums">{timeRange}</span>
-        )}
-      </span>
-    </span>
-  );
 }
 
 export function AgendaBoard({
@@ -434,40 +433,6 @@ export function AgendaBoard({
       label: minutesToTime(value),
     }));
   }, [days, selectedCell]);
-
-  // Resumen del período visible: cuántas reservas hay y cuánto queda por cobrar.
-  const periodSummary = useMemo(() => {
-    let reservations = 0;
-    let pending = 0;
-    let pendingAmount = 0;
-    for (const day of days) {
-      for (const occupation of day.occupations) {
-        if (occupation.type !== "reserva") continue;
-        reservations += 1;
-        const charge = resolveChargeState(occupation);
-        if (charge?.kind === "pending") {
-          pending += 1;
-          pendingAmount += charge.amount;
-        }
-      }
-    }
-    return { reservations, pending, pendingAmount };
-  }, [days]);
-
-  const nowMinutes = useMemo(
-    () => (nowMs > 0 ? getLocalMinutes(new Date(nowMs).toISOString()) : -1),
-    [nowMs],
-  );
-  const showNowLine = !isWeek && data.date === getTodayInLima();
-  // Día finalizado: pasó la hora de cierre, así que ninguna hora se puede
-  // reservar y toda la grilla queda como pasada.
-  const lastSlot = dailySlots.at(-1);
-  const dayEnded = Boolean(
-    !isWeek &&
-    lastSlot &&
-    nowMs > 0 &&
-    isPastSlot(data, { start: lastSlot.end, end: lastSlot.end, label: "" }),
-  );
 
   useEffect(() => {
     const refresh = () => setNowMs(Date.now());
@@ -632,20 +597,6 @@ export function AgendaBoard({
     setPanelMinimized(false);
     setSelectedCell(cell);
     setOperation(nextOperation);
-  }
-
-  function openSlot(
-    court: AgendaCourt,
-    start: number,
-    occupation?: AgendaOccupation,
-  ) {
-    openPanel({
-      date: data.date,
-      courtId: court.id,
-      courtName: court.name,
-      slot: { start, end: start + 60, label: minutesToTime(start) },
-      occupation,
-    });
   }
 
   function openProofLightbox() {
@@ -1080,12 +1031,7 @@ export function AgendaBoard({
     );
   }
 
-  function renderCell(
-    day: AgendaData,
-    court: AgendaCourt,
-    slot: Slot,
-    dimPast = true,
-  ) {
+  function renderCell(day: AgendaData, court: AgendaCourt, slot: Slot) {
     const segment = getOccupationSegment(day.occupations, court.id, slot);
     // selectedCell conserva blocks al abrir el formulario; así el rango sigue
     // visible y no aparenta reducirse al primer bloque seleccionado.
@@ -1115,12 +1061,6 @@ export function AgendaBoard({
     const isDraggable = Boolean(
       segment?.occupation && canMove(segment.occupation),
     );
-    const chargeState = segment?.occupation
-      ? resolveChargeState(segment.occupation)
-      : null;
-    const segmentTop = segment?.top ?? 0;
-    const segmentDuration = segment?.durationMinutes ?? 0;
-
     // El botón de la celda vuelve a ser la fuente del arrastre: los navegadores
     // no inician un drag HTML5 desde un hijo de <button>. La tarjeta unida es
     // pointer-events-none para que dragover/drop resuelvan la celda real bajo
@@ -1225,6 +1165,21 @@ export function AgendaBoard({
                   +30 min
                 </span>
               )}
+            {segment.occupation.type === "reserva" &&
+              segment.occupation.reservationStatus === "confirmada" &&
+              (segment.occupation.outstandingAmount ?? 0) > 0.005 && (
+                <span
+                  role="img"
+                  aria-label={`Saldo pendiente: falta cobrar ${(segment.occupation.outstandingAmount ?? 0).toFixed(2)} soles`}
+                  className="absolute right-1.5 top-1.5 inline-flex items-center rounded-full bg-amber-500 px-1 py-0.5 shadow-sm ring-1 ring-amber-950/25"
+                >
+                  <HugeiconsIcon
+                    icon={MoneyReceive01Icon}
+                    strokeWidth={3}
+                    className="size-3 text-amber-950"
+                  />
+                </span>
+              )}
           </span>
         ) : segment ? null : past ? (
           <span className="pointer-events-none absolute inset-0 grid place-items-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">
@@ -1253,7 +1208,7 @@ export function AgendaBoard({
               gridTemplateColumns: `72px repeat(${data.courts.length}, minmax(170px, 1fr))`,
             }}
           >
-            <div className="sticky left-0 z-20 border-r bg-background px-3 py-3 text-[10px] font-extrabold uppercase tracking-[.14em] text-muted-foreground">
+            <div className="sticky left-0 z-10 border-r bg-background px-3 py-3 text-[10px] font-extrabold uppercase tracking-[.14em] text-muted-foreground">
               Hora
             </div>
             {data.courts.map((court) => (
@@ -1269,48 +1224,27 @@ export function AgendaBoard({
               </div>
             ))}
           </div>
-          {dailySlots.map((slot) => {
-            const showNow =
-              showNowLine && nowMinutes >= slot.start && nowMinutes < slot.end;
-            return (
-              <div
-                key={slot.start}
-                className="relative grid"
-                style={{
-                  gridTemplateColumns: `72px repeat(${data.courts.length}, minmax(170px, 1fr))`,
-                }}
-              >
-                <div className="sticky left-0 z-20 flex min-h-16 items-start justify-end border-r border-b bg-background px-3 py-1.5 font-display text-sm font-bold tabular-nums text-muted-foreground">
-                  {slot.label}
-                </div>
-                {data.courts.map((court) =>
-                  renderCell(data, court, slot, !dayEnded),
-                )}
-                {showNow && (
-                  <div
-                    className="pointer-events-none absolute inset-x-0 z-20"
-                    style={{
-                      top: `${((nowMinutes - slot.start) / 60) * 100}%`,
-                    }}
-                  >
-                    <div className="relative border-t-2 border-destructive/70">
-                      <span className="absolute -top-[7px] left-[76px] size-3 rounded-full border-2 border-background bg-destructive" />
-                      <span className="absolute right-1 -top-[9px] rounded bg-destructive px-1.5 py-px text-[9px] font-black uppercase tracking-wide text-destructive-foreground">
-                        Ahora
-                      </span>
-                    </div>
-                  </div>
-                )}
+          {dailySlots.map((slot) => (
+            <div
+              key={slot.start}
+              className="grid"
+              style={{
+                gridTemplateColumns: `72px repeat(${data.courts.length}, minmax(170px, 1fr))`,
+              }}
+            >
+              <div className="sticky left-0 z-10 flex min-h-16 items-start justify-end border-r border-b bg-background px-3 py-1.5 text-[11px] font-bold tabular-nums text-muted-foreground">
+                {slot.label}
               </div>
-            );
-          })}
+              {data.courts.map((court) => renderCell(data, court, slot))}
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
   function renderWeeklyGrid() {
-    if (!selectedCourt) {
+    if (!selectedCourt)
       return (
         <div className="px-6 py-16 text-center">
           <p className="font-bold">Selecciona una cancha</p>
@@ -1319,7 +1253,6 @@ export function AgendaBoard({
           </p>
         </div>
       );
-    }
     return (
       <div className="overflow-x-auto">
         <div className="min-w-[1120px]">
@@ -1329,7 +1262,7 @@ export function AgendaBoard({
               gridTemplateColumns: `72px repeat(${days.length}, minmax(145px, 1fr))`,
             }}
           >
-            <div className="sticky left-0 z-20 border-r bg-background px-3 py-3 text-[10px] font-extrabold uppercase tracking-[.14em] text-muted-foreground">
+            <div className="sticky left-0 z-10 border-r bg-background px-3 py-3 text-[10px] font-extrabold uppercase tracking-[.14em] text-muted-foreground">
               Hora
             </div>
             {days.map((day) => (
@@ -1340,7 +1273,7 @@ export function AgendaBoard({
                 <p className="text-[10px] font-extrabold uppercase tracking-[.12em] text-muted-foreground">
                   {formatAgendaDate(day.date).split(",")[0]}
                 </p>
-                <p className="mt-0.5 font-display text-xl font-black tracking-[-.02em]">
+                <p className="mt-0.5 text-lg font-black tracking-[-.04em]">
                   {day.date.slice(-2)}
                 </p>
               </div>
@@ -1349,12 +1282,12 @@ export function AgendaBoard({
           {weeklySlots.map((slot) => (
             <div
               key={slot.start}
-              className="relative grid"
+              className="grid"
               style={{
                 gridTemplateColumns: `72px repeat(${days.length}, minmax(145px, 1fr))`,
               }}
             >
-              <div className="sticky left-0 z-20 flex min-h-16 items-start justify-end border-r border-b bg-background px-3 py-1.5 font-display text-sm font-bold tabular-nums text-muted-foreground">
+              <div className="sticky left-0 z-10 flex min-h-16 items-start justify-end border-r border-b bg-background px-3 py-1.5 text-[11px] font-bold tabular-nums text-muted-foreground">
                 {slot.label}
               </div>
               {days.map((day) => {
@@ -1367,7 +1300,7 @@ export function AgendaBoard({
                 ) : (
                   <div
                     key={`${day.date}-${slot.start}`}
-                    className="grid min-h-16 place-items-center border-r border-b bg-muted-foreground/6 px-2 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/75 last:border-r-0"
+                    className="grid min-h-16 place-items-center border-r border-b bg-muted/45 px-2 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground/75 last:border-r-0"
                     aria-label={`${day.date}, fuera de horario`}
                   >
                     Fuera de horario
@@ -1378,112 +1311,6 @@ export function AgendaBoard({
           ))}
         </div>
       </div>
-    );
-  }
-
-  function renderDailyList() {
-    if (!data.courts.length) return null;
-    return (
-      <ul className="divide-y">
-        {data.courts.map((court) => {
-          const items = data.occupations
-            .filter((occupation) => occupation.courtId === court.id)
-            .sort(
-              (a, b) => getLocalMinutes(a.start) - getLocalMinutes(b.start),
-            );
-          const firstFree = dailySlots.find(
-            (slot) =>
-              !getOccupationSegment(data.occupations, court.id, slot) &&
-              !isPastSlot(data, slot),
-          );
-          return (
-            <li key={court.id} className="px-5 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-display text-lg font-extrabold uppercase tracking-[.01em]">
-                    {court.name}
-                  </p>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {court.sports.map((sport) => sport.name).join(" · ") ||
-                      "Sin deporte"}
-                  </p>
-                </div>
-                {firstFree && (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={() => openSlot(court, firstFree.start)}
-                  >
-                    <HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Reservar
-                  </Button>
-                )}
-              </div>
-              {items.length ? (
-                <ul className="mt-3 space-y-1.5">
-                  {items.map((occupation) => {
-                    const design =
-                      occupation.type === "mantenimiento"
-                        ? maintenanceDesign
-                        : reservationStatusDesign(occupation.reservationStatus);
-                    const charge = resolveChargeState(occupation);
-                    const start = getLocalMinutes(occupation.start);
-                    return (
-                      <li
-                        key={
-                          occupation.reservationId ??
-                          `${occupation.courtId}-${occupation.start}`
-                        }
-                      >
-                        <button
-                          type="button"
-                          onClick={() => openSlot(court, start, occupation)}
-                          className={cn(
-                            "flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left",
-                            design.card,
-                          )}
-                        >
-                          <span className="shrink-0 font-display text-sm font-bold tabular-nums">
-                            {isoToLocalTime(occupation.start)}–
-                            {isoToLocalTime(occupation.end)}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-bold">
-                              {occupation.type === "mantenimiento"
-                                ? "Mantenimiento"
-                                : occupation.customerName?.trim() ||
-                                  reservationStatusLabel(
-                                    occupation.reservationStatus,
-                                  )}
-                            </span>
-                            {occupation.type === "reserva" && (
-                              <span className="block truncate text-[11px] font-semibold opacity-80">
-                                {reservationStatusLabel(
-                                  occupation.reservationStatus,
-                                )}
-                                {occupation.sportName
-                                  ? ` · ${occupation.sportName}`
-                                  : ""}
-                              </span>
-                            )}
-                          </span>
-                          {occupation.type === "reserva" && (
-                            <ChargeBadge state={charge} />
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="mt-3 rounded-xl border border-dashed px-3 py-2 text-xs text-muted-foreground">
-                  Sin reservas. Todo el día disponible.
-                </p>
-              )}
-            </li>
-          );
-        })}
-      </ul>
     );
   }
 
@@ -1508,12 +1335,7 @@ export function AgendaBoard({
           </p>
         </div>
       );
-    return (
-      <>
-        <div className="md:hidden">{renderDailyList()}</div>
-        <div className="hidden md:block">{renderDailyGrid()}</div>
-      </>
-    );
+    return renderDailyGrid();
   }
 
   function renderDialog() {
@@ -1716,6 +1538,13 @@ export function AgendaBoard({
     const advance = formatAmount(reservation?.advanceAmount);
     const paid = formatAmount(reservation?.paidAmount);
     const outstanding = formatAmount(reservation?.outstandingAmount);
+    const refunded = formatAmount(reservation?.refundedAmount);
+    const advanceCovered = Boolean(
+      reservation &&
+      typeof reservation.advanceAmount === "number" &&
+      typeof reservation.paidAmount === "number" &&
+      reservation.paidAmount >= reservation.advanceAmount,
+    );
     const phone = reservation?.customerPhone?.replace(/\D/g, "");
     const hasStarted = Boolean(
       reservation && new Date(reservation.start).getTime() <= nowMs,
@@ -1740,14 +1569,7 @@ export function AgendaBoard({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-bold">
               <span
-                className={cn(
-                  "size-2.5 rounded-full",
-                  selectedOccupation?.type === "mantenimiento"
-                    ? maintenanceDesign.dot
-                    : reservation
-                      ? statusDesign.dot
-                      : "bg-primary",
-                )}
+                className={`size-2.5 rounded-full ${selectedOccupation?.type === "mantenimiento" ? "bg-warning" : reservation ? statusDot(status) : "bg-primary"}`}
               />
               {selectedOccupation?.type === "mantenimiento"
                 ? occupationLabel(selectedOccupation)
@@ -1757,10 +1579,7 @@ export function AgendaBoard({
             </div>
             {reservation && (
               <span
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.08em]",
-                  statusDesign.card,
-                )}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.08em] ${reservationStatusBadgeTone(status)}`}
               >
                 {reservationStatusLabel(status)}
               </span>
@@ -2165,6 +1984,16 @@ export function AgendaBoard({
           <span className="size-2 rounded-full bg-primary" /> Confirmada
         </span>
         <span className="flex items-center gap-1.5">
+          <span className="inline-flex items-center rounded-full bg-amber-500 px-1 py-0.5 ring-1 ring-amber-950/25">
+            <HugeiconsIcon
+              icon={MoneyReceive01Icon}
+              strokeWidth={3}
+              className="size-3 text-amber-950"
+            />
+          </span>{" "}
+          Saldo pendiente
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-secondary" /> Mantenimiento
         </span>
         <span className="flex items-center gap-1.5">
@@ -2507,7 +2336,6 @@ export function AgendaBoard({
           )}
         </SheetContent>
       </Sheet>
-
       {selectedOccupation?.proofUrl &&
         isImageProof(selectedOccupation.proofPath) && (
           <Dialog open={lightboxOpen} onOpenChange={onProofLightboxChange}>

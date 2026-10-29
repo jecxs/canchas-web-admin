@@ -1,5 +1,5 @@
-import { NotFoundState } from '@/components/states'
+import { NotFoundGame } from '@/components/not-found-game'
 
 export default function AdminPanelNotFound() {
-  return <NotFoundState dashboardHref="/admin" />
+  return <NotFoundGame homeHref="/admin" />
 }

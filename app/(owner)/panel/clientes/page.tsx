@@ -2,7 +2,7 @@ import { ClientsDashboard } from '@/features/clients/clients-dashboard'
 import { getClientsData } from '@/features/clients/queries'
 import type { ClientsFilters } from '@/features/clients/types'
 
-type ClientsSearchParams = Promise<{ court?: string; q?: string; page?: string }>
+type ClientsSearchParams = Promise<{ court?: string; q?: string; page?: string; client?: string }>
 
 export default async function OwnerClientsPage({ searchParams }: { searchParams: ClientsSearchParams }) {
   const params = await searchParams
@@ -14,5 +14,5 @@ export default async function OwnerClientsPage({ searchParams }: { searchParams:
     page: Number.isFinite(page) && page > 0 ? page : 1,
   }
   const data = await getClientsData(filters)
-  return <ClientsDashboard data={data} />
+  return <ClientsDashboard key={params.client ?? 'all'} data={data} initialClientId={params.client ?? null} />
 }
