@@ -121,16 +121,13 @@ function PlatformParameterCard({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-md bg-muted/70 px-2 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
-              {definition.key}
-            </span>
-            {definition.rangeLabel ? (
+          {definition.rangeLabel ? (
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded-md border border-border/70 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
                 {definition.rangeLabel}
               </span>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           {isWords ? (
             <Textarea

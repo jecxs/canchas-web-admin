@@ -97,6 +97,7 @@ export function CreateSedeForm({ defaults }: { defaults: SedeCreationDefaults })
                 latitude={latitude}
                 longitude={longitude}
                 defaultCenter={defaultCenter}
+                autoFillAddress
                 onLocationChange={handleLocationChange}
               />
               <FieldDescription>Mueve el pin sobre la puerta de la sede para fijar las coordenadas exactas.</FieldDescription>
