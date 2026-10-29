@@ -45,6 +45,9 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-plum: var(--plum);
+  --color-brand: var(--violet-500);
+  --color-brand-soft: var(--violet-300);
+  --color-brand-deep: var(--violet-900);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -75,6 +78,11 @@
 :root {
   --radius: 0.9rem;
   --plum: oklch(0.54 0.24 300);
+  /* Escala violeta (matiz ~252°) de la app móvil, base #6E4BFF */
+  --violet-300: #a58fff;
+  --violet-400: #8c70ff;
+  --violet-500: #6e4bff;
+  --violet-900: #190080;
   --background: oklch(0.991 0.008 118);
   --foreground: oklch(0.205 0.032 145);
   --surface: oklch(0.972 0.018 122);
@@ -226,8 +234,10 @@
     @apply border-border outline-ring/50;
   }
 
-  html {
-    scroll-behavior: smooth;
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   body {
@@ -270,14 +280,6 @@
     radial-gradient(circle at 21% 97%, color-mix(in oklab, var(--sidebar) 35%, transparent), transparent 31%);
 }
 
-.dashboard-screen {
-  transform: perspective(1200px) rotateX(2deg);
-}
-
-.hero-ball {
-  filter: drop-shadow(0 20px 26px oklch(0 0 0 / 0.28));
-}
-
 .eyebrow {
   font-size: 10px;
   font-weight: 800;
@@ -295,52 +297,6 @@
   letter-spacing: -0.022em;
   line-height: 0.92;
   text-transform: uppercase;
-}
-
-.section-title em {
-  color: var(--primary);
-  font-style: normal;
-}
-
-.spotlight-card {
-  --x: 50%;
-  --y: 50%;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.spotlight-card::before {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    360px circle at var(--x) var(--y),
-    color-mix(in oklab, var(--primary) 28%, transparent),
-    transparent 45%
-  );
-  content: "";
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.35s ease;
-}
-
-.spotlight-card:hover {
-  box-shadow: var(--shadow-grassly-floating);
-  transform: translateY(-4px);
-}
-
-.spotlight-card:hover::before {
-  opacity: 1;
-}
-
-.ticker-track {
-  animation: ticker 26s linear infinite;
-}
-
-@keyframes ticker {
-  to {
-    transform: translateX(-50%);
-  }
 }
 
 /* ===== Reportes — sistema "pizarra" ===== */
