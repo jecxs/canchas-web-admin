@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import type { LocalSummary, SubscriptionSummary } from '@/lib/auth/access'
 import type { PublicationChecklist } from '@/features/local-publication/types'
 import { AutoMarquee } from '@/components/dashboard/auto-marquee'
+import { ClientAvatar } from '@/components/dashboard/client-avatar'
 import { ClientsSpotlight } from './clients-spotlight'
 import { CourtRotationPause } from './court-rotation-pause'
 import { CourtsCarousel } from './courts-carousel'
@@ -168,7 +169,16 @@ function PendingRow({ reservation }: { reservation: DashboardReservation }) {
         <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold">{reservation.customerName}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <ClientAvatar
+            src={reservation.customerAvatarUrl}
+            name={reservation.customerName}
+            size="sm"
+            className="size-6"
+            fallbackClassName="bg-primary/15 text-primary-foreground"
+          />
+          <p className="truncate text-sm font-bold">{reservation.customerName}</p>
+        </div>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {reservation.courtName} · {formatDateTime(reservation.start)}
         </p>
@@ -245,7 +255,7 @@ export function OwnerDashboard({
 
   return (
     <div className="w-full" data-owner-dashboard>
-      <section className="relative z-0 -mx-4 overflow-hidden rounded-b-[2rem] bg-secondary text-secondary-foreground shadow-floating md:-mx-6 lg:-mx-8 2xl:sticky 2xl:top-0">
+      <section className="relative z-0 -mx-4 pb-4 overflow-hidden rounded-b-[2rem] bg-secondary text-secondary-foreground shadow-floating md:-mx-6 lg:-mx-8 min-[1200px]:sticky min-[1200px]:top-0">
         <div
           aria-hidden="true"
           className="owner-blob pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-primary/25 blur-3xl"
@@ -256,7 +266,7 @@ export function OwnerDashboard({
         />
 
         <CourtsSyncProvider courts={activeCourts}>
-          <div className="relative grid gap-4 px-6 pt-5 pb-3 sm:px-8 sm:pt-6 sm:pb-4 lg:px-8 min-[1200px]:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] 2xl:px-12 2xl:pb-5">
+          <div className="relative grid gap-4 px-6 pt-5 pb-10 sm:px-8 sm:pt-6 lg:px-8 min-[1200px]:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] 2xl:gap-5 2xl:px-12">
           <div className="order-1 flex flex-col gap-3 duration-500 fill-mode-both animate-in fade-in slide-in-from-bottom-2">
             <div>
               <p className="text-base font-bold text-white/65 sm:text-xl">
@@ -320,7 +330,7 @@ export function OwnerDashboard({
             <div className="mt-auto grid grid-cols-2 gap-2">
               <Link
                 href={`/panel/agenda?date=${data.today}`}
-                className="group rounded-2xl border border-white/10 bg-white/[.06] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-plum/40 hover:bg-plum/10 hover:shadow-md 2xl:p-4"
+                className="group rounded-2xl border border-white/10 bg-white/[.06] p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-plum/40 hover:bg-plum/10 hover:shadow-md 2xl:p-5"
               >
                 <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-primary transition-colors group-hover:text-plum">Reservas hoy</p>
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -340,7 +350,7 @@ export function OwnerDashboard({
               </Link>
               <Link
                 href={`/panel/agenda?date=${data.today}`}
-                className="group rounded-2xl border border-white/10 bg-white/[.06] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-plum/40 hover:bg-plum/10 hover:shadow-md 2xl:p-4"
+                className="group rounded-2xl border border-white/10 bg-white/[.06] p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-plum/40 hover:bg-plum/10 hover:shadow-md 2xl:p-5"
               >
                 <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-primary transition-colors group-hover:text-plum">Ocupación hoy</p>
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -369,7 +379,7 @@ export function OwnerDashboard({
           <div className="order-3">
             <Link href="/panel/reportes?tab=operativo" className="group block h-full rounded-2xl">
               <Card className="h-full gap-0 rounded-2xl border border-white/10 bg-white/[.06] p-0 text-white backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-plum/40 group-hover:bg-plum/10 group-hover:shadow-md">
-                <div className="flex h-full flex-col p-3 2xl:p-4">
+                <div className="flex h-full flex-col p-3.5 2xl:p-5">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[11px] font-extrabold uppercase tracking-[.14em] text-primary transition-colors duration-300 group-hover:text-plum">
                       Actividad del mes
@@ -379,11 +389,11 @@ export function OwnerDashboard({
                     </span>
                   </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <div className="flex flex-col items-center rounded-xl bg-white/[.04] p-2.5 2xl:p-3">
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  <div className="flex flex-col items-center rounded-xl bg-white/[.04] p-3 2xl:p-4">
                     <p className="mt-2 mb-2 text-[11px] font-bold text-white/80">Ocupación del mes</p>
                     <Donut
-                      size={82}
+                      size={88}
                       segments={[
                         { label: 'Ocupado', value: data.month.occupancyRate, color: 'var(--primary)' },
                         {
@@ -401,10 +411,10 @@ export function OwnerDashboard({
                     </p>
                   </div>
 
-                  <div className="flex flex-col items-center rounded-xl bg-white/[.04] p-2.5 2xl:p-3">
+                  <div className="flex flex-col items-center rounded-xl bg-white/[.04] p-3 2xl:p-4">
                     <p className="mt-2 mb-2 text-[11px] font-bold text-white/80">Reservas del mes</p>
                     <Donut
-                      size={82}
+                      size={88}
                       segments={[
                         { label: 'App', value: data.month.appReservations, color: 'var(--primary)' },
                         {
@@ -437,8 +447,8 @@ export function OwnerDashboard({
         </CourtsSyncProvider>
       </section>
 
-      <div className="relative z-10 -mx-4 rounded-t-[2rem] bg-white px-4 pb-12 pt-5 duration-500 fill-mode-both animate-in fade-in md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-        <div className="space-y-7">
+      <div className="relative z-10 -mx-4 -mt-10 rounded-t-[2rem] bg-white px-4 pb-7 pt-4 shadow-[0_-24px_50px_-32px_rgba(0,0,0,0.35)] duration-500 fill-mode-both animate-in fade-in md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+        <div className="space-y-8">
           {notice ? (
             <div
               className={cn(
@@ -459,11 +469,11 @@ export function OwnerDashboard({
             </div>
           ) : null}
 
-          <section className="grid gap-4 min-[1200px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <section className="grid gap-5 min-[1200px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             <Card
               className="gap-0 overflow-hidden rounded-2xl border border-foreground/15 bg-lime-50/30 py-0 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary hover:shadow-lg"
             >
-              <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 pb-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-6 pb-2">
                 <h1 className="text-xl font-extrabold uppercase text-plum">
                   Ingresos de este mes
                 </h1>
@@ -480,7 +490,7 @@ export function OwnerDashboard({
                 </Button>
               </div>
 
-              <div className="grid gap-5 px-5 pb-5 pt-3 sm:grid-cols-2">
+              <div className="grid gap-6 px-6 pb-6 pt-4 sm:grid-cols-2">
                 <div className="text-center">
                   <div className="flex items-stretch justify-center">
                     <div className="min-w-0 flex-1 px-2 2xl:px-3">
@@ -524,8 +534,8 @@ export function OwnerDashboard({
                 </div>
               </div>
 
-              <div className="px-5 pb-5">
-                <div className="rounded-xl border border-border/70 bg-card p-3 shadow-sm">
+              <div className="px-6 pb-6">
+                <div className="rounded-xl border border-border/70 bg-card p-4 shadow-sm">
                   <div className="flex items-center justify-end gap-3 pb-1 text-[10px] text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <span className="size-2 rounded-full bg-primary" />
@@ -543,7 +553,7 @@ export function OwnerDashboard({
             </Card>
 
             <div className="flex flex-col gap-4">
-              <Card className="flex h-72 flex-col gap-0 overflow-hidden rounded-2xl border border-foreground/15 bg-lime-50/30 py-0 shadow-sm backdrop-blur-sm">
+              <Card className="flex h-[19rem] flex-col gap-0 overflow-hidden rounded-2xl border border-foreground/15 bg-lime-50/30 py-0 shadow-sm backdrop-blur-sm">
                 <div className="flex shrink-0 items-start justify-between gap-3 px-4 pt-4 pb-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <span

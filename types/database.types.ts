@@ -1505,6 +1505,7 @@ export type Database = {
       }
       perfiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           dni: string | null
           email: string | null
@@ -1515,6 +1516,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           dni?: string | null
           email?: string | null
@@ -1525,6 +1527,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           dni?: string | null
           email?: string | null
@@ -2439,6 +2442,7 @@ export type Database = {
       buscar_clientes_para_dueno: {
         Args: { p_busqueda: string; p_limite?: number }
         Returns: {
+          avatar_url: string | null
           dni: string
           email: string
           nombre_completo: string
@@ -2473,6 +2477,7 @@ export type Database = {
       buscar_perfil_por_telefono_dueno: {
         Args: { p_telefono: string }
         Returns: {
+          avatar_url: string | null
           nombre_completo: string
           perfil_id: string
           telefono: string
@@ -3250,6 +3255,7 @@ export type Database = {
           p_offset?: number
         }
         Returns: {
+          avatar_url: string | null
           canceladas: number
           cliente_id: string
           completadas: number
@@ -3271,6 +3277,7 @@ export type Database = {
       obtener_clientes_reservas_dueno: {
         Args: { p_local_id: string; p_reserva_ids: string[] }
         Returns: {
+          cliente_avatar_url: string | null
           cliente_nombre: string
           cliente_telefono: string
           reserva_id: string

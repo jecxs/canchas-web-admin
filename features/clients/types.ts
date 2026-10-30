@@ -11,6 +11,7 @@ export type ClientSummary = {
   clienteId: string | null
   name: string
   phone: string | null
+  avatarUrl: string | null
   isAccount: boolean
   totalReservations: number
   confirmed: number
