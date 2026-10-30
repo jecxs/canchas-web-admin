@@ -1,31 +1,44 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { useEffect, useState, type FocusEvent } from 'react'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowUpRight01Icon } from '@hugeicons/core-free-icons'
-import { cn } from '@/lib/utils'
-import type { DashboardClient } from './types'
+import Link from "next/link";
+import { useEffect, useState, type FocusEvent } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
+import type { DashboardClient } from "./types";
 
-const LIMA = 'America/Lima'
-const ROTATION_MS = 2000
+const LIMA = "America/Lima";
+const ROTATION_MS = 2000;
+
+function parseDate(value: string) {
+  if (!value?.trim()) return null;
+
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
 
 function timeLabel(value: string) {
-  return new Intl.DateTimeFormat('es-PE', {
+  const date = parseDate(value);
+  if (!date) return "Hora no disponible";
+
+  return new Intl.DateTimeFormat("es-PE", {
     timeZone: LIMA,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(value))
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
 }
 
 function dateKey(value: string) {
-  return new Intl.DateTimeFormat('en-CA', {
+  const date = parseDate(value);
+  if (!date) return null;
+
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: LIMA,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(value))
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function initials(name: string) {
@@ -34,19 +47,20 @@ function initials(name: string) {
       .trim()
       .split(/\s+/)
       .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .join('') || 'C'
-  )
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "C"
+  );
 }
 
-function clientHref(client: DashboardClient, kind: 'today' | 'frequent') {
-  if (kind === 'today' && client.reservationId) {
-    return `/panel/agenda?date=${dateKey(client.lastReservationAt)}&reservation=${client.reservationId}`
+function clientHref(client: DashboardClient, kind: "today" | "frequent") {
+  const reservationDate = dateKey(client.lastReservationAt);
+  if (kind === "today" && client.reservationId && reservationDate) {
+    return `/panel/agenda?date=${reservationDate}&reservation=${client.reservationId}`;
   }
 
-  const params = new URLSearchParams({ q: client.phone || client.name })
-  if (client.clientId) params.set('client', client.clientId)
-  return `/panel/clientes?${params.toString()}`
+  const params = new URLSearchParams({ q: client.phone || client.name });
+  if (client.clientId) params.set("client", client.clientId);
+  return `/panel/clientes?${params.toString()}`;
 }
 
 function ClientPane({
@@ -57,14 +71,14 @@ function ClientPane({
   accent,
   kind,
 }: {
-  label: string
-  clients: DashboardClient[]
-  index: number
-  emptyMessage: string
-  accent: string
-  kind: 'today' | 'frequent'
+  label: string;
+  clients: DashboardClient[];
+  index: number;
+  emptyMessage: string;
+  accent: string;
+  kind: "today" | "frequent";
 }) {
-  const current = clients.length ? clients[index % clients.length] : null
+  const current = clients.length ? clients[index % clients.length] : null;
 
   return (
     <div className="flex min-w-0 flex-col justify-between gap-3 p-4">
@@ -83,17 +97,21 @@ function ClientPane({
         >
           <span
             className={cn(
-              'grid size-9 shrink-0 place-items-center rounded-full text-[11px] font-black',
+              "grid size-9 shrink-0 place-items-center rounded-full text-[11px] font-black",
               accent,
             )}
           >
             {initials(current.name)}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-extrabold leading-tight">{current.name}</p>
+            <p className="truncate text-sm font-extrabold leading-tight">
+              {current.name}
+            </p>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {current.reservations === 1 ? '1 reserva' : `${current.reservations} reservas`}
-              {' · '}
+              {current.reservations === 1
+                ? "1 reserva"
+                : `${current.reservations} reservas`}
+              {" · "}
               {timeLabel(current.lastReservationAt)}
             </p>
           </div>
@@ -104,7 +122,9 @@ function ClientPane({
           />
         </Link>
       ) : (
-        <p className="text-xs leading-5 text-muted-foreground">{emptyMessage}</p>
+        <p className="text-xs leading-5 text-muted-foreground">
+          {emptyMessage}
+        </p>
       )}
 
       <div className="flex items-center gap-1">
@@ -113,8 +133,10 @@ function ClientPane({
             <span
               key={client.key}
               className={cn(
-                'h-1 rounded-full transition-all duration-300',
-                dotIndex === index % clients.length ? 'w-4 bg-plum' : 'w-1 bg-foreground/15',
+                "h-1 rounded-full transition-all duration-300",
+                dotIndex === index % clients.length
+                  ? "w-4 bg-plum"
+                  : "w-1 bg-foreground/15",
               )}
             />
           ))
@@ -123,32 +145,33 @@ function ClientPane({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 export function ClientsSpotlight({
   todayClients,
   frequentClients,
 }: {
-  todayClients: DashboardClient[]
-  frequentClients: DashboardClient[]
+  todayClients: DashboardClient[];
+  frequentClients: DashboardClient[];
 }) {
-  const [index, setIndex] = useState(0)
-  const [paused, setPaused] = useState(false)
-  const maxItems = Math.max(todayClients.length, frequentClients.length)
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const maxItems = Math.max(todayClients.length, frequentClients.length);
 
   useEffect(() => {
-    if (maxItems <= 1 || paused) return
+    if (maxItems <= 1 || paused) return;
 
     const interval = window.setInterval(() => {
-      setIndex((current) => current + 1)
-    }, ROTATION_MS)
+      setIndex((current) => current + 1);
+    }, ROTATION_MS);
 
-    return () => window.clearInterval(interval)
-  }, [maxItems, paused])
+    return () => window.clearInterval(interval);
+  }, [maxItems, paused]);
 
   function handleBlur(event: FocusEvent<HTMLDivElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPaused(false)
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+      setPaused(false);
   }
 
   return (
@@ -184,5 +207,5 @@ export function ClientsSpotlight({
         />
       </div>
     </div>
-  )
+  );
 }

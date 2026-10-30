@@ -518,6 +518,7 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
 
   const clientAggregates = new Map<string, DashboardClient>()
   for (const { row, startIso } of last14Rows) {
+    const reservationAt = new Date(startIso).toISOString()
     const details = clientDetails.get(row.id)
     const phone = details?.phone || row.cliente_sin_cuenta_telefono?.trim() || ''
     const name = details?.name || (phone ? `Cliente ${phone.slice(-4)}` : 'Cliente')
@@ -526,8 +527,8 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
     const current = clientAggregates.get(key)
     if (current) {
       current.reservations += 1
-      if (new Date(startIso).getTime() > new Date(current.lastReservationAt).getTime()) {
-        current.lastReservationAt = startIso
+      if (new Date(reservationAt).getTime() > new Date(current.lastReservationAt).getTime()) {
+        current.lastReservationAt = reservationAt
       }
     } else {
       clientAggregates.set(key, {
@@ -535,7 +536,7 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
         name,
         phone: phone || null,
         reservations: 1,
-        lastReservationAt: startIso,
+        lastReservationAt: reservationAt,
         reservationId: null,
         clientId,
       })
@@ -557,14 +558,26 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
   const todayClientAggregates = new Map<string, DashboardClient>()
   for (const row of todayRows) {
     if (NON_BOOKED_STATES.has(row.estado)) continue
+    const reservationTime =
+      typeof row.inicio === 'string' && row.inicio.trim()
+        ? new Date(row.inicio).getTime()
+        : Number.NaN
+    if (!Number.isFinite(reservationTime)) {
+      console.warn('[owner-dashboard:clients:invalid-date]', {
+        reservationId: row.reserva_id,
+      })
+      continue
+    }
+
+    const reservationAt = new Date(reservationTime).toISOString()
     const phone = row.cliente_telefono?.trim() || ''
     const name = row.cliente_nombre?.trim() || (phone ? `Cliente ${phone.slice(-4)}` : 'Cliente')
     const key = phone || name
     const current = todayClientAggregates.get(key)
     if (current) {
       current.reservations += 1
-      if (new Date(row.inicio).getTime() > new Date(current.lastReservationAt).getTime()) {
-        current.lastReservationAt = row.inicio
+      if (reservationTime > new Date(current.lastReservationAt).getTime()) {
+        current.lastReservationAt = reservationAt
         current.reservationId = row.reserva_id
       }
     } else {
@@ -573,7 +586,7 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
         name,
         phone: phone || null,
         reservations: 1,
-        lastReservationAt: row.inicio,
+        lastReservationAt: reservationAt,
         reservationId: row.reserva_id,
         clientId: phone ? `ext:${phone}` : null,
       })
