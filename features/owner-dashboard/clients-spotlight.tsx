@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState, type FocusEvent } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowUpRight01Icon } from '@hugeicons/core-free-icons'
+import { ClientAvatar } from '@/components/dashboard/client-avatar'
 import { cn } from '@/lib/utils'
 import type { DashboardClient } from './types'
 
@@ -26,17 +27,6 @@ function dateKey(value: string) {
     month: '2-digit',
     day: '2-digit',
   }).format(new Date(value))
-}
-
-function initials(name: string) {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .join('') || 'C'
-  )
 }
 
 function clientHref(client: DashboardClient, kind: 'today' | 'frequent') {
@@ -81,14 +71,12 @@ function ClientPane({
           href={clientHref(current, kind)}
           className="group/client pointer-events-auto -mx-2 flex min-w-0 animate-in items-center gap-2.5 rounded-xl border border-transparent px-2 py-1.5 duration-500 fade-in slide-in-from-bottom-1 transition-[background-color,border-color,box-shadow,transform] motion-safe:hover:-translate-y-0.5 hover:border-primary hover:bg-primary/10 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50 active:translate-y-0"
         >
-          <span
-            className={cn(
-              'grid size-9 shrink-0 place-items-center rounded-full text-[11px] font-black',
-              accent,
-            )}
-          >
-            {initials(current.name)}
-          </span>
+          <ClientAvatar
+            src={current.avatarUrl}
+            name={current.name}
+            className="size-9 rounded-full"
+            fallbackClassName={cn('rounded-full', accent)}
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-extrabold leading-tight">{current.name}</p>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -153,7 +141,7 @@ export function ClientsSpotlight({
 
   return (
     <div
-      className="relative flex min-h-[10rem] flex-1 flex-col overflow-hidden rounded-2xl border border-foreground/15 bg-lime-50/30 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary hover:bg-primary/10 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
+      className="relative flex min-h-[11rem] flex-1 flex-col overflow-hidden rounded-2xl border border-foreground/15 bg-lime-50/30 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary hover:bg-primary/10 hover:shadow-lg motion-safe:hover:-translate-y-0.5"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}

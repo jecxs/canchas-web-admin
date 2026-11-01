@@ -5,6 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon, CheckmarkCircle01Icon, Search01Icon } from '@hugeicons/core-free-icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ClientAvatar } from '@/components/dashboard/client-avatar'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
@@ -16,6 +17,7 @@ export type PickedClient = {
   clienteId: string | null
   name: string
   phone: string | null
+  avatarUrl?: string | null
   isAccount: boolean
   totalReservations: number
 }
@@ -63,6 +65,7 @@ export function ClientPicker({ localId, state, onBlockedChange, initial = null }
           clienteId: client.cliente_id,
           name: client.nombre,
           phone: client.telefono,
+          avatarUrl: client.avatar_url ?? null,
           isAccount: client.es_cuenta,
           totalReservations: Number(client.total_reservas),
         })))
@@ -88,13 +91,13 @@ export function ClientPicker({ localId, state, onBlockedChange, initial = null }
       if (!active) return
       const localMatch = (localResult.data ?? []).find((client) => phoneDigits(client.telefono) === digits)
       if (localMatch) {
-        setWarning({ kind: 'local', option: { clienteId: localMatch.cliente_id, name: localMatch.nombre, phone: localMatch.telefono, isAccount: localMatch.es_cuenta, totalReservations: Number(localMatch.total_reservas) } })
+        setWarning({ kind: 'local', option: { clienteId: localMatch.cliente_id, name: localMatch.nombre, phone: localMatch.telefono, avatarUrl: localMatch.avatar_url ?? null, isAccount: localMatch.es_cuenta, totalReservations: Number(localMatch.total_reservas) } })
         onBlockedChange?.(true)
         return
       }
       const accountMatch = (accountResult.data ?? []).find((profile) => phoneDigits(profile.telefono) === digits)
       if (accountMatch) {
-        setWarning({ kind: 'account', option: { clienteId: accountMatch.perfil_id, name: accountMatch.nombre_completo, phone: accountMatch.telefono, isAccount: true, totalReservations: 0 } })
+        setWarning({ kind: 'account', option: { clienteId: accountMatch.perfil_id, name: accountMatch.nombre_completo, phone: accountMatch.telefono, avatarUrl: accountMatch.avatar_url ?? null, isAccount: true, totalReservations: 0 } })
         onBlockedChange?.(true)
         return
       }
@@ -145,9 +148,12 @@ export function ClientPicker({ localId, state, onBlockedChange, initial = null }
         </div>
       ) : selected ? (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/40 bg-primary/8 p-3.5">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-extrabold">{selected.name}</p><Badge variant={selected.isAccount ? 'default' : 'neutral'}>{selected.isAccount ? 'Cuenta' : 'Externo'}</Badge></div>
-            <p className="mt-1 text-xs text-muted-foreground">{selected.phone ?? 'Sin teléfono'} · {selected.totalReservations} reserva{selected.totalReservations === 1 ? '' : 's'}</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <ClientAvatar src={selected.avatarUrl} name={selected.name} size="lg" className="size-10" fallbackClassName="bg-primary/20 text-primary-foreground" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-extrabold">{selected.name}</p><Badge variant={selected.isAccount ? 'default' : 'neutral'}>{selected.isAccount ? 'Cuenta' : 'Externo'}</Badge></div>
+              <p className="mt-1 text-xs text-muted-foreground">{selected.phone ?? 'Sin teléfono'} · {selected.totalReservations} reserva{selected.totalReservations === 1 ? '' : 's'}</p>
+            </div>
           </div>
           <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(null)}><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />Cambiar</Button>
         </div>
@@ -161,7 +167,10 @@ export function ClientPicker({ localId, state, onBlockedChange, initial = null }
             <div className="max-h-64 space-y-1 overflow-y-auto">
               {loading ? <p className="px-2.5 py-3 text-xs text-muted-foreground">Buscando clientes…</p> : results.length ? results.map((option) => (
                 <button key={option.clienteId ?? `ext:${option.phone}`} type="button" onClick={() => selectExisting(option)} className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent">
-                  <span className="min-w-0"><span className="flex items-center gap-1.5"><span className="truncate text-sm font-bold">{option.name}</span><Badge variant={option.isAccount ? 'default' : 'neutral'}>{option.isAccount ? 'Cuenta' : 'Externo'}</Badge></span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{option.phone ?? 'Sin teléfono'} · {option.totalReservations} reserva{option.totalReservations === 1 ? '' : 's'}</span></span>
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <ClientAvatar src={option.avatarUrl} name={option.name} size="sm" className="size-8" fallbackClassName="bg-primary/15 text-primary-foreground" />
+                    <span className="min-w-0"><span className="flex items-center gap-1.5"><span className="truncate text-sm font-bold">{option.name}</span><Badge variant={option.isAccount ? 'default' : 'neutral'}>{option.isAccount ? 'Cuenta' : 'Externo'}</Badge></span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{option.phone ?? 'Sin teléfono'} · {option.totalReservations} reserva{option.totalReservations === 1 ? '' : 's'}</span></span>
+                  </span>
                   <HugeiconsIcon icon={CheckmarkCircle01Icon} strokeWidth={2} className="size-4 shrink-0 text-primary" />
                 </button>
               )) : <p className="px-2.5 py-3 text-xs text-muted-foreground">{query.trim() ? 'No se encontraron clientes con ese nombre o celular.' : 'Este local todavía no tiene clientes registrados.'}</p>}

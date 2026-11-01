@@ -185,6 +185,7 @@ function mapAgendaReservation(
   row: AgendaRow,
   courtNames: Map<string, string>,
   sportNames: Map<string, string>,
+  customerAvatarUrl: string | null = null,
 ): DashboardReservation {
   return {
     id: row.reserva_id,
@@ -192,6 +193,7 @@ function mapAgendaReservation(
     courtName: courtNames.get(row.cancha_id) ?? 'Cancha',
     sportName: sportNames.get(row.deporte_id) ?? 'Deporte',
     customerName: row.cliente_nombre?.trim() || 'Cliente',
+    customerAvatarUrl,
     start: row.inicio,
     end: row.fin,
     status: row.estado,
@@ -365,13 +367,17 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
     .filter((row) => row.estado === 'confirmada' && new Date(row.inicio).getTime() > now)
     .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
 
-  const nextByCourt: Record<string, DashboardReservation> = {}
-  for (const row of futureRows) {
-    if (nextByCourt[row.cancha_id]) continue
-    nextByCourt[row.cancha_id] = mapAgendaReservation(row, courtNames, sportNames)
-  }
-
   const nextRpcReservation = futureRows[0] ?? null
+
+  // Solo se necesita la foto del primer turno de cada cancha para las tarjetas
+  // del hero; no hace falta pedir la de toda la agenda.
+  const nextTurnRows: AgendaRow[] = []
+  const nextTurnCourts = new Set<string>()
+  for (const row of futureRows) {
+    if (nextTurnCourts.has(row.cancha_id)) continue
+    nextTurnCourts.add(row.cancha_id)
+    nextTurnRows.push(row)
+  }
 
   const todayWindowStart = new Date(`${today}T00:00:00-05:00`).getTime()
   const tomorrowWindowStart = new Date(`${tomorrow}T00:00:00-05:00`).getTime()
@@ -391,7 +397,7 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
   )
 
   const pendingRows = pendingResult.rows
-  const pendingCustomerNames = new Map<string, string>()
+  const pendingCustomers = new Map<string, { name: string; avatarUrl: string | null }>()
   if (pendingRows.length) {
     const { data: customers, error } = await supabase.rpc('obtener_clientes_reservas_dueno', {
       p_local_id: local.id,
@@ -401,7 +407,10 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
       console.warn('[owner-dashboard:pending-customers]', { code: error.code })
     }
     for (const customer of customers ?? []) {
-      if (customer.cliente_nombre) pendingCustomerNames.set(customer.reserva_id, customer.cliente_nombre)
+      pendingCustomers.set(customer.reserva_id, {
+        name: customer.cliente_nombre?.trim() ?? '',
+        avatarUrl: customer.cliente_avatar_url ?? null,
+      })
     }
   }
 
@@ -413,9 +422,10 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
       courtName: courtNames.get(row.cancha_id) ?? 'Cancha',
       sportName: sportNames.get(row.deporte_id) ?? 'Deporte',
       customerName:
-        pendingCustomerNames.get(row.id)?.trim() ||
+        pendingCustomers.get(row.id)?.name ||
         row.cliente_sin_cuenta_nombre?.trim() ||
         'Cliente',
+      customerAvatarUrl: pendingCustomers.get(row.id)?.avatarUrl ?? null,
       start,
       end,
       status: row.estado,
@@ -499,11 +509,20 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
       !NON_BOOKED_STATES.has(row.estado),
   )
 
-  const clientDetails = new Map<string, { name: string; phone: string }>()
-  if (last14Rows.length) {
+  const clientDetails = new Map<
+    string,
+    { name: string; phone: string; avatarUrl: string | null }
+  >()
+  const clientReservationIds = [
+    ...new Set([
+      ...last14Rows.map(({ row }) => row.id),
+      ...nextTurnRows.map((row) => row.reserva_id),
+    ]),
+  ]
+  if (clientReservationIds.length) {
     const { data: customers, error } = await supabase.rpc('obtener_clientes_reservas_dueno', {
       p_local_id: local.id,
-      p_reserva_ids: last14Rows.map(({ row }) => row.id),
+      p_reserva_ids: clientReservationIds,
     })
     if (error) {
       console.warn('[owner-dashboard:clients]', { code: error.code })
@@ -512,8 +531,21 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
       clientDetails.set(customer.reserva_id, {
         name: customer.cliente_nombre?.trim() ?? '',
         phone: customer.cliente_telefono?.trim() ?? '',
+        avatarUrl: customer.cliente_avatar_url ?? null,
       })
     }
+  }
+
+  // El próximo turno por cancha se arma después de resolver las fotos para que
+  // la tarjeta muestre la misma imagen que el resto del dashboard.
+  const nextByCourt: Record<string, DashboardReservation> = {}
+  for (const row of nextTurnRows) {
+    nextByCourt[row.cancha_id] = mapAgendaReservation(
+      row,
+      courtNames,
+      sportNames,
+      clientDetails.get(row.reserva_id)?.avatarUrl ?? null,
+    )
   }
 
   const clientAggregates = new Map<string, DashboardClient>()
@@ -521,11 +553,13 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
     const details = clientDetails.get(row.id)
     const phone = details?.phone || row.cliente_sin_cuenta_telefono?.trim() || ''
     const name = details?.name || (phone ? `Cliente ${phone.slice(-4)}` : 'Cliente')
+    const avatarUrl = details?.avatarUrl ?? null
     const key = row.cliente_id ?? (phone || row.id)
     const clientId = row.cliente_id ?? (phone ? `ext:${phone}` : null)
     const current = clientAggregates.get(key)
     if (current) {
       current.reservations += 1
+      if (!current.avatarUrl && avatarUrl) current.avatarUrl = avatarUrl
       if (new Date(startIso).getTime() > new Date(current.lastReservationAt).getTime()) {
         current.lastReservationAt = startIso
       }
@@ -534,6 +568,7 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
         key,
         name,
         phone: phone || null,
+        avatarUrl,
         reservations: 1,
         lastReservationAt: startIso,
         reservationId: null,
@@ -559,10 +594,12 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
     if (NON_BOOKED_STATES.has(row.estado)) continue
     const phone = row.cliente_telefono?.trim() || ''
     const name = row.cliente_nombre?.trim() || (phone ? `Cliente ${phone.slice(-4)}` : 'Cliente')
+    const avatarUrl = clientDetails.get(row.reserva_id)?.avatarUrl ?? null
     const key = phone || name
     const current = todayClientAggregates.get(key)
     if (current) {
       current.reservations += 1
+      if (!current.avatarUrl && avatarUrl) current.avatarUrl = avatarUrl
       if (new Date(row.inicio).getTime() > new Date(current.lastReservationAt).getTime()) {
         current.lastReservationAt = row.inicio
         current.reservationId = row.reserva_id
@@ -572,6 +609,7 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
         key,
         name,
         phone: phone || null,
+        avatarUrl,
         reservations: 1,
         lastReservationAt: row.inicio,
         reservationId: row.reserva_id,
@@ -644,7 +682,12 @@ export async function getOwnerDashboardData(): Promise<OwnerDashboardData> {
       outstanding: todayOutstanding,
       activeCourts,
       nextReservation: nextRpcReservation
-        ? mapAgendaReservation(nextRpcReservation, courtNames, sportNames)
+        ? mapAgendaReservation(
+            nextRpcReservation,
+            courtNames,
+            sportNames,
+            clientDetails.get(nextRpcReservation.reserva_id)?.avatarUrl ?? null,
+          )
         : null,
     },
     pendingValidations,

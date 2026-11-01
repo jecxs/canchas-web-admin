@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Invoice03Icon, Money03Icon, Search01Icon, UserGroupIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
+import { ClientAvatar } from '@/components/dashboard/client-avatar'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -48,10 +49,6 @@ function formatDateTime(value: string) {
 
 function monthKey(value?: string | null) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: LIMA, year: 'numeric', month: '2-digit' }).format(value && !Number.isNaN(new Date(value).getTime()) ? new Date(value) : new Date())
-}
-
-function initials(name: string) {
-  return name.split(' ').filter(Boolean).slice(0, 2).map((word) => word[0]).join('').toUpperCase() || 'CL'
 }
 
 function incidentCount(client: ClientSummary) {
@@ -102,6 +99,7 @@ function agendaBookingHref(client: ClientSummary) {
   const params = new URLSearchParams({ newClient: '1', clientName: client.name, clientAccount: client.isAccount ? '1' : '0', clientCount: String(client.totalReservations) })
   if (client.clienteId) params.set('clientId', client.clienteId)
   if (client.phone) params.set('clientPhone', client.phone)
+  if (client.avatarUrl) params.set('clientAvatar', client.avatarUrl)
   return `/panel/agenda?${params.toString()}`
 }
 
@@ -292,7 +290,7 @@ function ClientRow({ client, selected, onClick }: { client: ClientSummary; selec
   const incidents = incidentCount(client)
   return <div className={cn('group flex w-full items-center gap-3 px-4 py-4 transition-colors sm:px-5', selected ? 'bg-primary/10' : 'hover:bg-muted/55')}>
     <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-      <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-muted text-xs font-black text-muted-foreground">{initials(client.name)}</span>
+      <ClientAvatar src={client.avatarUrl} name={client.name} size="lg" className="size-10 rounded-2xl" fallbackClassName="rounded-2xl bg-muted text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-extrabold">{client.name}</p>{client.isAccount ? <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[9px] font-extrabold text-primary-foreground">CUENTA</span> : <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-extrabold text-muted-foreground">EXTERNO</span>}{client.totalReservations >= 2 && <span className="rounded-md bg-success/18 px-1.5 py-0.5 text-[9px] font-extrabold text-success-foreground">RECURRENTE</span>}</div>
         <p className="mt-1 truncate text-xs text-muted-foreground">{client.phone ?? 'Sin teléfono'}</p>
@@ -312,7 +310,10 @@ function ClientDetail({ client, history, status, onClose }: { client: ClientSumm
   return <aside className="min-w-0 overflow-hidden rounded-3xl border border-border/80 bg-card shadow-[0_14px_35px_oklch(0.205_0.032_145/0.08)] xl:sticky xl:top-0 xl:max-h-[calc(100dvh-8.5rem)] xl:overflow-y-auto">
     <div className="border-b border-border/75 p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><p className="eyebrow">Ficha del cliente</p><h2 className="mt-2 truncate text-2xl font-black tracking-[-.035em]">{client.name}</h2><p className="mt-1 text-xs text-muted-foreground">{client.isAccount ? 'Cuenta Grassly' : 'Cliente externo'}</p></div>
+        <div className="flex min-w-0 items-start gap-3">
+          <ClientAvatar src={client.avatarUrl} name={client.name} size="lg" className="size-12 rounded-2xl ring-1 ring-border" fallbackClassName="rounded-2xl bg-primary/15 text-sm text-primary-foreground" />
+          <div className="min-w-0"><p className="eyebrow">Ficha del cliente</p><h2 className="mt-2 truncate text-2xl font-black tracking-[-.035em]">{client.name}</h2><p className="mt-1 text-xs text-muted-foreground">{client.isAccount ? 'Cuenta Grassly' : 'Cliente externo'}</p></div>
+        </div>
         <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Cerrar detalle"><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} /></Button>
       </div>
       {client.phone && <div className="mt-4 flex flex-wrap gap-2"><a href={`https://wa.me/${phoneDigits}`} target="_blank" rel="noreferrer" className="rounded-xl border border-border px-3 py-2 text-xs font-bold transition-colors hover:bg-accent">WhatsApp</a><a href={`tel:${client.phone}`} className="rounded-xl border border-border px-3 py-2 text-xs font-bold transition-colors hover:bg-accent">Llamar</a></div>}
