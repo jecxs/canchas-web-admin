@@ -28,6 +28,7 @@ export type AgendaOccupation = {
 export type AgendaSport = {
   id: string
   name: string
+  support: 'dedicada' | 'adaptada'
 }
 
 export type AgendaCourt = {
@@ -49,7 +50,6 @@ export type AgendaData = {
   closingTime: string | null
   courts: AgendaCourt[]
   occupations: AgendaOccupation[]
-  sports: AgendaSport[]
   paymentMethods: LocalPaymentMethod[]
 }
 
