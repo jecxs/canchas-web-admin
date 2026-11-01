@@ -9,9 +9,12 @@ import {RegistrationSteps} from '@/components/registration-steps'
 import {Footer} from '@/components/footer'
 import {FeaturesBento} from '@/components/features-bento'
 import {MagazineHero} from '@/components/magazine-hero'
+import {Navbar} from '@/components/navbar'
+import {FAQSection} from '@/components/faq-section'
 
 export default function LandingPage() {
     return <main className="site-shell overflow-x-clip bg-background text-foreground">
+        <Navbar/>
         <MagazineHero/>
         <FeaturesBento/>
         <PaymentsFlow/>
@@ -57,6 +60,7 @@ export default function LandingPage() {
                 </div>
             </div>
         </section>
+        <FAQSection/>
         <Footer/>
     </main>
 }

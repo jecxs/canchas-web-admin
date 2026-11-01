@@ -531,7 +531,7 @@ export function NotFoundGame({ homeHref = '/' }: { homeHref?: string }) {
                   <motion.div style={{ left: keeperLeft, x: '-50%', bottom: '46%' }} className="absolute z-20 h-44 w-40 will-change-[left] sm:h-64 sm:w-60">
                     <motion.div style={{ rotate: keeperTilt, scaleX: keeperStretch, y: '17.5%' }} className="relative h-full w-full">
                       <Image
-                        src="/mascota/grassy.png"
+                        src="/mascota/grassyPenal.png"
                         alt=""
                         fill
                         loading="eager"
@@ -542,7 +542,7 @@ export function NotFoundGame({ homeHref = '/' }: { homeHref?: string }) {
                         )}
                       />
                       <Image
-                        src="/mascota/grassyBalon.png"
+                        src="/mascota/grassyTapar.png"
                         alt=""
                         fill
                         loading="eager"

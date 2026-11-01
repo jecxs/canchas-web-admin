@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className="h-full antialiased">
+    <html lang="es" className="h-full scroll-smooth scroll-pt-32 antialiased">
       <body className="flex min-h-full flex-col">
         <TooltipProvider>{children}</TooltipProvider>
         <GrasslyToaster />

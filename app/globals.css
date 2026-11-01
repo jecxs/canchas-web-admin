@@ -479,6 +479,21 @@
   will-change: transform;
 }
 
+@keyframes app-showcase-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.app-showcase-float {
+  animation: app-showcase-float 6s ease-in-out infinite;
+  will-change: transform;
+}
+
 @keyframes owner-shake {
   0%,
   55%,

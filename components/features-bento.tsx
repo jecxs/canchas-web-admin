@@ -3,11 +3,10 @@
 import Image from 'next/image'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  Analytics01Icon,
   Calendar03Icon,
   Store01Icon,
 } from '@hugeicons/core-free-icons'
-import { useState } from 'react'
+import { FinancialControlCard } from '@/components/financial-control-card'
 
 const features = [
   {
@@ -20,23 +19,16 @@ const features = [
     title: 'Panel Multisede',
     text: 'Administra una cancha hoy o una red completa mañana, sin perder el control de cada sede.',
   },
-  {
-    icon: Analytics01Icon,
-    title: 'Control Financiero',
-    text: 'Mira cuánto entra por día, qué canchas rinden más y qué deportes dejan más dinero.',
-  },
 ]
 
 export function FeaturesBento() {
-  const [activeCard, setActiveCard] = useState<'tiempo' | 'cancha' | 'deporte'>('deporte')
-
   return (
     <section id="beneficios" className="mx-auto max-w-7xl px-5 py-24 lg:px-8 lg:py-32">
-      <div className="grid gap-8 lg:grid-cols-[.85fr_1.15fr] lg:items-end">
+      <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr] lg:items-end">
         <div>
           <h2 className="section-title">Menos tareas<br />manuales. Más cancha.</h2>
         </div>
-        <p className="max-w-xl text-lg leading-8 text-muted-foreground">
+        <p className="max-w-xl text-lg leading-8 text-muted-foreground lg:justify-self-end">
           Tú conoces a tus clientes y tu negocio. Grassly se encarga del orden detrás de cada reserva para que puedas concentrarte en hacerlo crecer.
         </p>
       </div>
@@ -52,7 +44,7 @@ export function FeaturesBento() {
               <p className="mt-3 text-sm leading-6 text-muted-foreground">{features[0].text}</p>
             </div>
           </div>
-          <div className="mt-8 overflow-hidden rounded-xl border-2 border-[#151c16] bg-[#151c16]">
+          <div className="mt-8 overflow-hidden rounded-xl border border-gray-200/70 bg-[#151c16] shadow-2xl shadow-gray-200/50">
             <div className="flex h-9 items-center gap-2 px-3">
               <span aria-hidden="true" className="flex gap-1.5">
                 <span className="size-2 rounded-full bg-white/40" />
@@ -73,8 +65,17 @@ export function FeaturesBento() {
           </div>
         </article>
 
-        <article className="rounded-2xl border border-border bg-card p-7">
-          <div className="flex items-start gap-4">
+        <article className="relative isolate overflow-hidden rounded-2xl border border-border bg-card p-7">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden opacity-[0.07]">
+            <svg viewBox="0 0 480 240" fill="none" className="absolute -right-10 -top-8 h-[125%] w-[70%] text-[#151c16]">
+              <path d="M288-20 240 36l34 35-47 35 31 39-48 54 28 59M352-20l-30 47 42 23-38 44 31 35-34 40 39 48M420-20l-45 54 38 32-32 42 39 34-40 42 34 48M482 11l-50 37 31 41-44 38 39 35-35 47 28 34" stroke="currentColor" strokeWidth="2"/>
+              <path d="m239 36 83-9 56 18 42-34M227 106l95-17 74 28 58-43M210 160l112-19 78 28 55-17M182 214l140-14 79 15 52-24" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="322" cy="89" r="7" fill="currentColor"/>
+              <circle cx="400" cy="115" r="5" fill="currentColor"/>
+              <circle cx="357" cy="200" r="6" fill="currentColor"/>
+            </svg>
+          </div>
+          <div className="relative z-10 flex items-start gap-4">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-success-foreground">
               <HugeiconsIcon icon={features[1].icon} strokeWidth={2} className="size-5" />
             </span>
@@ -83,7 +84,7 @@ export function FeaturesBento() {
               <p className="mt-3 text-sm leading-6 text-muted-foreground">{features[1].text}</p>
             </div>
           </div>
-          <div className="mt-6 flex flex-wrap gap-2" aria-label="Ejemplo de selector de sedes">
+          <div className="relative z-10 mt-6 flex flex-wrap gap-2" aria-label="Ejemplo de selector de sedes">
             <span className="inline-flex min-h-10 items-center rounded-full border border-[#151c16] bg-[#D7FF38] px-4 text-sm font-bold text-[#151c16]">
               Complejo Norte
             </span>
@@ -93,67 +94,7 @@ export function FeaturesBento() {
           </div>
         </article>
 
-        <article className="group rounded-2xl border border-border bg-card p-7">
-          <div className="flex items-start gap-4">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-success-foreground">
-              <HugeiconsIcon icon={features[2].icon} strokeWidth={2} className="size-5" />
-            </span>
-            <div>
-              <h3 className="text-2xl font-black tracking-[-.045em]">{features[2].title}</h3>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{features[2].text}</p>
-            </div>
-          </div>
-          <div className="relative mt-8 h-64" aria-label="Vistas de reportes financieros">
-            <button
-              type="button"
-              onClick={() => setActiveCard('tiempo')}
-              aria-label="Destacar reporte de cobros en el tiempo"
-              aria-pressed={activeCard === 'tiempo'}
-              className={`absolute left-1/2 top-0 w-[92%] -translate-x-1/2 cursor-pointer overflow-hidden rounded-xl border-2 border-[#151c16] bg-white transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#151c16] ${activeCard === 'tiempo' ? 'z-40 rotate-0 scale-105 shadow-[8px_8px_0px_#151c16]' : 'z-10 rotate-2 scale-[.96] opacity-90 shadow-[4px_4px_0px_#151c16] hover:opacity-100'}`}
-            >
-              <Image
-                src="/landing/capCobrado.png"
-                alt="Reporte de cobros en el tiempo"
-                width={1450}
-                height={500}
-                sizes="(min-width: 1024px) 480px, 80vw"
-                className="block h-auto w-full"
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveCard('cancha')}
-              aria-label="Destacar reporte de cobros por cancha"
-              aria-pressed={activeCard === 'cancha'}
-              className={`absolute bottom-0 left-0 w-[66%] cursor-pointer overflow-hidden rounded-xl border-2 border-[#151c16] bg-white transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#151c16] ${activeCard === 'cancha' ? 'z-40 rotate-0 scale-105 shadow-[8px_8px_0px_#151c16]' : 'z-20 -rotate-3 opacity-90 shadow-[4px_4px_0px_#151c16] hover:opacity-100'}`}
-            >
-              <Image
-                src="/landing/capCobradoxCancha.png"
-                alt="Reporte de cobros por cancha"
-                width={740}
-                height={432}
-                sizes="(min-width: 1024px) 420px, 72vw"
-                className="block h-auto w-full"
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveCard('deporte')}
-              aria-label="Destacar reporte de cobros por deporte"
-              aria-pressed={activeCard === 'deporte'}
-              className={`absolute bottom-0 right-0 w-[60%] cursor-pointer overflow-hidden rounded-xl border-2 border-[#151c16] bg-white transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#151c16] ${activeCard === 'deporte' ? 'z-40 rotate-0 scale-105 shadow-[8px_8px_0px_#151c16]' : 'z-30 rotate-2 opacity-90 shadow-[4px_4px_0px_#151c16] hover:opacity-100'}`}
-            >
-              <Image
-                src="/landing/capCobradoxDep.png"
-                alt="Reporte de cobros por deporte"
-                width={718}
-                height={300}
-                sizes="(min-width: 1024px) 340px, 58vw"
-                className="block h-auto w-full"
-              />
-            </button>
-          </div>
-        </article>
+        <FinancialControlCard />
       </div>
     </section>
   )
