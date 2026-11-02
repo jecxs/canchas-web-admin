@@ -1,43 +1,80 @@
-import { cookies } from 'next/headers'
-import { AgendaBoard } from '@/features/agenda/agenda-board'
-import { getRollingAgendaDates, getTodayInLima, getWeekStart, isValidAgendaDate } from '@/features/agenda/date-utils'
-import { getAgendaData, getAgendaWeekData } from '@/features/agenda/queries'
-import { normalizeAgendaSportId } from '@/features/agenda/sport-filter'
+import { cookies } from "next/headers";
+import { AgendaBoard } from "@/features/agenda/agenda-board";
+import {
+  getRollingAgendaDates,
+  getTodayInLima,
+  getWeekStart,
+  isValidAgendaDate,
+} from "@/features/agenda/date-utils";
+import { getAgendaData, getAgendaWeekData } from "@/features/agenda/queries";
 
-type AgendaSearchParams = Promise<{ date?: string; sport?: string; view?: string; court?: string; reservation?: string; newClient?: string; clientId?: string; clientName?: string; clientPhone?: string; clientAvatar?: string; clientAccount?: string; clientCount?: string }>
+type AgendaSearchParams = Promise<{
+  date?: string;
+  view?: string;
+  court?: string;
+  reservation?: string;
+  newClient?: string;
+  clientId?: string;
+  clientName?: string;
+  clientPhone?: string;
+  clientAvatar?: string;
+  clientAccount?: string;
+  clientCount?: string;
+}>;
 
-export default async function OwnerAgendaPage({ searchParams }: { searchParams: AgendaSearchParams }) {
-  const params = await searchParams
-  const cookieStore = await cookies()
-  const savedView = cookieStore.get('grassly_agenda_view')?.value
-  const view = params.view === 'week' || params.view === 'day'
-    ? params.view
-    : savedView === 'week' ? 'week' : 'day'
-  const newClient = params.newClient === '1' && params.clientName
-    ? {
-        clienteId: params.clientId || null,
-        name: params.clientName,
-        phone: params.clientPhone || null,
-        avatarUrl: params.clientAvatar || null,
-        isAccount: params.clientAccount === '1',
-        totalReservations: Number.parseInt(params.clientCount ?? '0', 10) || 0,
-      }
-    : null
-  const today = getTodayInLima()
-  const requestedDate = isValidAgendaDate(params.date) ? params.date : today
+export default async function OwnerAgendaPage({
+  searchParams,
+}: {
+  searchParams: AgendaSearchParams;
+}) {
+  const params = await searchParams;
+  const cookieStore = await cookies();
+  const savedView = cookieStore.get("grassly_agenda_view")?.value;
+  const view =
+    params.view === "week" || params.view === "day"
+      ? params.view
+      : savedView === "week"
+        ? "week"
+        : "day";
+  const newClient =
+    params.newClient === "1" && params.clientName
+      ? {
+          clienteId: params.clientId || null,
+          name: params.clientName,
+          phone: params.clientPhone || null,
+          avatarUrl: params.clientAvatar || null,
+          isAccount: params.clientAccount === "1",
+          totalReservations:
+            Number.parseInt(params.clientCount ?? "0", 10) || 0,
+        }
+      : null;
+  const today = getTodayInLima();
+  const requestedDate = isValidAgendaDate(params.date) ? params.date : today;
   // Links created by the former calendar-week view pointed to Monday. When
   // that Monday belongs to the current week, reopen the operational board at
   // today instead of filling the first columns with elapsed days.
-  const date = view === 'week' && requestedDate < today && getWeekStart(requestedDate) === getWeekStart(today) ? today : requestedDate
-  const requestedSportId = params.sport
-  const weekDates = getRollingAgendaDates(date)
-  const weekData = view === 'week' ? await getAgendaWeekData(weekDates, requestedSportId) : undefined
-  const data = weekData?.[0] ?? await getAgendaData(date, requestedSportId)
-  const selectedSportId = normalizeAgendaSportId(requestedSportId, data.sports)
+  const date =
+    view === "week" &&
+    requestedDate < today &&
+    getWeekStart(requestedDate) === getWeekStart(today)
+      ? today
+      : requestedDate;
+  const weekDates = getRollingAgendaDates(date);
+  const weekData =
+    view === "week" ? await getAgendaWeekData(weekDates) : undefined;
+  const data = weekData?.[0] ?? (await getAgendaData(date));
 
   return (
     <div className="mx-auto w-full max-w-[1440px]">
-      <AgendaBoard data={data} selectedSportId={selectedSportId} view={view} weekData={weekData} selectedCourtId={params.court ?? ''} highlightReservationId={params.reservation ?? ''} newClient={newClient} />
+      <p className="eyebrow mb-4">Operación diaria</p>
+      <AgendaBoard
+        data={data}
+        view={view}
+        weekData={weekData}
+        selectedCourtId={params.court ?? ""}
+        highlightReservationId={params.reservation ?? ""}
+        newClient={newClient}
+      />
     </div>
-  )
+  );
 }

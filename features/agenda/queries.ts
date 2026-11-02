@@ -3,11 +3,10 @@ import 'server-only'
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { getDayOfWeek, formatAgendaDate, shiftAgendaDate } from './date-utils'
-import { getLocalAgendaSports, normalizeAgendaSportId } from './sport-filter'
 import type { AgendaData } from './types'
 import type { LocalPaymentMethod, PaymentMethodType } from '@/features/payments/types'
 
-export async function getAgendaData(date: string, sportId?: string): Promise<AgendaData> {
+export async function getAgendaData(date: string): Promise<AgendaData> {
   const { local } = await requireOperationalOwnerLocal()
   const supabase = await createClient()
   const dayOfWeek = getDayOfWeek(date)
@@ -15,7 +14,7 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
   const [{ data: courts, error: courtsError }, { data: schedule, error: scheduleError }, { data: paymentMethods, error: paymentMethodsError }] = await Promise.all([
     supabase
       .from('canchas')
-      .select('id,nombre,activa,superficie,descripcion,largo_metros,ancho_metros,cancha_deportes(deporte_id,deportes(id,nombre))')
+      .select('id,nombre,activa,superficie,descripcion,largo_metros,ancho_metros,cancha_deportes(deporte_id,tipo_soporte,deportes(id,nombre))')
       .eq('local_id', local.id)
       .eq('activa', true)
       .order('created_at'),
@@ -49,16 +48,14 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
     sports: court.cancha_deportes.map((relation) => ({
       id: relation.deporte_id,
       name: relation.deportes.nombre,
+      support: relation.tipo_soporte,
     })),
   }))
-  const sports = getLocalAgendaSports(agendaCourts)
-  const selectedSportId = normalizeAgendaSportId(sportId, sports)
 
   const [{ data: occupations, error: occupationsError }, { data: reservationRows, error: reservationsError }] = await Promise.all([
     supabase.rpc('fn_ocupacion_tablero_local', {
       p_local_id: local.id,
       p_fecha: date,
-      p_deporte_id: selectedSportId || undefined,
     }),
     supabase.rpc('obtener_reservas_agenda_dueno', {
       p_local_id: local.id,
@@ -84,7 +81,20 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
     throw new Error('No se pudieron cargar los detalles de las reservas.')
   }
 
-  const sportNames = new Map(sports.map((sport) => [sport.id, sport.name]))
+  const sportNames = new Map(agendaCourts.flatMap((court) => court.sports.map((sport) => [sport.id, sport.name] as const)))
+  const missingSportIds = [...new Set((reservationRows ?? []).map((reservation) => reservation.deporte_id))]
+    .filter((sportId) => !sportNames.has(sportId))
+  if (missingSportIds.length) {
+    const { data: historicalSports, error: sportsError } = await supabase
+      .from('deportes')
+      .select('id,nombre')
+      .in('id', missingSportIds)
+    if (sportsError) {
+      console.warn('[agenda:sport-names]', { code: sportsError.code })
+    } else {
+      for (const sport of historicalSports ?? []) sportNames.set(sport.id, sport.nombre)
+    }
+  }
   const reservations = await Promise.all((reservationRows ?? []).map(async (reservation) => {
     if (!reservation.comprobante_url) return { ...reservation, proofUrl: null }
     const { data: signedProof, error: proofError } = await supabase.storage
@@ -96,11 +106,7 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
     return { ...reservation, proofUrl: signedProof?.signedUrl ?? null }
   }))
 
-  const visibleCourtIds = new Set(
-    agendaCourts
-      .filter((court) => !selectedSportId || court.sports.some((sport) => sport.id === selectedSportId))
-      .map((court) => court.id),
-  )
+  const visibleCourtIds = new Set(agendaCourts.map((court) => court.id))
   const courtNames = new Map(agendaCourts.map((court) => [court.id, court.name]))
 
   // Reservations and maintenance have different privacy contracts. The
@@ -153,7 +159,6 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
     closingTime: schedule?.hora_cierre ?? null,
     courts: agendaCourts,
     occupations: [...maintenanceOccupations, ...reservationOccupations],
-    sports,
     paymentMethods: (paymentMethods ?? []).map((method): LocalPaymentMethod => ({
       id: method.id,
       type: method.tipo as PaymentMethodType,
@@ -168,8 +173,8 @@ export async function getAgendaData(date: string, sportId?: string): Promise<Age
   }
 }
 
-export async function getAgendaWeekData(dates: string[], sportId?: string) {
-  return Promise.all(dates.map((date) => getAgendaData(date, sportId)))
+export async function getAgendaWeekData(dates: string[]) {
+  return Promise.all(dates.map((date) => getAgendaData(date)))
 }
 
 // Defense in depth for the UI: a reservation must overlap the selected

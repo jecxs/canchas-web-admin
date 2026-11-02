@@ -22,11 +22,11 @@ import {
   CalendarRemove01Icon,
   CheckmarkCircle01Icon,
   Clock01Icon,
-  FilterHorizontalIcon,
   MoreHorizontalIcon,
   Cancel01Icon,
   Maximize02Icon,
   Minimize02Icon,
+  Share08Icon,
 } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -87,6 +87,7 @@ import {
 } from "./operation-forms";
 import type { PickedClient } from "@/features/clients/client-picker";
 import type { AgendaCourt, AgendaData, AgendaOccupation } from "./types";
+import { ShareAgendaDialog } from "./share-agenda-dialog";
 
 type Slot = { start: number; end: number; label: string };
 type SelectedCell = {
@@ -248,6 +249,31 @@ function reservationStatusLabel(status?: string) {
   }
 }
 
+const SPORT_BADGE_TONES = [
+  "bg-indigo-900 text-indigo-50",
+  "bg-emerald-900 text-emerald-50",
+  "bg-rose-900 text-rose-50",
+  "bg-amber-900 text-amber-50",
+  "bg-teal-900 text-teal-50",
+];
+
+function sportBadgeTone(sportId?: string, sportName?: string) {
+  const name = (sportName ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (name.includes("futbol")) return "bg-sky-900 text-sky-50";
+  if (name.includes("voley") || name.includes("voleibol"))
+    return "bg-violet-900 text-violet-50";
+  if (!sportId && !name) return "bg-slate-800 text-slate-50";
+
+  let hash = 0;
+  for (const character of sportId ?? name) {
+    hash = (hash * 31 + character.charCodeAt(0)) % SPORT_BADGE_TONES.length;
+  }
+  return SPORT_BADGE_TONES[hash];
+}
+
 function reservationTone(status?: string) {
   switch (status) {
     case "pendiente_validacion":
@@ -313,15 +339,21 @@ function formatAmount(amount?: number) {
   return typeof amount === "number" ? `S/ ${amount.toFixed(2)}` : null;
 }
 
+function courtSportsLabel(court: AgendaCourt) {
+  return (
+    court.sports
+      .map((sport) => `${sport.name} (${sport.support})`)
+      .join(" · ") || "Sin deporte configurado"
+  );
+}
+
 function buildAgendaUrl(
   pathname: string,
   date: string,
-  sportId: string,
   view: "day" | "week",
   courtId?: string,
 ) {
   const params = new URLSearchParams({ date, view });
-  if (sportId) params.set("sport", sportId);
   if (view === "week" && courtId) params.set("court", courtId);
   return `${pathname}?${params.toString()}`;
 }
@@ -340,7 +372,6 @@ function weekSlots(weekData: AgendaData[]) {
 
 export function AgendaBoard({
   data,
-  selectedSportId = "",
   view = "day",
   weekData,
   selectedCourtId = "",
@@ -348,7 +379,6 @@ export function AgendaBoard({
   newClient = null,
 }: {
   data: AgendaData;
-  selectedSportId?: string;
   view?: "day" | "week";
   weekData?: AgendaData[];
   selectedCourtId?: string;
@@ -371,6 +401,7 @@ export function AgendaBoard({
   const [panelMinimized, setPanelMinimized] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const openingLightbox = useRef(false);
   const [draggedReservation, setDraggedReservation] =
     useState<AgendaOccupation | null>(null);
@@ -395,7 +426,13 @@ export function AgendaBoard({
   );
   const weeklySlots = useMemo(() => weekSlots(days), [days]);
   const occupiedCourts = new Set(
-    data.occupations.map((occupation) => occupation.courtId),
+    days.flatMap((day) =>
+      day.occupations
+        .filter(
+          (occupation) => !isWeek || occupation.courtId === selectedCourt?.id,
+        )
+        .map((occupation) => occupation.courtId),
+    ),
   ).size;
   const selectedOccupation = selectedCell?.occupation;
   const selectionStart = selectedCells[0];
@@ -571,15 +608,7 @@ export function AgendaBoard({
       date > data.date ? "forward" : date < data.date ? "backward" : "refresh",
     );
     startTransition(() =>
-      router.push(
-        buildAgendaUrl(
-          pathname,
-          date,
-          selectedSportId,
-          view,
-          selectedCourt?.id,
-        ),
-      ),
+      router.push(buildAgendaUrl(pathname, date, view, selectedCourt?.id)),
     );
   }
 
@@ -872,13 +901,7 @@ export function AgendaBoard({
       const targetDate = isWeek ? getWeekStart(next.date) : next.date;
       startTransition(() =>
         router.push(
-          buildAgendaUrl(
-            pathname,
-            targetDate,
-            selectedSportId,
-            view,
-            selectedCourt?.id,
-          ),
+          buildAgendaUrl(pathname, targetDate, view, selectedCourt?.id),
         ),
       );
     }
@@ -914,13 +937,7 @@ export function AgendaBoard({
     setBoardTransition("refresh");
     startTransition(() =>
       router.push(
-        buildAgendaUrl(
-          pathname,
-          getTodayInLima(),
-          selectedSportId,
-          nextView,
-          selectedCourt?.id,
-        ),
+        buildAgendaUrl(pathname, getTodayInLima(), nextView, selectedCourt?.id),
       ),
     );
   }
@@ -1131,22 +1148,54 @@ export function AgendaBoard({
         {segment?.isAnchor ? (
           <span
             data-reservation-id={segment.occupation.reservationId}
-            className={`pointer-events-none absolute z-10 inset-x-1 overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] font-bold leading-tight shadow-sm transition-colors duration-300 ${isHighlighted ? "animate-[pulse_1.1s_ease-in-out_5] ring-4 ring-primary/50 ring-offset-2 ring-offset-background" : ""} ${segment.occupation.type === "mantenimiento" ? "border-secondary bg-secondary text-secondary-foreground" : reservationTone(segment.occupation.reservationStatus)}`}
+            className={`pointer-events-none absolute z-10 inset-x-1 overflow-hidden rounded-lg border px-2 py-1 text-[11px] font-bold leading-tight shadow-sm transition-colors duration-300 ${segment.occupation.type === "reserva" && segment.durationMinutes >= 120 ? "flex flex-col justify-center" : ""} ${isHighlighted ? "animate-[pulse_1.1s_ease-in-out_5] ring-4 ring-primary/50 ring-offset-2 ring-offset-background" : ""} ${segment.occupation.type === "mantenimiento" ? "border-secondary bg-secondary text-secondary-foreground" : reservationTone(segment.occupation.reservationStatus)}`}
             style={{
               top: `calc(${segment.top}% + 0.375rem)`,
               height: `calc(${segment.durationMinutes / 15}rem - 0.75rem)`,
             }}
           >
-            <span className="block truncate">
+            <span className="block truncate pr-5">
               {segment.occupation.type === "mantenimiento"
                 ? occupationLabel(segment.occupation)
                 : reservationStatusLabel(segment.occupation.reservationStatus)}
             </span>
-            {segment.durationMinutes > 60 && (
-              <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">
-                {isoToLocalTime(segment.occupation.start)} –{" "}
-                {isoToLocalTime(segment.occupation.end)}
+            {segment.occupation.type === "reserva" ? (
+              <span
+                className={cn(
+                  "mt-0.5 flex min-w-0 gap-1",
+                  segment.durationMinutes >= 120
+                    ? "flex-col items-start"
+                    : "items-center",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-flex min-w-0 max-w-full items-center rounded-full px-1.5 py-px text-[10px] font-extrabold leading-none shadow-sm",
+                    sportBadgeTone(
+                      segment.occupation.sportId,
+                      segment.occupation.sportName,
+                    ),
+                  )}
+                  title={
+                    segment.occupation.sportName ?? "Deporte sin especificar"
+                  }
+                >
+                  <span className="truncate">
+                    {segment.occupation.sportName ?? "Deporte"}
+                  </span>
+                </span>
+                <span className="shrink-0 whitespace-nowrap text-[10px] font-semibold opacity-80">
+                  {isoToLocalTime(segment.occupation.start)} –{" "}
+                  {isoToLocalTime(segment.occupation.end)}
+                </span>
               </span>
+            ) : (
+              segment.durationMinutes > 60 && (
+                <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">
+                  {isoToLocalTime(segment.occupation.start)} –{" "}
+                  {isoToLocalTime(segment.occupation.end)}
+                </span>
+              )
             )}
             {segment.occupation.type === "reserva" && isHighlighted && (
               <span className="mt-0.5 block truncate text-[10px] font-semibold">
@@ -1171,7 +1220,12 @@ export function AgendaBoard({
                 <span
                   role="img"
                   aria-label={`Saldo pendiente: falta cobrar ${(segment.occupation.outstandingAmount ?? 0).toFixed(2)} soles`}
-                  className="absolute right-1.5 top-1.5 inline-flex items-center rounded-full bg-amber-500 px-1 py-0.5 shadow-sm ring-1 ring-amber-950/25"
+                  className={cn(
+                    "absolute right-1.5 inline-flex items-center rounded-full bg-amber-500 px-1 py-0.5 shadow-sm ring-1 ring-amber-950/25",
+                    segment.durationMinutes >= 120
+                      ? "top-1/2 -translate-y-7"
+                      : "top-1.5",
+                  )}
                 >
                   <HugeiconsIcon
                     icon={MoneyReceive01Icon}
@@ -1193,6 +1247,12 @@ export function AgendaBoard({
         <span className="sr-only">
           {court.name}, {day.date}, {slot.label},{" "}
           {past ? "hora pasada" : occupationLabel(segment?.occupation)}
+          {segment?.occupation.type === "reserva"
+            ? ", " +
+              (segment.occupation.sportName ?? "deporte sin especificar") +
+              ", " +
+              reservationStatusLabel(segment.occupation.reservationStatus)
+            : ""}
         </span>
       </button>
     );
@@ -1217,9 +1277,11 @@ export function AgendaBoard({
                 className="border-r px-4 py-2.5 last:border-r-0"
               >
                 <p className="truncate text-sm font-extrabold">{court.name}</p>
-                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                  {court.sports.map((sport) => sport.name).join(" · ") ||
-                    "Sin deporte"}
+                <p
+                  className="mt-0.5 truncate text-[11px] text-muted-foreground"
+                  title={courtSportsLabel(court)}
+                >
+                  {courtSportsLabel(court)}
                 </p>
               </div>
             ))}
@@ -1880,44 +1942,6 @@ export function AgendaBoard({
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={selectedSportId || "all"}
-            onValueChange={(value) => {
-              setBoardTransition("refresh");
-              startTransition(() =>
-                router.push(
-                  buildAgendaUrl(
-                    pathname,
-                    data.date,
-                    value === "all" ? "" : value,
-                    view,
-                    selectedCourt?.id,
-                  ),
-                ),
-              );
-            }}
-          >
-            <SelectTrigger
-              aria-label="Filtrar por deporte"
-              size="sm"
-              className="min-w-44"
-            >
-              <HugeiconsIcon
-                icon={FilterHorizontalIcon}
-                strokeWidth={2}
-                className="text-primary"
-              />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectItem value="all">Todos los deportes</SelectItem>
-              {data.sports.map((sport) => (
-                <SelectItem key={sport.id} value={sport.id}>
-                  {sport.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           {isWeek && (
             <Select
               value={selectedCourt?.id ?? ""}
@@ -1925,13 +1949,7 @@ export function AgendaBoard({
                 setBoardTransition("refresh");
                 startTransition(() =>
                   router.push(
-                    buildAgendaUrl(
-                      pathname,
-                      data.date,
-                      selectedSportId,
-                      "week",
-                      value,
-                    ),
+                    buildAgendaUrl(pathname, data.date, "week", value),
                   ),
                 );
               }}
@@ -2005,16 +2023,22 @@ export function AgendaBoard({
         </span>
       </div>
       <Card className="overflow-hidden p-0 shadow-sm">
-        <div className="flex items-center justify-between border-b bg-muted/20 px-5 py-4">
+        <div className="flex flex-col gap-3 border-b bg-muted/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-base font-extrabold tracking-[-.02em]">
               {data.localName}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {isWeek && selectedCourt ? `${selectedCourt.name} · ` : ""}
-              {data.courts.length} canchas configuradas · {occupiedCourts} con
-              actividad
+              {data.courts.length} canchas activas · {occupiedCourts}{" "}
+              {occupiedCourts === 1 ? "cancha" : "canchas"} con actividad{" "}
+              {isWeek ? "en estos 7 días" : "hoy"}
             </p>
+            {isWeek && selectedCourt && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Admite: {courtSportsLabel(selectedCourt)}
+              </p>
+            )}
             {!isWeek && data.openingTime && data.closingTime && (
               <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
                 Atención: {data.openingTime.slice(0, 5)}–
@@ -2023,19 +2047,31 @@ export function AgendaBoard({
               </p>
             )}
           </div>
-          <Button
-            ref={newReservationButtonRef}
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => openFirstFree("manual")}
-            disabled={!data.courts.length}
-          >
-            <HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Nueva reserva
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setShareOpen(true)}
+              disabled={!data.courts.length}
+            >
+              <HugeiconsIcon icon={Share08Icon} strokeWidth={2} /> Compartir
+              horario
+            </Button>
+            <Button
+              ref={newReservationButtonRef}
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => openFirstFree("manual")}
+              disabled={!data.courts.length}
+            >
+              <HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Nueva reserva
+            </Button>
+          </div>
         </div>
         <div
-          key={`${view}-${data.date}-${selectedSportId}-${selectedCourt?.id ?? "all"}`}
+          key={`${view}-${data.date}-${selectedCourt?.id ?? "all"}`}
           className={cn(
             "animate-in fade-in-0 duration-300 motion-reduce:animate-none",
             boardTransition === "forward" && "slide-in-from-right-3",
@@ -2045,6 +2081,16 @@ export function AgendaBoard({
           {renderBoardBody()}
         </div>
       </Card>
+      {shareOpen && (
+        <ShareAgendaDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          data={data}
+          days={days}
+          isWeek={isWeek}
+          selectedCourt={selectedCourt}
+        />
+      )}
       {contextMenu && (
         <div
           className="fixed z-[60] min-w-56 rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-floating"
