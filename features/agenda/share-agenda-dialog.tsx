@@ -81,7 +81,7 @@ export function ShareAgendaDialog({ open, onOpenChange, data, days, isWeek, sele
     <DialogContent className="flex h-[min(92vh,920px)] w-[min(96vw,1160px)] max-w-none flex-col sm:max-w-[1160px] gap-0 overflow-hidden rounded-2xl p-0" showCloseButton>
       <DialogHeader className="border-b px-6 py-5 pr-14 text-left">
         <DialogTitle className="text-xl font-extrabold tracking-tight">Compartir disponibilidad</DialogTitle>
-        <DialogDescription className="max-w-2xl text-sm">Vista pública de {isWeek ? `los 7 días desde ${data.dayLabel} para ${selectedCourt?.name ?? 'la cancha'}` : `las canchas de ${data.localName}`}. Muestra espacios libres y ocupados sin datos de clientes ni pagos.</DialogDescription>
+        <DialogDescription className="max-w-2xl text-sm">Vista pública de {isWeek ? `los 7 días desde ${data.dayLabel} para ${selectedCourt?.name ?? 'la cancha'}` : `las canchas de ${data.localName}`}. Muestra espacios libres y ocupados con el primer nombre de quien reservó, sin datos de contacto ni pagos.</DialogDescription>
       </DialogHeader>
       <div className="min-h-0 flex-1 overflow-auto bg-[#eaf0e5] p-4 sm:p-6">
         {isRendering && <div className="grid min-h-full place-items-center rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">Preparando imagen de disponibilidad…</div>}

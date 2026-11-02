@@ -11,6 +11,8 @@ export type ShareSchedule = {
   starts: number[]
   cells: ShareAvailability[][]
   capturedAt: Date
+  reservationNames: (string | undefined)[][]
+  reservationKeys: (string | undefined)[][]
 }
 
 const STEP = 30
@@ -71,13 +73,24 @@ export function buildShareSchedule({
       return 'free'
     })
   })
-  return { mode: isWeek ? 'week' : 'day', localName: data.localName, courtName: isWeek ? selectedCourt?.name : undefined, columns, starts, cells, capturedAt }
+  const reservations = columns.map((column) => starts.map((start, row) => {
+    if (cells[columns.indexOf(column)][row] !== 'busy') return undefined
+    const opening = openingRange(column.day)?.start ?? first
+    return column.day.occupations.find((occupation) => {
+      if (occupation.courtId !== column.courtId || occupation.type !== 'reserva') return false
+      const range = occupationRange(occupation, opening)
+      return range.start < start + STEP && range.end > start
+    })
+  }))
+  const reservationNames = reservations.map((column) => column.map((reservation) => reservation?.customerName?.trim().split(/\s+/)[0] || undefined))
+  const reservationKeys = reservations.map((column) => column.map((reservation) => reservation ? `${reservation.reservationId ?? ''}|${reservation.start}|${reservation.end}` : undefined))
+  return { mode: isWeek ? 'week' : 'day', localName: data.localName, courtName: isWeek ? selectedCourt?.name : undefined, columns, starts, cells, capturedAt, reservationNames, reservationKeys }
 }
 
 const COLORS: Record<ShareAvailability, { fill: string; text: string; label: string }> = {
-  free: { fill: '#cdf45b', text: '#17270e', label: 'Libre' },
-  busy: { fill: '#203526', text: '#ffffff', label: 'Ocupado' },
-  unavailable: { fill: '#819088', text: '#ffffff', label: 'No disponible' },
+  free: { fill: '#edf6e9', text: '#315c3d', label: 'Libre' },
+  busy: { fill: '#ddd3f4', text: '#39275c', label: 'Ocupado' },
+  unavailable: { fill: '#dfe5df', text: '#4a5c50', label: 'No disponible' },
   past: { fill: '#e9eee6', text: '#79887b', label: 'Ya pasó' },
   closed: { fill: '#f3f4ee', text: '#a3aca3', label: 'Cerrado' },
 }
@@ -114,23 +127,18 @@ function updatedLabel(date: Date) {
     .replaceAll('.', '')
 }
 
-function drawPlayMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.scale(size / 40, size / 40)
-  ctx.fillStyle = '#12b6bf'
-  ctx.beginPath(); ctx.moveTo(2, 2); ctx.lineTo(21, 20); ctx.lineTo(2, 38); ctx.closePath(); ctx.fill()
-  ctx.fillStyle = '#43c764'
-  ctx.beginPath(); ctx.moveTo(2, 2); ctx.lineTo(26, 16); ctx.lineTo(21, 20); ctx.closePath(); ctx.fill()
-  ctx.fillStyle = '#ffc441'
-  ctx.beginPath(); ctx.moveTo(21, 20); ctx.lineTo(26, 16); ctx.lineTo(39, 20); ctx.lineTo(26, 25); ctx.closePath(); ctx.fill()
-  ctx.fillStyle = '#f35b68'
-  ctx.beginPath(); ctx.moveTo(2, 38); ctx.lineTo(21, 20); ctx.lineTo(26, 25); ctx.closePath(); ctx.fill()
-  ctx.restore()
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('No se pudo cargar un recurso de marca'))
+    image.src = src
+  })
 }
 
 export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<Blob> {
   await document.fonts.ready
+  const [logo, playLogo] = await Promise.all([loadImage('/logo.png'), loadImage('/google-play-logo-nuevo.png')])
   const canvas = document.createElement('canvas')
   const width = schedule.mode === 'week' ? 1680 : Math.max(1180, 260 + schedule.columns.length * 330)
   const margin = 44
@@ -153,24 +161,23 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   ctx.fillRect(0, 0, width, height)
 
   const headerGradient = ctx.createLinearGradient(0, 0, width, headerHeight)
-  headerGradient.addColorStop(0, '#0a180d')
-  headerGradient.addColorStop(1, '#24402a')
+  headerGradient.addColorStop(0, '#f1f8e8')
+  headerGradient.addColorStop(1, '#eee8fa')
   ctx.fillStyle = headerGradient
   ctx.fillRect(0, 0, width, headerHeight)
-  roundedRect(ctx, margin, 34, 48, 48, 24, '#c5f72e')
-  roundedRect(ctx, margin + 17, 51, 14, 14, 7, '#10220f')
-  ctx.fillStyle = '#ffffff'
+  ctx.drawImage(logo, 55, 98, 180, 180, margin, 20, 70, 70)
+  ctx.fillStyle = '#203629'
   ctx.font = '800 31px Manrope, Arial, sans-serif'
-  ctx.fillText('Grassly', margin + 64, 69)
+  ctx.fillText('Grassly', margin + 82, 69)
   ctx.textAlign = 'right'
   ctx.font = '600 18px Manrope, Arial, sans-serif'
-  ctx.fillStyle = '#c8d8c8'
+  ctx.fillStyle = '#596b5d'
   ctx.fillText(`Actualizado ${updatedLabel(schedule.capturedAt)}`, width - margin, 65)
   ctx.textAlign = 'left'
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = '#172c20'
   ctx.font = '800 49px Manrope, Arial, sans-serif'
   ctx.fillText('Horarios disponibles', margin, 140)
-  ctx.fillStyle = '#d7e4d5'
+  ctx.fillStyle = '#506355'
   ctx.font = '600 23px Manrope, Arial, sans-serif'
   const firstDate = schedule.columns[0]?.day.date ?? ''
   const lastDate = schedule.columns.at(-1)?.day.date ?? firstDate
@@ -180,7 +187,7 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   let legendX = margin
   for (const item of legend) {
     roundedRect(ctx, legendX, 201, 14, 14, 7, COLORS[item].fill)
-    ctx.fillStyle = '#e8f0e6'
+    ctx.fillStyle = '#405448'
     ctx.font = '600 17px Manrope, Arial, sans-serif'
     ctx.fillText(COLORS[item].label, legendX + 22, 214)
     legendX += ctx.measureText(COLORS[item].label).width + 54
@@ -218,7 +225,7 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
     for (let row = 0; row < values.length;) {
       const state = values[row]
       let next = row + 1
-      while (next < values.length && values[next] === state) next++
+      while (next < values.length && values[next] === state && (state !== 'busy' || schedule.reservationKeys[index][next] === schedule.reservationKeys[index][row])) next++
       const blockY = boardY + row * rowHeight + 3
       const blockHeight = (next - row) * rowHeight - 6
       const tone = COLORS[state]
@@ -226,14 +233,15 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
       ctx.textAlign = 'center'
       ctx.fillStyle = tone.text
       ctx.font = '800 17px Manrope, Arial, sans-serif'
+      const label = state === 'busy' && schedule.reservationNames[index][row] ? schedule.reservationNames[index][row]! : tone.label
       const centerX = x + columnWidth / 2
       const centerY = blockY + blockHeight / 2
       if (blockHeight >= 74) {
-        ctx.fillText(tone.label, centerX, centerY - 5)
+        ctx.fillText(fitText(ctx, label, columnWidth - 20), centerX, centerY - 5)
         ctx.font = '600 14px Manrope, Arial, sans-serif'
         ctx.fillText(`${minutesToTime(schedule.starts[row])} – ${minutesToTime(schedule.starts[next - 1] + STEP)}`, centerX, centerY + 20)
       } else {
-        ctx.fillText(tone.label, centerX, centerY + 6)
+        ctx.fillText(fitText(ctx, label, columnWidth - 20), centerX, centerY + 6)
       }
       row = next
     }
@@ -245,19 +253,19 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   ctx.strokeStyle = '#dce4d9'
   ctx.beginPath(); ctx.moveTo(width - margin, headerHeight); ctx.lineTo(width - margin, boardY + boardHeight); ctx.stroke()
 
-  ctx.fillStyle = '#102315'
+  ctx.fillStyle = '#e9f3e5'
   ctx.fillRect(0, footerTop, width, height - footerTop)
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = '#203629'
   ctx.font = '800 25px Manrope, Arial, sans-serif'
   ctx.fillText('Encuentra tu próxima cancha en Grassly', margin, footerTop + 58)
-  ctx.fillStyle = '#c9d9c6'
+  ctx.fillStyle = '#526959'
   ctx.font = '600 18px Manrope, Arial, sans-serif'
   ctx.fillText('Disponibilidad al momento de esta captura. Confirma con el local antes de reservar.', margin, footerTop + 91)
   roundedRect(ctx, width - margin - 350, footerTop + 28, 350, 102, 18, '#f7f9f3')
-  drawPlayMark(ctx, width - margin - 325, footerTop + 55, 48)
+  ctx.drawImage(playLogo, width - margin - 325, footerTop + 55, 48, 48)
   ctx.fillStyle = '#526553'
   ctx.font = '800 15px Manrope, Arial, sans-serif'
-  ctx.fillText('PRÓXIMAMENTE EN', width - margin - 263, footerTop + 71)
+  ctx.fillText('DISPONIBLE EN', width - margin - 263, footerTop + 71)
   ctx.fillStyle = '#172b1a'
   ctx.font = '800 27px Manrope, Arial, sans-serif'
   ctx.fillText('Google Play', width - margin - 263, footerTop + 105)

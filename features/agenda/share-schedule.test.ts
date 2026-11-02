@@ -28,6 +28,7 @@ describe('public agenda image schedule', () => {
     expect(schedule.columns).toHaveLength(2)
     expect(stateAt(schedule, 0, '09:00')).toBe('free')
     expect(stateAt(schedule, 0, '09:30')).toBe('busy')
+    expect(schedule.reservationNames[0][schedule.starts.indexOf(570)]).toBe('Private')
     expect(stateAt(schedule, 0, '10:00')).toBe('busy')
     expect(stateAt(schedule, 0, '10:30')).toBe('free')
     expect(stateAt(schedule, 1, '09:30')).toBe('free')
