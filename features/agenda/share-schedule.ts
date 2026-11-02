@@ -88,11 +88,11 @@ export function buildShareSchedule({
 }
 
 const COLORS: Record<ShareAvailability, { fill: string; text: string; label: string }> = {
-  free: { fill: '#f8fcf5', text: '#315c3d', label: 'Libre' },
-  busy: { fill: '#805bc0', text: '#ffffff', label: 'Ocupado' },
-  unavailable: { fill: '#c8d2c8', text: '#314239', label: 'No disponible' },
-  past: { fill: '#e1e7df', text: '#617466', label: 'Ya pasó' },
-  closed: { fill: '#e8ece5', text: '#697b6c', label: 'Cerrado' },
+  free: { fill: '#f5faf3', text: '#315c3d', label: 'Libre' },
+  busy: { fill: '#7048c4', text: '#ffffff', label: 'Ocupado' },
+  unavailable: { fill: '#dfe5df', text: '#46564b', label: 'No disponible' },
+  past: { fill: '#edf0ec', text: '#7a897d', label: 'Ya pasó' },
+  closed: { fill: '#e9ede8', text: '#748278', label: 'Cerrado' },
 }
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, color: string) {
@@ -157,10 +157,10 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   const boardWidth = width - margin * 2 - axisWidth
   const columnWidth = boardWidth / Math.max(schedule.columns.length, 1)
   const boardY = headerHeight + tableHeaderHeight
-  ctx.fillStyle = '#f9faf5'
+  ctx.fillStyle = '#f1f4ef'
   ctx.fillRect(0, 0, width, height)
 
-  ctx.fillStyle = '#c8e99a'
+  ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, width, headerHeight)
   ctx.drawImage(logo, 55, 98, 180, 180, margin, 20, 70, 70)
   ctx.fillStyle = '#203629'
@@ -174,6 +174,12 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   ctx.fillStyle = '#172c20'
   ctx.font = '800 49px Manrope, Arial, sans-serif'
   ctx.fillText('Horarios disponibles', margin, 140)
+  roundedRect(ctx, width - margin - 166, 109, 166, 44, 22, '#c9f33d')
+  ctx.fillStyle = '#203629'
+  ctx.textAlign = 'center'
+  ctx.font = '800 16px Manrope, Arial, sans-serif'
+  ctx.fillText(schedule.mode === 'week' ? '7 DÍAS' : 'VISTA DIARIA', width - margin - 83, 137)
+  ctx.textAlign = 'left'
   ctx.fillStyle = '#506355'
   ctx.font = '600 23px Manrope, Arial, sans-serif'
   const firstDate = schedule.columns[0]?.day.date ?? ''
@@ -190,7 +196,7 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
     legendX += ctx.measureText(COLORS[item].label).width + 54
   }
 
-  ctx.fillStyle = '#d9e6d4'
+  ctx.fillStyle = '#ffffff'
   ctx.fillRect(margin, headerHeight, width - margin * 2, tableHeaderHeight)
   ctx.fillStyle = '#566c55'
   ctx.font = '800 16px Manrope, Arial, sans-serif'
@@ -205,10 +211,10 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   ctx.textAlign = 'left'
   schedule.starts.forEach((start, row) => {
     const y = boardY + row * rowHeight
-    ctx.fillStyle = row % 2 ? '#f9faf5' : '#f4f7ef'
+    ctx.fillStyle = '#f1f4ef'
     ctx.fillRect(margin, y, width - margin * 2, rowHeight)
     if (start % 60 === 0) {
-      ctx.strokeStyle = '#d5ded2'
+      ctx.strokeStyle = '#e1e8df'
       ctx.lineWidth = 1
       ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(width - margin, y); ctx.stroke()
     }
@@ -223,11 +229,7 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
       const state = values[row]
       if (state === 'free') {
         const y = boardY + row * rowHeight
-        ctx.fillStyle = COLORS.free.fill
-        ctx.fillRect(x, y, columnWidth, rowHeight)
-        ctx.strokeStyle = '#bdcdbc'
-        ctx.lineWidth = 1
-        ctx.strokeRect(x + 0.5, y + 0.5, columnWidth - 1, rowHeight - 1)
+        roundedRect(ctx, x + 2, y + 1, columnWidth - 4, rowHeight - 2, 5, COLORS.free.fill)
         row++
         continue
       }
@@ -252,15 +254,15 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
       }
       row = next
     }
-    ctx.strokeStyle = '#dce4d9'
+    ctx.strokeStyle = '#e5ebe3'
     ctx.lineWidth = 1
     ctx.beginPath(); ctx.moveTo(x, headerHeight); ctx.lineTo(x, boardY + boardHeight); ctx.stroke()
   })
   ctx.textAlign = 'left'
-  ctx.strokeStyle = '#dce4d9'
+  ctx.strokeStyle = '#e5ebe3'
   ctx.beginPath(); ctx.moveTo(width - margin, headerHeight); ctx.lineTo(width - margin, boardY + boardHeight); ctx.stroke()
 
-  ctx.fillStyle = '#d2eab9'
+  ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, footerTop, width, height - footerTop)
   ctx.fillStyle = '#203629'
   ctx.font = '800 25px Manrope, Arial, sans-serif'
@@ -268,7 +270,7 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   ctx.fillStyle = '#526959'
   ctx.font = '600 18px Manrope, Arial, sans-serif'
   ctx.fillText('Disponibilidad al momento de esta captura. Confirma con el local antes de reservar.', margin, footerTop + 91)
-  roundedRect(ctx, width - margin - 350, footerTop + 28, 350, 102, 18, '#f7f9f3')
+  roundedRect(ctx, width - margin - 350, footerTop + 28, 350, 102, 18, '#f0ecf9')
   ctx.drawImage(playLogo, width - margin - 325, footerTop + 55, 48, 48)
   ctx.fillStyle = '#526553'
   ctx.font = '800 15px Manrope, Arial, sans-serif'
