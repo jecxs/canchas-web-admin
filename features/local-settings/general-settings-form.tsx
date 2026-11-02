@@ -204,7 +204,24 @@ export function GeneralSettingsForm({ settings }: { settings: LocalSettings }) {
               <FieldDescription>
                 Escríbela o usa «Actualizar según el mapa» para tomarla del pin.
               </FieldDescription>
+              {addressError ? (
+                <p className="text-sm font-medium text-destructive">
+                  {addressError}
+                </p>
+              ) : null}
               <FieldError errors={errors(state.fieldErrors?.address)} />
+            </Field>
+            <Field>
+              <FieldLabel>Ubicación en el mapa</FieldLabel>
+              <MapLocationPicker
+                latitude={latitude}
+                longitude={longitude}
+                onLocationChange={handleLocationChange}
+              />
+              <FieldDescription>
+                Mueve el pin sobre la puerta del local para fijar las
+                coordenadas exactas.
+              </FieldDescription>
             </Field>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field data-invalid={Boolean(state.fieldErrors?.latitude)}>
