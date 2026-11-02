@@ -88,11 +88,11 @@ export function buildShareSchedule({
 }
 
 const COLORS: Record<ShareAvailability, { fill: string; text: string; label: string }> = {
-  free: { fill: '#edf6e9', text: '#315c3d', label: 'Libre' },
-  busy: { fill: '#ddd3f4', text: '#39275c', label: 'Ocupado' },
-  unavailable: { fill: '#dfe5df', text: '#4a5c50', label: 'No disponible' },
-  past: { fill: '#e9eee6', text: '#79887b', label: 'Ya pasó' },
-  closed: { fill: '#f3f4ee', text: '#a3aca3', label: 'Cerrado' },
+  free: { fill: '#f8fcf5', text: '#315c3d', label: 'Libre' },
+  busy: { fill: '#805bc0', text: '#ffffff', label: 'Ocupado' },
+  unavailable: { fill: '#c8d2c8', text: '#314239', label: 'No disponible' },
+  past: { fill: '#e1e7df', text: '#617466', label: 'Ya pasó' },
+  closed: { fill: '#e8ece5', text: '#697b6c', label: 'Cerrado' },
 }
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, color: string) {
@@ -160,10 +160,7 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   ctx.fillStyle = '#f9faf5'
   ctx.fillRect(0, 0, width, height)
 
-  const headerGradient = ctx.createLinearGradient(0, 0, width, headerHeight)
-  headerGradient.addColorStop(0, '#f1f8e8')
-  headerGradient.addColorStop(1, '#eee8fa')
-  ctx.fillStyle = headerGradient
+  ctx.fillStyle = '#c8e99a'
   ctx.fillRect(0, 0, width, headerHeight)
   ctx.drawImage(logo, 55, 98, 180, 180, margin, 20, 70, 70)
   ctx.fillStyle = '#203629'
@@ -186,14 +183,14 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   const legend: ShareAvailability[] = ['free', 'busy', 'unavailable', 'past']
   let legendX = margin
   for (const item of legend) {
-    roundedRect(ctx, legendX, 201, 14, 14, 7, COLORS[item].fill)
+    roundedRect(ctx, legendX, 201, 14, 14, 7, item === 'free' ? '#438b4e' : COLORS[item].fill)
     ctx.fillStyle = '#405448'
     ctx.font = '600 17px Manrope, Arial, sans-serif'
     ctx.fillText(COLORS[item].label, legendX + 22, 214)
     legendX += ctx.measureText(COLORS[item].label).width + 54
   }
 
-  ctx.fillStyle = '#e9eee5'
+  ctx.fillStyle = '#d9e6d4'
   ctx.fillRect(margin, headerHeight, width - margin * 2, tableHeaderHeight)
   ctx.fillStyle = '#566c55'
   ctx.font = '800 16px Manrope, Arial, sans-serif'
@@ -224,6 +221,16 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
     const values = schedule.cells[index] ?? []
     for (let row = 0; row < values.length;) {
       const state = values[row]
+      if (state === 'free') {
+        const y = boardY + row * rowHeight
+        ctx.fillStyle = COLORS.free.fill
+        ctx.fillRect(x, y, columnWidth, rowHeight)
+        ctx.strokeStyle = '#bdcdbc'
+        ctx.lineWidth = 1
+        ctx.strokeRect(x + 0.5, y + 0.5, columnWidth - 1, rowHeight - 1)
+        row++
+        continue
+      }
       let next = row + 1
       while (next < values.length && values[next] === state && (state !== 'busy' || schedule.reservationKeys[index][next] === schedule.reservationKeys[index][row])) next++
       const blockY = boardY + row * rowHeight + 3
@@ -253,7 +260,7 @@ export async function renderShareSchedulePng(schedule: ShareSchedule): Promise<B
   ctx.strokeStyle = '#dce4d9'
   ctx.beginPath(); ctx.moveTo(width - margin, headerHeight); ctx.lineTo(width - margin, boardY + boardHeight); ctx.stroke()
 
-  ctx.fillStyle = '#e9f3e5'
+  ctx.fillStyle = '#d2eab9'
   ctx.fillRect(0, footerTop, width, height - footerTop)
   ctx.fillStyle = '#203629'
   ctx.font = '800 25px Manrope, Arial, sans-serif'
