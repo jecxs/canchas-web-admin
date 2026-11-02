@@ -11,7 +11,7 @@ const GROUPINGS: Array<{ value: ReportGranularity; label: string }> = [
   { value: 'mes', label: 'Mensual' },
 ]
 
-function formatMoney(value: number, maximumFractionDigits = 0) {
+function formatMoney(value: number, maximumFractionDigits = 2) {
   return new Intl.NumberFormat('es-PE', {
     style: 'currency',
     currency: 'PEN',
