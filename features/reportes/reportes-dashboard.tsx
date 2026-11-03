@@ -24,12 +24,24 @@ function formatCount(value: number) {
   return new Intl.NumberFormat('es-PE').format(value)
 }
 
-function methodColor(label: string) {
+const METHOD_PALETTE = [
+  'var(--rp-violet)',
+  'var(--rp-carbon)',
+  'var(--rp-cal)',
+  'var(--rp-steel)',
+  'var(--rp-ochre)',
+  'var(--rp-rose)',
+]
+
+function methodColor(label: string, index = 0) {
   const value = label.toLowerCase()
   if (value.includes('efectivo')) return 'var(--rp-cal)'
-  if (value.includes('yape')) return 'var(--rp-violet-700)'
-  if (value.includes('plin')) return 'var(--rp-violet-300)'
-  return 'var(--rp-violet)'
+  if (value.includes('yape')) return 'var(--rp-violet)'
+  if (value.includes('plin')) return 'var(--rp-carbon)'
+  if (value.includes('transfer')) return 'var(--rp-steel)'
+  if (value.includes('otro')) return 'var(--rp-ochre)'
+  if (value.includes('comprobante')) return 'var(--rp-rose)'
+  return METHOD_PALETTE[index % METHOD_PALETTE.length]
 }
 
 function ChartEmpty({ message }: { message: string }) {
@@ -42,6 +54,7 @@ function ChartEmpty({ message }: { message: string }) {
 
 export function ReportesDashboard({ data }: { data: IncomeReport }) {
   const [granularity, setGranularity] = useState<ReportGranularity>('dia')
+  const [hoveredMethod, setHoveredMethod] = useState<number | null>(null)
   const series = groupDaily(data.daily, granularity)
   const sportPositive = data.bySport.filter((item) => item.income > 0)
   const methodPositive = data.byMethod.filter((item) => item.income > 0)
@@ -53,6 +66,12 @@ export function ReportesDashboard({ data }: { data: IncomeReport }) {
   }))
   const maxSport = Math.max(1, ...sportPositive.map((item) => item.income))
   const methodTotal = methodPositive.reduce((sum, item) => sum + item.income, 0) || 1
+  const methodSegments = methodPositive.map((item, index) => {
+    const pct = (item.income / methodTotal) * 100
+    const before = methodPositive.slice(0, index).reduce((sum, previous) => sum + (previous.income / methodTotal) * 100, 0)
+    return { item, index, pct, color: methodColor(item.label, index), center: before + pct / 2 }
+  })
+  const hoveredSegment = hoveredMethod === null ? null : methodSegments[hoveredMethod] ?? null
   const hasSeries = series.some((point) => point.income !== 0)
 
   return (
@@ -153,19 +172,29 @@ export function ReportesDashboard({ data }: { data: IncomeReport }) {
         </div>
         {methodPositive.length ? (
           <>
-            <div className="rp-split" aria-hidden="true">
-              {methodPositive.map((item) => (
-                <i
-                  key={item.id}
-                  style={{ width: `${(item.income / methodTotal) * 100}%`, background: methodColor(item.label) }}
-                />
-              ))}
+            <div className="rp-splitwrap" aria-hidden="true" onMouseLeave={() => setHoveredMethod(null)}>
+              <div className="rp-split">
+                {methodSegments.map((seg) => (
+                  <i
+                    key={seg.item.id}
+                    style={{ width: `${seg.pct}%`, background: seg.color }}
+                    onMouseEnter={() => setHoveredMethod(seg.index)}
+                  />
+                ))}
+              </div>
+              {hoveredSegment && (
+                <span className="rp-tip" style={{ left: `${hoveredSegment.center}%` }}>
+                  <i style={{ background: hoveredSegment.color }} />
+                  {hoveredSegment.item.label}
+                  <b>{formatMoney(hoveredSegment.item.income, 2)}</b>
+                </span>
+              )}
             </div>
             <div className="rp-splitlegend">
-              {methodPositive.map((item) => (
-                <span key={item.id}>
-                  <span className="rp-dot" style={{ background: methodColor(item.label) }} />
-                  {item.label} <b>{formatMoney(item.income)}</b>
+              {methodSegments.map((seg) => (
+                <span key={seg.item.id}>
+                  <span className="rp-dot" style={{ background: seg.color }} />
+                  {seg.item.label} <b>{formatMoney(seg.item.income)}</b>
                 </span>
               ))}
             </div>

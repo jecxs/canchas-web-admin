@@ -45,6 +45,9 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-plum: var(--plum);
+  --color-brand: var(--violet-500);
+  --color-brand-soft: var(--violet-300);
+  --color-brand-deep: var(--violet-900);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -75,6 +78,11 @@
 :root {
   --radius: 0.9rem;
   --plum: oklch(0.54 0.24 300);
+  /* Escala violeta (matiz ~252°) de la app móvil, base #6E4BFF */
+  --violet-300: #a58fff;
+  --violet-400: #8c70ff;
+  --violet-500: #6e4bff;
+  --violet-900: #190080;
   --background: oklch(0.991 0.008 118);
   --foreground: oklch(0.205 0.032 145);
   --surface: oklch(0.972 0.018 122);
@@ -226,8 +234,10 @@
     @apply border-border outline-ring/50;
   }
 
-  html {
-    scroll-behavior: smooth;
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   body {
@@ -270,14 +280,6 @@
     radial-gradient(circle at 21% 97%, color-mix(in oklab, var(--sidebar) 35%, transparent), transparent 31%);
 }
 
-.dashboard-screen {
-  transform: perspective(1200px) rotateX(2deg);
-}
-
-.hero-ball {
-  filter: drop-shadow(0 20px 26px oklch(0 0 0 / 0.28));
-}
-
 .eyebrow {
   font-size: 10px;
   font-weight: 800;
@@ -297,52 +299,6 @@
   text-transform: uppercase;
 }
 
-.section-title em {
-  color: var(--primary);
-  font-style: normal;
-}
-
-.spotlight-card {
-  --x: 50%;
-  --y: 50%;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.spotlight-card::before {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    360px circle at var(--x) var(--y),
-    color-mix(in oklab, var(--primary) 28%, transparent),
-    transparent 45%
-  );
-  content: "";
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.35s ease;
-}
-
-.spotlight-card:hover {
-  box-shadow: var(--shadow-grassly-floating);
-  transform: translateY(-4px);
-}
-
-.spotlight-card:hover::before {
-  opacity: 1;
-}
-
-.ticker-track {
-  animation: ticker 26s linear infinite;
-}
-
-@keyframes ticker {
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 /* ===== Reportes — sistema "pizarra" ===== */
 .reportes {
   --rp-ink: var(--foreground);
@@ -357,6 +313,10 @@
   --rp-violet-soft: #efebff;
   --rp-amber: var(--warning-foreground);
   --rp-red: var(--destructive);
+  --rp-carbon: #232323;
+  --rp-steel: #2f7d9e;
+  --rp-ochre: #c98a2b;
+  --rp-rose: #b04a7a;
   color: var(--rp-ink);
 }
 
@@ -430,11 +390,17 @@
 .reportes .rp-ranktrack i { display:block; height:100%; background:var(--rp-cal); border-radius:999px; }
 .reportes .rp-rankval { font-variant-numeric:tabular-nums; font-weight:700; font-size:13px; white-space:nowrap; }
 
+.reportes .rp-splitwrap { position:relative; }
 .reportes .rp-split { display:flex; height:16px; border-radius:999px; overflow:hidden; background:color-mix(in oklab, var(--rp-ink) 8%, transparent); }
 .reportes .rp-split i { display:block; height:100%; }
 .reportes .rp-split i + i { margin-left:2px; }
-.reportes .rp-splitlegend { display:flex; flex-wrap:wrap; gap:18px; margin-top:12px; font-size:12.5px; color:var(--rp-muted); }
-.reportes .rp-splitlegend b { color:var(--rp-ink); }
+.reportes .rp-splitlegend { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px 28px; margin-top:14px; font-size:13px; color:var(--rp-muted); }
+.reportes .rp-splitlegend > span { display:inline-flex; align-items:center; gap:8px; min-width:0; }
+.reportes .rp-splitlegend b { color:var(--rp-ink); font-variant-numeric:tabular-nums; }
+.reportes .rp-tip { position:absolute; bottom:calc(100% + 10px); transform:translateX(-50%); display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:8px; background:var(--rp-ink); color:var(--background); font-size:12px; font-weight:700; white-space:nowrap; box-shadow:0 8px 20px oklch(0 0 0 / 0.18); pointer-events:none; z-index:5; }
+.reportes .rp-tip::after { content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:var(--rp-ink); }
+.reportes .rp-tip i { display:inline-block; width:8px; height:8px; border-radius:50%; }
+.reportes .rp-tip b { font-variant-numeric:tabular-nums; }
 
 .reportes .rp-stackrow { margin-bottom:14px; }
 .reportes .rp-stacktop { display:flex; justify-content:space-between; font-size:12.5px; font-weight:600; margin-bottom:6px; }
@@ -510,6 +476,21 @@
 
 .owner-blob-slow {
   animation: owner-float 18s ease-in-out infinite alternate-reverse;
+  will-change: transform;
+}
+
+@keyframes app-showcase-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.app-showcase-float {
+  animation: app-showcase-float 6s ease-in-out infinite;
   will-change: transform;
 }
 

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { HelpCircleIcon, Logout01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { signOutAction } from '@/lib/auth/actions'
+import { GrasslyIcon } from '@/components/brand/grassly-mark'
 import { Badge } from '@/components/ui/badge'
 import {
   Sidebar,
@@ -59,9 +60,7 @@ export function AppSidebar({ role, localsCount, activeLocal, subscription }: App
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip="Grassly" className="h-12 rounded-xl hover:bg-sidebar-foreground/8 hover:text-sidebar-foreground data-[active=true]:bg-transparent">
               <Link href={homeHref} onClick={() => setOpenMobile(false)}>
-                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-sidebar-primary">
-                  <span className="size-2.5 rounded-full bg-sidebar-primary-foreground" />
-                </span>
+                <GrasslyIcon />
                 <span className="text-lg font-extrabold tracking-tight">Grassly</span>
               </Link>
             </SidebarMenuButton>
