@@ -13,16 +13,16 @@ function formatMoney(value: number) {
     style: 'currency',
     currency: 'PEN',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(value)
 }
 
 function formatCompact(value: number) {
+  const formatter = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 2 })
   if (Math.abs(value) >= 1000) {
-    const thousands = value / 1000
-    return `S/ ${thousands.toFixed(Number.isInteger(thousands) ? 0 : 1)}k`
+    return `S/ ${formatter.format(value / 1000)}k`
   }
-  return `S/ ${value}`
+  return `S/ ${formatter.format(value)}`
 }
 
 type ChartTooltipProps = { active?: boolean; payload?: Array<{ payload?: ReportSeriesPoint }> }
