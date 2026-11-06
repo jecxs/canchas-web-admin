@@ -457,14 +457,14 @@ export function AgendaBoard({
     : data.dayLabel;
   const manualTimeOptions = useMemo(() => {
     const selectedDay = selectedCell
-      ? days.find((day) => day.date === selectedCell.date)
-      : undefined;
+        ? days.find((day) => day.date === selectedCell.date)
+        : undefined;
     const slots = selectedDay
-      ? buildSlots(selectedDay.openingTime, selectedDay.closingTime)
-      : [];
+        ? buildSlots(selectedDay.openingTime, selectedDay.closingTime)
+        : [];
     const values = slots.length
-      ? slots.map((slot) => slot.start)
-      : Array.from({ length: 24 }, (_, hour) => hour * 60);
+        ? slots.map((slot) => slot.start)
+        : Array.from({ length: 24 }, (_, hour) => hour * 60);
     return values.map((value) => ({
       value: minutesToTime(value),
       label: minutesToTime(value),
