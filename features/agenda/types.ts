@@ -11,6 +11,8 @@ export type AgendaOccupation = {
   sportId?: string
   sportName?: string
   customerName?: string
+  publicName?: string | null
+  publicNameBlocked?: boolean
   customerPhone?: string
   reservationStatus?: string
   reservationChannel?: string
@@ -19,10 +21,16 @@ export type AgendaOccupation = {
   proofUrl?: string | null
   proofUploadedAt?: string | null
   totalAmount?: number
+  tariffAmount?: number
+  specialDiscountAmount?: number
   advanceAmount?: number
   paidAmount?: number
   refundedAmount?: number
   outstandingAmount?: number
+  hourExtensionId?: string | null
+  hourExtensionAmount?: number | null
+  hourExtensionOldEnd?: string | null
+  hourExtensionNewEnd?: string | null
 }
 
 export type AgendaSport = {

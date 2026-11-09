@@ -2,11 +2,16 @@
 
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { useActionState, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { shiftDate, startOfMonth, todayLima } from '../reportes/date-utils'
+import { registerExceptionalIncome, voidExceptionalIncome, type ExceptionalActionState } from './actions'
 import type { CajaReport } from './types'
 
 const MEDIO_COLORS: Record<string, string> = {
@@ -20,6 +25,8 @@ const MEDIO_COLORS: Record<string, string> = {
   otro: 'bg-slate-200',
   reembolso: 'bg-destructive',
 }
+
+const initialExceptionalActionState: ExceptionalActionState = { success: false, message: '' }
 
 function money(value: number) {
   return new Intl.NumberFormat('es-PE', {
@@ -79,9 +86,71 @@ function PeriodPicker({ start, end }: { start: string; end: string }) {
   )
 }
 
+function ExceptionalIncomeDialog({ data }: { data: CajaReport }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [state, action, pending] = useActionState(async (previous: ExceptionalActionState, form: FormData) => {
+    const result = await registerExceptionalIncome(previous, form)
+    if (result.success) { setOpen(false); router.refresh() }
+    return result
+  }, initialExceptionalActionState)
+  return <Dialog open={open} onOpenChange={setOpen}>
+    <DialogTrigger asChild><Button>Registrar ingreso excepcional</Button></DialogTrigger>
+    <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogHeader><DialogTitle>Registrar ingreso excepcional</DialogTitle><DialogDescription>Registra un cobro recibido que no tiene reserva en el sistema.</DialogDescription></DialogHeader>
+      <form action={action} className="space-y-4">
+        <label className="block space-y-1.5 text-sm font-semibold">Monto recibido (S/)<Input name="amount" type="number" min="0.01" max="99999.99" step="0.01" required placeholder="0.00" /></label>
+        <label className="block space-y-1.5 text-sm font-semibold">Medio de pago
+          <select name="methodId" required defaultValue="" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+            <option value="" disabled>Selecciona un medio</option>
+            {data.paymentMethods.map((method) => <option key={method.id} value={method.id}>{method.name}</option>)}
+          </select>
+        </label>
+        <label className="block space-y-1.5 text-sm font-semibold">Motivo / referencia<Textarea name="concept" minLength={3} maxLength={500} required placeholder="Ej. Reservas por madrugada, extra." /></label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1.5 text-sm font-semibold">Fecha de juego (opcional)<Input name="activityDate" type="date" /></label>
+          <label className="block space-y-1.5 text-sm font-semibold">Cancha (opcional)
+            <select name="courtId" defaultValue="" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+              <option value="">Sin cancha específica</option>
+              {data.courts.map((court) => <option key={court.id} value={court.id}>{court.name}</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">Este ingreso se suma a Caja. No crea una reserva ni ocupa horarios en Agenda.</p>
+        {!state.success && state.message && <p role="status" className="text-sm text-destructive">{state.message}</p>}
+        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button><Button type="submit" disabled={pending || data.paymentMethods.length === 0}>{pending ? 'Guardando…' : 'Registrar cobro'}</Button></div>
+      </form>
+    </DialogContent>
+  </Dialog>
+}
+
+function VoidExceptionalDialog({ entryId }: { entryId: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [state, action, pending] = useActionState(async (previous: ExceptionalActionState, form: FormData) => {
+    const result = await voidExceptionalIncome(previous, form)
+    if (result.success) { setOpen(false); router.refresh() }
+    return result
+  }, initialExceptionalActionState)
+  return <Dialog open={open} onOpenChange={setOpen}>
+    <DialogTrigger asChild><Button type="button" size="sm" variant="ghost">Anular</Button></DialogTrigger>
+    <DialogContent>
+      <DialogHeader><DialogTitle>Anular ingreso excepcional</DialogTitle><DialogDescription>El movimiento original quedará en el historial y Caja mostrará una corrección por el mismo monto.</DialogDescription></DialogHeader>
+      <form action={action} className="space-y-4">
+        <input type="hidden" name="entryId" value={entryId} />
+        <label className="block space-y-1.5 text-sm font-semibold">Motivo de anulación<Textarea name="reason" minLength={3} maxLength={500} required placeholder="Ej. Registro duplicado" /></label>
+        {!state.success && state.message && <p role="status" className="text-sm text-destructive">{state.message}</p>}
+        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setOpen(false)}>Volver</Button><Button type="submit" variant="destructive" disabled={pending}>{pending ? 'Anulando…' : 'Anular ingreso'}</Button></div>
+      </form>
+    </DialogContent>
+  </Dialog>
+}
+
 export function CajaView({ data }: { data: CajaReport }) {
+  const [movementFilter, setMovementFilter] = useState<'todos' | 'reservas' | 'excepcionales'>('todos')
+  const visibleMovements = data.movements.filter((movement) => movementFilter === 'todos' || (movementFilter === 'excepcionales') === Boolean(movement.ingreso_excepcional_id))
   const total = data.totals.collected
-  const methodTotal = data.byMethod.reduce((sum, item) => sum + item.amount, 0) || 1
+  const methodTotal = Math.max(1, data.byMethod.reduce((sum, item) => sum + Math.max(0, item.amount), 0))
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -94,6 +163,7 @@ export function CajaView({ data }: { data: CajaReport }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ExceptionalIncomeDialog data={data} />
           <PeriodPicker start={data.start} end={data.end} />
           <a
             href="https://www.mercadopago.com.pe/"
@@ -111,7 +181,7 @@ export function CajaView({ data }: { data: CajaReport }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Cobrado menos reembolsos</p>
+            <p className="text-sm text-muted-foreground">Cobrado menos reembolsos y anulaciones</p>
             <p className="mt-2 text-2xl font-black">{money(data.totals.neto)}</p>
             <p className="mt-1 text-xs text-muted-foreground">antes de deducciones</p>
           </CardContent>
@@ -144,6 +214,7 @@ export function CajaView({ data }: { data: CajaReport }) {
             <p className="text-sm text-muted-foreground">Comprobante / manual</p>
             <p className="mt-2 text-2xl font-black">{money(data.totals.comprobante)}</p>
             <p className="mt-1 text-xs text-muted-foreground">yape, plin, efectivo y otros</p>
+            <p className="mt-1 text-xs text-muted-foreground">Incluye {money(data.totals.excepcionales)} excepcionales</p>
           </CardContent>
         </Card>
         <Card>
@@ -153,6 +224,7 @@ export function CajaView({ data }: { data: CajaReport }) {
               {money(data.totals.reembolsos)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">devueltos en el periodo</p>
+            {data.totals.anulaciones > 0 && <p className="mt-1 text-xs text-muted-foreground">Anulaciones: {money(data.totals.anulaciones)}</p>}
           </CardContent>
         </Card>
       </div>
@@ -175,7 +247,7 @@ export function CajaView({ data }: { data: CajaReport }) {
                 <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className={cn('h-full rounded-full', MEDIO_COLORS[item.id] ?? 'bg-slate-400')}
-                    style={{ width: `${Math.round((item.amount / methodTotal) * 100)}%` }}
+                    style={{ width: `${Math.max(0, Math.round((item.amount / methodTotal) * 100))}%` }}
                   />
                 </div>
               </div>
@@ -187,9 +259,9 @@ export function CajaView({ data }: { data: CajaReport }) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Movimientos</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3"><CardTitle>Movimientos</CardTitle><div className="flex gap-1" role="group" aria-label="Filtrar movimientos">{(['todos', 'reservas', 'excepcionales'] as const).map((filter) => <Button key={filter} type="button" size="sm" variant={movementFilter === filter ? 'default' : 'ghost'} onClick={() => setMovementFilter(filter)} className="capitalize">{filter}</Button>)}</div></CardHeader>
         <CardContent>
-          {data.movements.length ? (
+          {visibleMovements.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -203,14 +275,14 @@ export function CajaView({ data }: { data: CajaReport }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {data.movements.map((movement) => (
+                  {visibleMovements.map((movement) => (
                     <tr key={movement.movimiento_id}>
                       <td className="py-3 pr-4 whitespace-nowrap text-muted-foreground">{dateTime(movement.created_at)}</td>
-                      <td className="py-3 pr-4 font-medium">{movement.cliente}</td>
+                      <td className="py-3 pr-4 font-medium">{movement.cliente}{movement.ingreso_excepcional_id && <span className="mt-1 block max-w-56 text-xs font-normal text-muted-foreground">{movement.notas}{movement.fecha_actividad ? ` · Juego ${movement.fecha_actividad}` : ''}</span>}</td>
                       <td className="py-3 pr-4">{movement.cancha_nombre}</td>
                       <td className="py-3 pr-4 capitalize">{movement.medio_tipo}</td>
                       <td className="py-3 pr-4">
-                        <Badge variant={movement.tipo === 'reembolso' ? 'destructive' : movement.tipo === 'saldo' ? 'neutral' : 'success'}>
+                        <Badge variant={movement.tipo === 'reembolso' || movement.tipo === 'anulacion' ? 'destructive' : movement.tipo === 'saldo' || movement.tipo === 'excepcional' ? 'neutral' : 'success'}>
                           {movement.tipo}
                         </Badge>
                       </td>
@@ -223,6 +295,7 @@ export function CajaView({ data }: { data: CajaReport }) {
                               : `−${money(movement.deducciones)} · Recibido ${money(movement.netoRecibido)}`}
                           </span>
                         ) : null}
+                        {movement.tipo === 'excepcional' && movement.ingreso_excepcional_id && !movement.anulado && <VoidExceptionalDialog entryId={movement.ingreso_excepcional_id} />}
                       </td>
                     </tr>
                   ))}

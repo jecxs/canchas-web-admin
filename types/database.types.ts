@@ -668,6 +668,79 @@ export type Database = {
           },
         ]
       }
+      ingresos_excepcionales_caja: {
+        Row: {
+          anulado_at: string | null
+          anulado_por: string | null
+          cancha_id: string | null
+          concepto: string
+          created_at: string
+          fecha_actividad: string | null
+          id: string
+          local_id: string
+          medio_nombre_snapshot: string
+          medio_pago_id: string
+          medio_tipo_snapshot: string
+          monto: number
+          motivo_anulacion: string | null
+          registrado_por: string
+        }
+        Insert: {
+          anulado_at?: string | null
+          anulado_por?: string | null
+          cancha_id?: string | null
+          concepto: string
+          created_at?: string
+          fecha_actividad?: string | null
+          id?: string
+          local_id: string
+          medio_nombre_snapshot: string
+          medio_pago_id: string
+          medio_tipo_snapshot: string
+          monto: number
+          motivo_anulacion?: string | null
+          registrado_por?: string
+        }
+        Update: {
+          anulado_at?: string | null
+          anulado_por?: string | null
+          cancha_id?: string | null
+          concepto?: string
+          created_at?: string
+          fecha_actividad?: string | null
+          id?: string
+          local_id?: string
+          medio_nombre_snapshot?: string
+          medio_pago_id?: string
+          medio_tipo_snapshot?: string
+          monto?: number
+          motivo_anulacion?: string | null
+          registrado_por?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingresos_excepcionales_caja_cancha_id_fkey"
+            columns: ["cancha_id"]
+            isOneToOne: false
+            referencedRelation: "canchas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingresos_excepcionales_caja_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "locales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingresos_excepcionales_caja_medio_pago_id_fkey"
+            columns: ["medio_pago_id"]
+            isOneToOne: false
+            referencedRelation: "local_medios_pago"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intentos_checkout_suscripcion: {
         Row: {
           checkout_url: string | null
@@ -978,6 +1051,7 @@ export type Database = {
       }
       locales: {
         Row: {
+          avisos_cumpleanos_activos: boolean
           aprobado_por: string | null
           created_at: string
           descripcion: string | null
@@ -1006,6 +1080,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avisos_cumpleanos_activos?: boolean
           aprobado_por?: string | null
           created_at?: string
           descripcion?: string | null
@@ -1034,6 +1109,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avisos_cumpleanos_activos?: boolean
           aprobado_por?: string | null
           created_at?: string
           descripcion?: string | null
@@ -1505,6 +1581,8 @@ export type Database = {
       }
       perfiles: {
         Row: {
+          cumpleanos_mes: number | null
+          cumpleanos_dia: number | null
           avatar_url: string | null
           created_at: string
           dni: string | null
@@ -1516,6 +1594,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cumpleanos_mes?: number | null
+          cumpleanos_dia?: number | null
           avatar_url?: string | null
           created_at?: string
           dni?: string | null
@@ -1527,6 +1607,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cumpleanos_mes?: number | null
+          cumpleanos_dia?: number | null
           avatar_url?: string | null
           created_at?: string
           dni?: string | null
@@ -1865,6 +1947,12 @@ export type Database = {
           },
         ]
       }
+      reserva_ampliaciones_hora: {
+        Row: { id: string; reserva_id: string; rango_previo: unknown; rango_nuevo: unknown; monto_adicional: number; autorizado_por: string; created_at: string; revertido_at: string | null; revertido_por: string | null }
+        Insert: { id?: string; reserva_id: string; rango_previo: unknown; rango_nuevo: unknown; monto_adicional: number; autorizado_por: string; created_at?: string; revertido_at?: string | null; revertido_por?: string | null }
+        Update: { id?: string; reserva_id?: string; rango_previo?: unknown; rango_nuevo?: unknown; monto_adicional?: number; autorizado_por?: string; created_at?: string; revertido_at?: string | null; revertido_por?: string | null }
+        Relationships: [{ foreignKeyName: 'reserva_ampliaciones_hora_reserva_id_fkey'; columns: ['reserva_id']; isOneToOne: false; referencedRelation: 'reservas'; referencedColumns: ['id'] }]
+      }
       reserva_extensiones: {
         Row: {
           adelanto_adicional_requerido: number
@@ -1935,8 +2023,51 @@ export type Database = {
           },
         ]
       }
+      reserva_descuentos_historial: {
+        Row: {
+          id: string
+          reserva_id: string
+          precio_tarifa_base: number
+          descuento_anterior: number
+          descuento_nuevo: number
+          total_anterior: number
+          total_nuevo: number
+          motivo: string
+          registrado_por: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          reserva_id: string
+          precio_tarifa_base: number
+          descuento_anterior: number
+          descuento_nuevo: number
+          total_anterior: number
+          total_nuevo: number
+          motivo: string
+          registrado_por: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          reserva_id?: string
+          precio_tarifa_base?: number
+          descuento_anterior?: number
+          descuento_nuevo?: number
+          total_anterior?: number
+          total_nuevo?: number
+          motivo?: string
+          registrado_por?: string
+          created_at?: string
+        }
+        Relationships: [{ foreignKeyName: "reserva_descuentos_historial_reserva_id_fkey"; columns: ["reserva_id"]; isOneToOne: false; referencedRelation: "reservas"; referencedColumns: ["id"] }]
+      }
       reservas: {
         Row: {
+          precio_tarifa_base: number
+          descuento_especial_monto: number
+          nombre_publico: string | null
+          nombre_publico_bloqueado: boolean
           canal_origen: Database["public"]["Enums"]["canal_origen_reserva"]
           cancelada_at: string | null
           cancelada_por: string | null
@@ -1970,6 +2101,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          precio_tarifa_base?: number
+          descuento_especial_monto?: number
+          nombre_publico?: string | null
+          nombre_publico_bloqueado?: boolean
           canal_origen?: Database["public"]["Enums"]["canal_origen_reserva"]
           cancelada_at?: string | null
           cancelada_por?: string | null
@@ -2003,6 +2138,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          precio_tarifa_base?: number
+          descuento_especial_monto?: number
+          nombre_publico?: string | null
+          nombre_publico_bloqueado?: boolean
           canal_origen?: Database["public"]["Enums"]["canal_origen_reserva"]
           cancelada_at?: string | null
           cancelada_por?: string | null
@@ -2182,6 +2321,55 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cotizar_ampliacion_hora_reserva_dueno: {
+        Args: { p_reserva_id: string }
+        Returns: { fin_anterior: string; fin_nuevo: string; monto_adicional: number; total_nuevo: number; saldo_nuevo: number }[]
+      }
+      ampliar_reserva_hora_dueno: {
+        Args: { p_reserva_id: string; p_fin_esperado: string; p_total_esperado: number; p_medio_pago_id?: string | null }
+        Returns: string
+      }
+      revertir_ampliacion_hora_reserva_dueno: {
+        Args: { p_ampliacion_id: string }
+        Returns: undefined
+      }
+      actualizar_avisos_cumpleanos_local_dueno: {
+        Args: { p_local_id: string; p_activos: boolean }
+        Returns: boolean
+      }
+      obtener_cumpleanos_clientes_local_dueno: {
+        Args: { p_local_id: string }
+        Returns: { cliente_id: string; nombre: string; cumpleanos_mes: number; cumpleanos_dia: number }[]
+      }
+      aplicar_precio_especial_reserva_dueno: {
+        Args: { p_reserva_id: string; p_monto_final: number; p_motivo: string; p_total_esperado?: number | null }
+        Returns: undefined
+      }
+      crear_reserva_manual_confirmada_dueno_con_descuento: {
+        Args: {
+          p_local_id: string
+          p_cancha_id: string
+          p_deporte_id: string
+          p_inicio: string
+          p_bloques: number
+          p_medio_pago_id: string | null
+          p_cliente_id: string | null
+          p_cliente_nombre: string
+          p_cliente_telefono: string
+          p_monto_adelanto: number
+          p_canal: Database["public"]["Enums"]["canal_origen_reserva"]
+          p_notas: string | null
+          p_nombre_publico: string | null
+          p_monto_final: number
+          p_motivo_descuento: string
+          p_total_cotizado: number
+        }
+        Returns: string
+      }
+      anular_ingreso_excepcional_caja: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: undefined
+      }
       actualizar_datos_generales_local: {
         Args: {
           p_descripcion: string
@@ -2560,6 +2748,14 @@ export type Database = {
           reserva_id: string
         }[]
       }
+      actualizar_nombre_publico_reserva: {
+        Args: {
+          p_reserva_id: string
+          p_nombre_publico?: string | null
+          p_bloquear?: boolean
+        }
+        Returns: undefined
+      }
       crear_reserva_en_local: {
         Args: {
           p_bloques: number
@@ -2634,6 +2830,10 @@ export type Database = {
           monto_total: number
           reserva_id: string
         }[]
+      }
+      crear_reserva_manual_confirmada_dueno_con_nombre: {
+        Args: Omit<Database["public"]["Functions"]["crear_reserva_manual_confirmada_dueno_v2"]["Args"], "p_medio_pago_id"> & { p_medio_pago_id: string | null; p_nombre_publico?: string | null }
+        Returns: Database["public"]["Functions"]["crear_reserva_manual_confirmada_dueno_v2"]["Returns"]
       }
       crear_reserva_manual_dueno: {
         Args: {
@@ -2731,6 +2931,10 @@ export type Database = {
           monto_total: number
           reserva_id: string
         }[]
+      }
+      crear_reserva_manual_encajada_confirmada_dueno_con_nombre: {
+        Args: Omit<Database["public"]["Functions"]["crear_reserva_manual_encajada_confirmada_dueno_v2"]["Args"], "p_medio_pago_id"> & { p_medio_pago_id: string | null; p_nombre_publico?: string | null }
+        Returns: Database["public"]["Functions"]["crear_reserva_manual_encajada_confirmada_dueno_v2"]["Returns"]
       }
       crear_sede_adicional: {
         Args: {

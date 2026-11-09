@@ -58,6 +58,8 @@ const MOVEMENT_LABELS: Record<string, string> = {
   adelanto: 'Adelanto',
   saldo: 'Saldo',
   reembolso: 'Reembolso',
+  excepcional: 'Excepcional',
+  anulacion: 'Anulación',
 }
 
 const MEDIO_LABELS: Record<string, string> = {
@@ -189,6 +191,9 @@ function reservationRow(row: ReservationExportRow): CellValue[] {
     STATUS_LABELS[row.estado] ?? row.estado,
     CHANNEL_LABELS[row.canal] ?? row.canal,
     row.monto_total,
+    row.precio_tarifa_base,
+    row.descuento_especial_monto,
+    row.descuento_especial_motivo ?? '',
     row.monto_adelanto,
     row.monto_cobrado,
     row.saldo_pendiente,
@@ -249,6 +254,9 @@ export async function buildReservationsWorkbook(range: OwnerDataRange) {
       { header: 'Estado', width: 24 },
       { header: 'Canal', width: 15 },
       { header: 'Total (S/)', width: 13, format: MONEY_FORMAT, align: 'right' },
+      { header: 'Tarifa (S/)', width: 13, format: MONEY_FORMAT, align: 'right' },
+      { header: 'Descuento especial (S/)', width: 20, format: MONEY_FORMAT, align: 'right' },
+      { header: 'Motivo precio especial', width: 35 },
       { header: 'Adelanto (S/)', width: 14, format: MONEY_FORMAT, align: 'right' },
       { header: 'Cobrado (S/)', width: 13, format: MONEY_FORMAT, align: 'right' },
       { header: 'Saldo (S/)', width: 13, format: MONEY_FORMAT, align: 'right' },
@@ -291,9 +299,10 @@ export async function buildCajaWorkbook(range: OwnerDataRange) {
   workbook.creator = 'Grassly'
   workbook.created = new Date()
 
-  const collected = rows.filter((row) => row.tipo !== 'reembolso').reduce((sum, row) => sum + row.monto, 0)
+  const collected = rows.filter((row) => row.tipo !== 'reembolso' && row.tipo !== 'anulacion').reduce((sum, row) => sum + row.monto, 0)
   const refunded = rows.filter((row) => row.tipo === 'reembolso').reduce((sum, row) => sum + Math.abs(row.monto), 0)
-  const movements = rows.filter((row) => row.tipo !== 'reembolso').length
+  const voided = rows.filter((row) => row.tipo === 'anulacion').reduce((sum, row) => sum + Math.abs(row.monto), 0)
+  const movements = rows.filter((row) => row.tipo !== 'reembolso' && row.tipo !== 'anulacion').length
 
   addSummarySheet(
     workbook,
@@ -306,7 +315,8 @@ export async function buildCajaWorkbook(range: OwnerDataRange) {
     [
       ['Ingresos brutos (S/)', collected, MONEY_FORMAT],
       ['Reembolsos (S/)', refunded, MONEY_FORMAT],
-      ['Neto (S/)', collected - refunded, MONEY_FORMAT],
+      ['Anulaciones (S/)', voided, MONEY_FORMAT],
+      ['Neto (S/)', collected - refunded - voided, MONEY_FORMAT],
       ['Cobros', movements, '#,##0'],
     ],
   )
@@ -316,7 +326,7 @@ export async function buildCajaWorkbook(range: OwnerDataRange) {
     if (row.tipo === 'reembolso') continue
     const bucket = byMethod.get(row.medio_tipo) ?? { amount: 0, count: 0 }
     bucket.amount += row.monto
-    bucket.count += 1
+    if (row.tipo !== 'anulacion') bucket.count += 1
     byMethod.set(row.medio_tipo, bucket)
   }
 
@@ -331,7 +341,7 @@ export async function buildCajaWorkbook(range: OwnerDataRange) {
     [...byMethod.entries()]
       .map<CellValue[]>(([medio, value]) => [MEDIO_LABELS[medio] ?? medio, value.amount, value.count])
       .sort((a, b) => Number(b[1]) - Number(a[1])),
-    ['Total', collected, movements],
+    ['Total', collected - voided, movements],
   )
 
   addTableSheet(

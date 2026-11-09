@@ -13,6 +13,9 @@ export type ClientSummary = {
   phone: string | null
   avatarUrl: string | null
   isAccount: boolean
+  birthdayMonth: number | null
+  birthdayDay: number | null
+  birthdayInDays: number | null
   totalReservations: number
   confirmed: number
   completed: number
@@ -53,6 +56,8 @@ export type ClientsData = {
   localName: string
   courts: ClientCourt[]
   clients: ClientSummary[]
+  birthdayAlertsEnabled: boolean
+  upcomingBirthdays: Array<{ clientId: string; name: string; month: number; day: number; inDays: number }>
   filters: ClientsFilters
   pagination: {
     page: number

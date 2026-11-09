@@ -65,6 +65,10 @@ export function OperativeDashboard({ data }: { data: OperativeReport }) {
           <span className="rp-mlab">Extensiones de +30 min</span>
         </div>
         <div className="rp-metric">
+          <span className="rp-mval">{data.totals.ampliacionesHora}</span>
+          <span className="rp-mlab">Ampliaciones de +1 h</span>
+        </div>
+        <div className="rp-metric">
           <span className="rp-mval">{formatHours(data.totals.extraHours)}</span>
           <span className="rp-mlab">Horas extra autorizadas</span>
         </div>

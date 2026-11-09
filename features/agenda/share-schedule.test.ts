@@ -34,6 +34,23 @@ describe('public agenda image schedule', () => {
     expect(stateAt(schedule, 1, '09:30')).toBe('free')
   })
 
+  it('shares the full chosen name and falls back to the first real name when the owner removes it', () => {
+    const reservation: AgendaOccupation = {
+      courtId: 'cancha-1', courtName: 'Cancha 01', type: 'reserva', isException: false,
+      customerName: 'Ana Pérez', publicName: 'Los Relámpagos',
+      start: '2026-11-02T14:30:00Z', end: '2026-11-02T15:30:00Z',
+    }
+    const data = day('2026-11-02', [reservation])
+    const capturedAt = new Date('2026-11-02T12:00:00Z')
+    const row = 570 - 420
+    const schedule = buildShareSchedule({ data, days: [data], isWeek: false, capturedAt })
+    expect(schedule.reservationNames[0][row / 30]).toBe('Los Relámpagos')
+    reservation.publicName = null
+    reservation.publicNameBlocked = true
+    const moderated = buildShareSchedule({ data, days: [data], isWeek: false, capturedAt })
+    expect(moderated.reservationNames[0][row / 30]).toBe('Ana')
+  })
+
   it('does not advertise elapsed or maintenance time as free', () => {
     const maintenance: AgendaOccupation = {
       courtId: 'cancha-1', courtName: 'Cancha 01', type: 'mantenimiento', isException: false,

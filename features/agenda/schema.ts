@@ -14,10 +14,35 @@ export const manualBookingSchema = z.object({
   clienteId: z.uuid().optional(),
   customerName: z.string().trim().min(2, 'Escribe el nombre del cliente.').max(120),
   customerPhone: z.string().trim().min(7, 'Escribe un teléfono válido.').max(30),
-  advanceAmount: z.coerce.number().positive('Registra el adelanto recibido.').max(99999, 'El adelanto es demasiado alto.'),
-  paymentMethodId: z.uuid('Selecciona cómo recibiste el adelanto.'),
+  publicName: z.string().trim().max(40, 'Máximo 40 caracteres.').refine((value) => !value || value.length >= 2 && !/[\x00-\x1f\x7f]/.test(value), 'Escribe entre 2 y 40 caracteres, sin saltos de línea.').default(''),
+  withoutAdvance: z.enum(['yes', 'no']),
+  advanceAmount: z.coerce.number().nonnegative('El adelanto no puede ser negativo.').max(99999, 'El adelanto es demasiado alto.'),
+  specialFinalAmount: z.preprocess((value) => value === '' || value == null ? undefined : value, z.coerce.number().positive().max(99999).optional()),
+  quotedTotal: z.preprocess((value) => value === '' || value == null ? undefined : value, z.coerce.number().positive().optional()),
+  discountReason: z.string().trim().max(300).default(''),
+  paymentMethodId: z.preprocess((value) => value === '' || value == null ? undefined : value, z.uuid().optional()),
   channel: z.enum(['whatsapp', 'presencial']),
   notes: z.string().trim().max(500),
+}).superRefine((value, context) => {
+  if (value.withoutAdvance === 'yes' && (value.advanceAmount !== 0 || value.paymentMethodId)) {
+    context.addIssue({ code: 'custom', path: ['advanceAmount'], message: 'Una reserva sin adelanto no puede registrar un cobro inicial.' })
+  }
+  if (value.withoutAdvance === 'yes' && !value.quotedTotal) {
+    context.addIssue({ code: 'custom', path: ['quotedTotal'], message: 'Espera a que se calcule el precio de la reserva.' })
+  }
+  if (value.withoutAdvance === 'no' && (value.advanceAmount <= 0 || !value.paymentMethodId)) {
+    context.addIssue({ code: 'custom', path: ['advanceAmount'], message: 'Registra el adelanto y su medio de cobro.' })
+  }
+  if (value.specialFinalAmount !== undefined && (!value.quotedTotal || value.discountReason.length < 3)) {
+    context.addIssue({ code: 'custom', path: ['discountReason'], message: 'Escribe el motivo privado del precio especial.' })
+  }
+})
+
+export const specialPriceSchema = z.object({
+  reservationId: z.uuid(),
+  finalAmount: z.coerce.number().positive().max(99999),
+  expectedTotal: z.coerce.number().positive(),
+  reason: z.string().trim().min(3, 'Escribe el motivo del descuento.').max(300),
 })
 
 export const encasedBookingSchema = z.object({
@@ -29,10 +54,23 @@ export const encasedBookingSchema = z.object({
   clienteId: z.uuid().optional(),
   customerName: z.string().trim().min(2, 'Escribe el nombre del cliente.').max(120),
   customerPhone: z.string().trim().min(7, 'Escribe un teléfono válido.').max(30),
-  advanceAmount: z.coerce.number().positive('Registra el adelanto recibido.').max(99999, 'El adelanto es demasiado alto.'),
-  paymentMethodId: z.uuid('Selecciona cómo recibiste el adelanto.'),
+  publicName: z.string().trim().max(40, 'Máximo 40 caracteres.').refine((value) => !value || value.length >= 2 && !/[\x00-\x1f\x7f]/.test(value), 'Escribe entre 2 y 40 caracteres, sin saltos de línea.').default(''),
+  withoutAdvance: z.enum(['yes', 'no']),
+  advanceAmount: z.coerce.number().nonnegative('El adelanto no puede ser negativo.').max(99999, 'El adelanto es demasiado alto.'),
+  quotedTotal: z.preprocess((value) => value === '' || value == null ? undefined : value, z.coerce.number().positive().optional()),
+  paymentMethodId: z.preprocess((value) => value === '' || value == null ? undefined : value, z.uuid().optional()),
   channel: z.enum(['whatsapp', 'presencial']),
   notes: z.string().trim().max(500),
+}).superRefine((value, context) => {
+  if (value.withoutAdvance === 'yes' && (value.advanceAmount !== 0 || value.paymentMethodId)) {
+    context.addIssue({ code: 'custom', path: ['advanceAmount'], message: 'Una reserva sin adelanto no puede registrar un cobro inicial.' })
+  }
+  if (value.withoutAdvance === 'yes' && !value.quotedTotal) {
+    context.addIssue({ code: 'custom', path: ['quotedTotal'], message: 'Espera a que se calcule el precio de la reserva.' })
+  }
+  if (value.withoutAdvance === 'no' && (value.advanceAmount <= 0 || !value.paymentMethodId)) {
+    context.addIssue({ code: 'custom', path: ['advanceAmount'], message: 'Registra el adelanto y su medio de cobro.' })
+  }
 })
 
 export const maintenanceSchema = z.object({
@@ -56,6 +94,15 @@ export const extendReservationSchema = z.object({
   if (value.chargeStatus === 'cobrado' && !z.uuid().safeParse(value.paymentMethodId).success) {
     context.addIssue({ code: 'custom', path: ['paymentMethodId'], message: 'Selecciona cómo se cobró la extensión.' })
   }
+})
+
+export const hourExtensionSchema = z.object({
+  reservationId: z.uuid(),
+  expectedEnd: z.iso.datetime({ offset: true }),
+  expectedTotal: z.coerce.number().positive(),
+  paymentMethodId: z.string().trim(),
+}).refine((value) => !value.paymentMethodId || z.uuid().safeParse(value.paymentMethodId).success, {
+  path: ['paymentMethodId'], message: 'Selecciona un medio de cobro válido.',
 })
 
 export const reservationDecisionSchema = z.object({

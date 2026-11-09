@@ -4,13 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
-import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Invoice03Icon, Money03Icon, Search01Icon, UserGroupIcon } from '@hugeicons/core-free-icons'
+import { Add01Icon, ArrowLeft01Icon, ArrowRight01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Invoice03Icon, Money03Icon, Search01Icon, Settings02Icon, UserGroupIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { ClientAvatar } from '@/components/dashboard/client-avatar'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
+import { notify } from '@/lib/notifications/notify'
+import { setBirthdayAlertsAction } from './actions'
 import type { ReservationStatus } from '@/features/reservations/types'
 import type { ClientReservation, ClientsData, ClientsFilters, ClientSummary } from './types'
 
@@ -53,6 +56,10 @@ function monthKey(value?: string | null) {
 
 function incidentCount(client: ClientSummary) {
   return client.noShows + client.cancelled + client.rejectedPayments
+}
+
+function birthdayDate(month: number, day: number) {
+  return new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, month - 1, day)))
 }
 
 function mapReservation(row: {
@@ -124,6 +131,9 @@ export function ClientsDashboard({ data, initialClientId }: { data: ClientsData;
   const [isRefreshing, startRefresh] = useTransition()
   const [query, setQuery] = useState(data.filters.query)
   const [segment, setSegment] = useState<Segment>('all')
+  const birthdayAlertsEnabled = data.birthdayAlertsEnabled
+  const [showBirthdays, setShowBirthdays] = useState(false)
+  const [birthdayPreferencePending, startBirthdayPreference] = useTransition()
   const [selectedId, setSelectedId] = useState<string | null>(initialClientId ?? null)
   const [history, setHistory] = useState<Record<string, ClientReservation[]>>({})
   const [historyStatus, setHistoryStatus] = useState<Record<string, 'loading' | 'error'>>(
@@ -138,6 +148,19 @@ export function ClientsDashboard({ data, initialClientId }: { data: ClientsData;
   }, [data.localId, router])
 
   const selected = data.clients.find((client) => client.id === selectedId) ?? null
+
+  function toggleBirthdayAlerts() {
+    const next = !birthdayAlertsEnabled
+    startBirthdayPreference(async () => {
+      const result = await setBirthdayAlertsAction(next)
+      if (!result.success) {
+        notify.error({ description: result.message ?? 'No se pudo guardar la preferencia.' })
+        return
+      }
+      setShowBirthdays(false)
+      router.refresh()
+    })
+  }
 
   const loadHistory = useCallback((client: ClientSummary) => {
     if (history[client.id] || historyStatus[client.id] === 'loading') return
@@ -243,7 +266,20 @@ export function ClientsDashboard({ data, initialClientId }: { data: ClientsData;
     <div className="mx-auto w-full max-w-[1480px]">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div><p className="eyebrow">Base de clientes</p><h1 className="mt-3 text-5xl font-black tracking-[-.045em] sm:text-6xl">Clientes</h1><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Consulta quién juega en {data.localName}, su historial y cuánto reserva, con foco en el local o en canchas concretas.</p></div>
-        <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => startRefresh(() => router.refresh())} disabled={isRefreshing}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className={cn(isRefreshing && 'animate-spin')} />Actualizar</Button><Button asChild size="sm"><Link href="/panel/agenda"><HugeiconsIcon icon={Add01Icon} strokeWidth={2} />Nueva reserva</Link></Button></div>
+        <div className="flex flex-wrap items-center gap-2">
+          {birthdayAlertsEnabled && data.upcomingBirthdays.length > 0 && <button type="button" onClick={() => setShowBirthdays((value) => !value)} className="rounded-full bg-primary/15 px-3 py-1.5 text-xs font-bold">🎂 {data.upcomingBirthdays.length} próximo{data.upcomingBirthdays.length === 1 ? '' : 's'}</button>}
+          <Popover>
+            <PopoverTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Preferencias de clientes" title="Preferencias de clientes"><HugeiconsIcon icon={Settings02Icon} strokeWidth={2} /></Button></PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-4">
+              <p className="text-sm font-extrabold">Preferencias</p>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold">Avisos de cumpleaños</span>
+                <button type="button" role="switch" aria-label="Avisos de cumpleaños" aria-checked={birthdayAlertsEnabled} disabled={birthdayPreferencePending} onClick={toggleBirthdayAlerts} className={cn('relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50', birthdayAlertsEnabled ? 'bg-primary' : 'bg-muted-foreground/35')}><span className={cn('absolute top-1 left-1 size-5 rounded-full bg-white shadow-sm transition-transform', birthdayAlertsEnabled && 'translate-x-5')} /></button>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="sm" onClick={() => startRefresh(() => router.refresh())} disabled={isRefreshing}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className={cn(isRefreshing && 'animate-spin')} />Actualizar</Button><Button asChild size="sm"><Link href="/panel/agenda"><HugeiconsIcon icon={Add01Icon} strokeWidth={2} />Nueva reserva</Link></Button>
+        </div>
       </div>
 
       <div className="mt-7 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
@@ -252,6 +288,8 @@ export function ClientsDashboard({ data, initialClientId }: { data: ClientsData;
         <QuickFilter active={segment === 'recent'} label="Nuevos" count={counts.recent} onClick={() => setSegment(segment === 'recent' ? 'all' : 'recent')} tone="success" />
         <QuickFilter active={segment === 'incidents'} label="Con incidencias" count={counts.incidents} onClick={() => setSegment(segment === 'incidents' ? 'all' : 'incidents')} tone="warning" />
       </div>
+
+      {birthdayAlertsEnabled && showBirthdays && data.upcomingBirthdays.length > 0 && <div className="mt-2 rounded-2xl border bg-card p-4"><p className="text-xs font-extrabold">Próximos cumpleaños</p><ul className="mt-2 space-y-2">{data.upcomingBirthdays.map((item) => <li key={item.clientId} className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-bold">{item.name}</span><span className="text-muted-foreground">{birthdayDate(item.month, item.day)} · {item.inDays === 0 ? 'hoy' : item.inDays === 1 ? 'mañana' : `en ${item.inDays} días`}</span></li>)}</ul></div>}
 
       <div className={cn('mt-6 grid min-h-[620px] gap-5', selected ? 'xl:grid-cols-[minmax(0,1fr)_390px]' : '')}>
         <section className="min-w-0 overflow-hidden rounded-3xl border border-border/80 bg-card shadow-sm">
@@ -292,7 +330,7 @@ function ClientRow({ client, selected, onClick }: { client: ClientSummary; selec
     <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left">
       <ClientAvatar src={client.avatarUrl} name={client.name} size="lg" className="size-10 rounded-2xl" fallbackClassName="rounded-2xl bg-muted text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-extrabold">{client.name}</p>{client.isAccount ? <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[9px] font-extrabold text-primary-foreground">CUENTA</span> : <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-extrabold text-muted-foreground">EXTERNO</span>}{client.totalReservations >= 2 && <span className="rounded-md bg-success/18 px-1.5 py-0.5 text-[9px] font-extrabold text-success-foreground">RECURRENTE</span>}</div>
+        <div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-extrabold">{client.name}</p>{client.isAccount ? <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[9px] font-extrabold text-primary-foreground">CUENTA</span> : <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-extrabold text-muted-foreground">EXTERNO</span>}{client.totalReservations >= 2 && <span className="rounded-md bg-success/18 px-1.5 py-0.5 text-[9px] font-extrabold text-success-foreground">RECURRENTE</span>}{client.birthdayInDays !== null && client.birthdayInDays <= 7 && <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[9px] font-extrabold">🎂 {client.birthdayInDays === 0 ? 'HOY' : client.birthdayInDays === 1 ? 'MAÑANA' : `${client.birthdayInDays} DÍAS`}</span>}</div>
         <p className="mt-1 truncate text-xs text-muted-foreground">{client.phone ?? 'Sin teléfono'}</p>
         <p className="mt-1 text-xs text-muted-foreground sm:hidden">{client.totalReservations} reserva{client.totalReservations === 1 ? '' : 's'} · {formatMoney(client.totalAmount)}</p>
       </div>
@@ -312,7 +350,7 @@ function ClientDetail({ client, history, status, onClose }: { client: ClientSumm
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <ClientAvatar src={client.avatarUrl} name={client.name} size="lg" className="size-12 rounded-2xl ring-1 ring-border" fallbackClassName="rounded-2xl bg-primary/15 text-sm text-primary-foreground" />
-          <div className="min-w-0"><p className="eyebrow">Ficha del cliente</p><h2 className="mt-2 truncate text-2xl font-black tracking-[-.035em]">{client.name}</h2><p className="mt-1 text-xs text-muted-foreground">{client.isAccount ? 'Cuenta Grassly' : 'Cliente externo'}</p></div>
+          <div className="min-w-0"><p className="eyebrow">Ficha del cliente</p><h2 className="mt-2 truncate text-2xl font-black tracking-[-.035em]">{client.name}</h2><p className="mt-1 text-xs text-muted-foreground">{client.isAccount ? 'Cuenta Grassly' : 'Cliente externo'}</p>{client.birthdayMonth && client.birthdayDay && <p className="mt-1 text-xs text-muted-foreground">Cumpleaños · {birthdayDate(client.birthdayMonth, client.birthdayDay)}</p>}</div>
         </div>
         <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Cerrar detalle"><HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} /></Button>
       </div>

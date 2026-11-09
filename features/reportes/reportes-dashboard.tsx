@@ -106,12 +106,12 @@ export function ReportesDashboard({ data }: { data: IncomeReport }) {
         <div className="rp-metric">
           <span className="rp-mval">{formatMoney(data.totals.income)}</span>
           <span className="rp-mlab">Ingresos cobrados</span>
-          <span className="rp-msub">en el periodo</span>
+          <span className="rp-msub">incluye {formatMoney(data.totals.exceptional)} excepcionales</span>
         </div>
         <div className="rp-metric">
           <span className="rp-mval rp-amber">{formatMoney(data.totals.outstanding)}</span>
           <span className="rp-mlab">Saldos por cobrar</span>
-          <span className="rp-msub">reservas confirmadas sin cerrar</span>
+          <span className="rp-msub">reservas por fecha de juego</span>
         </div>
         <div className="rp-metric">
           <span className="rp-mval">{formatCount(data.totals.reservations)}</span>
@@ -121,7 +121,7 @@ export function ReportesDashboard({ data }: { data: IncomeReport }) {
         <div className="rp-metric">
           <span className="rp-mval">{formatMoney(data.totals.averageTicket, 2)}</span>
           <span className="rp-mlab">Ticket promedio</span>
-          <span className="rp-msub">cobrado por reserva</span>
+          <span className="rp-msub">solo cobros asociados a reservas</span>
         </div>
       </section>
 
@@ -137,6 +137,7 @@ export function ReportesDashboard({ data }: { data: IncomeReport }) {
       <section className="rp-block rp-panels">
         <div className="rp-panel">
           <h3 className="rp-h3">Cobrado por cancha</h3>
+          <p className="rp-hint">Solo cobros vinculados a reservas.</p>
           {courtSeries.length ? (
             <IncomeBarChart data={courtSeries} className="h-64" maxBarSize={64} />
           ) : (
@@ -145,6 +146,7 @@ export function ReportesDashboard({ data }: { data: IncomeReport }) {
         </div>
         <div className="rp-panel">
           <h3 className="rp-h3">Cobrado por deporte</h3>
+          <p className="rp-hint">Solo cobros vinculados a reservas.</p>
           {sportPositive.length ? (
             <div>
               {sportPositive.map((item) => (

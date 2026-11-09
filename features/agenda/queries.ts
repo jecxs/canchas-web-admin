@@ -81,6 +81,21 @@ export async function getAgendaData(date: string): Promise<AgendaData> {
     throw new Error('No se pudieron cargar los detalles de las reservas.')
   }
 
+  const reservationIds = (reservationRows ?? []).map((reservation) => reservation.reserva_id)
+  const [{ data: publicNames, error: publicNamesError }, { data: hourExtensions, error: hourExtensionsError }] = await Promise.all([
+    reservationIds.length
+      ? supabase.from('reservas').select('id,nombre_publico,nombre_publico_bloqueado,precio_tarifa_base,descuento_especial_monto').in('id', reservationIds)
+      : Promise.resolve({ data: [], error: null }),
+    reservationIds.length
+      ? supabase.from('reserva_ampliaciones_hora').select('id,reserva_id,rango_previo,rango_nuevo,monto_adicional,created_at').in('reserva_id', reservationIds).is('revertido_at', null).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  if (publicNamesError || hourExtensionsError) throw new Error('No se pudieron cargar los detalles de las reservas.')
+  const publicNamesById = new Map((publicNames ?? []).map((reservation) => [reservation.id, reservation]))
+  const hourExtensionsByReservation = new Map<string, NonNullable<typeof hourExtensions>[number]>()
+  for (const extension of hourExtensions ?? []) if (!hourExtensionsByReservation.has(extension.reserva_id)) hourExtensionsByReservation.set(extension.reserva_id, extension)
+  const rangeEnd = (range: unknown) => String(range ?? '').match(/,([^\]\)]+)[\]\)]/)?.[1]?.replace(/^"|"$/g, '') ?? null
+
   const sportNames = new Map(agendaCourts.flatMap((court) => court.sports.map((sport) => [sport.id, sport.name] as const)))
   const missingSportIds = [...new Set((reservationRows ?? []).map((reservation) => reservation.deporte_id))]
     .filter((sportId) => !sportNames.has(sportId))
@@ -136,6 +151,8 @@ export async function getAgendaData(date: string): Promise<AgendaData> {
       sportId: reservation.deporte_id,
       sportName: sportNames.get(reservation.deporte_id),
       customerName: reservation.cliente_nombre ?? undefined,
+      publicName: publicNamesById.get(reservation.reserva_id)?.nombre_publico ?? null,
+      publicNameBlocked: publicNamesById.get(reservation.reserva_id)?.nombre_publico_bloqueado ?? false,
       customerPhone: reservation.cliente_telefono ?? undefined,
       reservationStatus: reservation.estado,
       reservationChannel: reservation.canal_origen,
@@ -144,10 +161,16 @@ export async function getAgendaData(date: string): Promise<AgendaData> {
       proofUrl: reservation.proofUrl,
       proofUploadedAt: reservation.comprobante_subido_at,
       totalAmount: reservation.monto_total,
+      tariffAmount: publicNamesById.get(reservation.reserva_id)?.precio_tarifa_base ?? reservation.monto_total,
+      specialDiscountAmount: publicNamesById.get(reservation.reserva_id)?.descuento_especial_monto ?? 0,
       advanceAmount: reservation.monto_adelanto_requerido,
       paidAmount: reservation.monto_cobrado,
       refundedAmount: reservation.monto_reembolsado,
       outstandingAmount: reservation.saldo_pendiente,
+      hourExtensionId: hourExtensionsByReservation.get(reservation.reserva_id)?.id ?? null,
+      hourExtensionAmount: hourExtensionsByReservation.get(reservation.reserva_id)?.monto_adicional ?? null,
+      hourExtensionOldEnd: rangeEnd(hourExtensionsByReservation.get(reservation.reserva_id)?.rango_previo),
+      hourExtensionNewEnd: rangeEnd(hourExtensionsByReservation.get(reservation.reserva_id)?.rango_nuevo),
     }))
 
   return {

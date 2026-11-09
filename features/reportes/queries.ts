@@ -4,6 +4,7 @@ import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import type { Enums } from '@/types/database.types'
 import { getMercadoPagoSettlements, summarizeMercadoPago } from '../caja/mercadopago-settlements'
+import { getExceptionalEvents } from '../caja/exceptional-entries'
 import {
   defaultRange,
   formatMethodLabel,
@@ -97,10 +98,11 @@ function addMovement(
   map: Map<string, CountTotals>,
   key: string,
   amount: number,
+  increment = 1,
 ) {
   const current = map.get(key) ?? { income: 0, count: 0 }
   current.income += amount
-  current.count += 1
+  current.count += increment
   map.set(key, current)
 }
 
@@ -165,7 +167,7 @@ export async function getIncomeReport(input: {
     start,
     end,
     today,
-    totals: { income: 0, outstanding: 0, reservations: 0, averageTicket: 0 },
+    totals: { income: 0, exceptional: 0, outstanding: 0, reservations: 0, averageTicket: 0 },
     mercadoPago: { bruto: 0, deducciones: 0, netoRecibido: 0, pendientes: 0 },
     kpis: {
       income: computeKpi(0, 0, true),
@@ -329,28 +331,21 @@ export async function getIncomeReport(input: {
     }
   }
 
-  // Extensiones de 30 min. Una extensión COBRADA genera un movimiento 'saldo'
-  // (ver extender_reserva_30_min_v2), así que ya está en los movimientos: solo
-  // se suma si NO existe ese movimiento (extensiones legadas). Las PENDIENTES
-  // no generan movimiento y se suman al saldo por cobrar.
+  // Las extensiones pendientes ya forman parte del monto_total de la reserva.
+  // El saldo se calcula con ese total en la fecha del partido, sin sumarlas
+  // otra vez en la fecha en que el dueño autorizó la extensión.
+  // Una extensión cobrada genera un movimiento 'saldo'; solo sumamos aparte
+  // cobros legados que no tengan ese movimiento.
   const movementKeys = new Set(
     movements.map((movement) => `${movement.reserva_id}|${movement.amount.toFixed(2)}`),
   )
-  let extensionPending = 0
-  let extensionPendingPrev = 0
   for (const extension of extensions) {
     const amount = Number(extension.monto_adicional) || 0
     if (amount <= 0) continue
+    if (extension.estado_cobro !== 'cobrado') continue
     const date = limaDate(extension.created_at)
-    const isPendiente = extension.estado_cobro === 'pendiente'
     const inCurrent = date >= start && date <= end
     const inPrev = date >= previous.start && date <= previous.end
-
-    if (isPendiente) {
-      if (inCurrent) extensionPending += amount
-      else if (inPrev) extensionPendingPrev += amount
-      continue
-    }
 
     // Cobrada: si ya existe el movimiento equivalente, no se cuenta dos veces.
     if (movementKeys.has(`${extension.reserva_id}|${amount.toFixed(2)}`)) continue
@@ -381,19 +376,35 @@ export async function getIncomeReport(input: {
     }
   }
 
-  let outstanding = extensionPending
+  let outstanding = 0
   for (const reservation of periodTotals.values()) {
     outstanding += Math.max(0, reservation.total - (paidTotal.get(reservation.id) ?? 0))
   }
-  let outstandingPrev = extensionPendingPrev
+  let outstandingPrev = 0
   for (const reservation of prevTotals.values()) {
     outstandingPrev += Math.max(0, reservation.total - (paidAsOfPrev.get(reservation.id) ?? 0))
   }
 
+  const reservationCollected = collected
+  const reservationCollectedPrev = collectedPrev
+  let exceptional = 0
+  const exceptionalEvents = await getExceptionalEvents(supabase, local.id, previous.start, end)
+  for (const event of exceptionalEvents) {
+    if (!methodNames.has(event.method)) methodNames.set(event.method, formatMethodLabel(event.method))
+    if (event.date >= start && event.date <= end) {
+      collected += event.amount
+      exceptional += event.amount
+      addMovement(dailyMap, event.date, event.amount, event.type === 'anulacion' ? 0 : 1)
+      addMovement(methodCash, event.method, event.amount, event.type === 'anulacion' ? 0 : 1)
+    } else if (event.date >= previous.start && event.date <= previous.end) {
+      collectedPrev += event.amount
+    }
+  }
+
   const reservations = periodTotals.size
   const reservationsPrev = prevTotals.size
-  const averageTicket = reservations ? collected / reservations : 0
-  const averageTicketPrev = reservationsPrev ? collectedPrev / reservationsPrev : 0
+  const averageTicket = reservations ? reservationCollected / reservations : 0
+  const averageTicketPrev = reservationsPrev ? reservationCollectedPrev / reservationsPrev : 0
 
   const daily = buildEmptyDaily(start, end).map((point) => {
     const bucket = dailyMap.get(point.date)
@@ -425,6 +436,7 @@ export async function getIncomeReport(input: {
     mercadoPago,
     totals: {
       income: collected,
+      exceptional,
       outstanding,
       reservations,
       averageTicket,

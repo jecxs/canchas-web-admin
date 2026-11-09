@@ -2,7 +2,7 @@ import 'server-only'
 
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
-import type { OwnerReservation, ReservationExtension, ReservationPaymentMovement, ReservationsData, ReservationsFilters } from './types'
+import type { OwnerReservation, ReservationExtension, ReservationHourExtension, ReservationPaymentMovement, ReservationsData, ReservationsFilters } from './types'
 import type { LocalPaymentMethod, PaymentMethodType } from '@/features/payments/types'
 import type { Json } from '@/types/database.types'
 
@@ -15,6 +15,8 @@ type RawReservation = {
   cliente_id: string | null
   cliente_sin_cuenta_nombre: string | null
   cliente_sin_cuenta_telefono: string | null
+  nombre_publico: string | null
+  nombre_publico_bloqueado: boolean
   comentario_rechazo_pago: string | null
   comprobante_subido_at: string | null
   comprobante_url: string | null
@@ -24,6 +26,8 @@ type RawReservation = {
   estado: OwnerReservation['status']
   monto_adelanto_requerido: number
   monto_total: number
+  precio_tarifa_base: number
+  descuento_especial_monto: number
   motivo_cancelacion: string | null
   motivo_rechazo_pago: string | null
   notas: string | null
@@ -49,7 +53,7 @@ type OwnerReservationCustomerReader = {
 
 function parseRange(range: unknown) {
   const values = String(range ?? '').match(/[\[\(]([^,]+),([^\]\)]+)[\]\)]/)
-  return { start: values?.[1] ?? '', end: values?.[2] ?? '' }
+  return { start: values?.[1]?.replace(/^"|"$/g, '') ?? '', end: values?.[2]?.replace(/^"|"$/g, '') ?? '' }
 }
 
 function nextDate(value: string) {
@@ -97,7 +101,7 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
   const courtIds = courts.map((court) => court.id)
   let reservationsQuery = supabase
     .from('reservas')
-    .select('id,cancha_id,canal_origen,cliente_id,cliente_sin_cuenta_nombre,cliente_sin_cuenta_telefono,comentario_rechazo_pago,comprobante_subido_at,comprobante_url,created_at,deporte_id,es_excepcion_horaria,estado,monto_adelanto_requerido,monto_total,motivo_cancelacion,motivo_rechazo_pago,notas,rango,rechazada_at,reembolso_resultado,cancelada_at,updated_at', { count: 'exact' })
+    .select('id,cancha_id,canal_origen,cliente_id,cliente_sin_cuenta_nombre,cliente_sin_cuenta_telefono,nombre_publico,nombre_publico_bloqueado,comentario_rechazo_pago,comprobante_subido_at,comprobante_url,created_at,deporte_id,es_excepcion_horaria,estado,monto_adelanto_requerido,monto_total,precio_tarifa_base,descuento_especial_monto,motivo_cancelacion,motivo_rechazo_pago,notas,rango,rechazada_at,reembolso_resultado,cancelada_at,updated_at', { count: 'exact' })
     .in('cancha_id', courtIds)
 
   if (filters.courtId && courtIds.includes(filters.courtId)) reservationsQuery = reservationsQuery.eq('cancha_id', filters.courtId)
@@ -122,14 +126,16 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
   const reservationIds = rawReservations.map((reservation) => reservation.id)
   const sportIds = [...new Set(rawReservations.map((reservation) => reservation.deporte_id))]
   const customerReader = supabase as unknown as OwnerReservationCustomerReader
-  const [sportsResult, customersResult, extensionsResult, paymentSummaryResult] = await Promise.all([
+  const [sportsResult, customersResult, extensionsResult, hourExtensionsResult, paymentSummaryResult, discountHistoryResult] = await Promise.all([
     sportIds.length ? supabase.from('deportes').select('id,nombre').in('id', sportIds) : Promise.resolve({ data: [], error: null }),
     reservationIds.length ? customerReader.rpc('obtener_clientes_reservas_dueno', { p_local_id: local.id, p_reserva_ids: reservationIds }) : Promise.resolve({ data: [], error: null }),
     reservationIds.length ? supabase.from('reserva_extensiones').select('id,reserva_id,monto_adicional,estado_cobro,medio_cobro,notas,created_at').in('reserva_id', reservationIds).order('created_at') : Promise.resolve({ data: [], error: null }),
+    reservationIds.length ? supabase.from('reserva_ampliaciones_hora').select('id,reserva_id,rango_previo,rango_nuevo,monto_adicional,created_at,revertido_at').in('reserva_id', reservationIds).order('created_at') : Promise.resolve({ data: [], error: null }),
     reservationIds.length ? supabase.rpc('obtener_resumen_pagos_reservas_dueno', { p_local_id: local.id, p_reserva_ids: reservationIds }) : Promise.resolve({ data: [], error: null }),
+    reservationIds.length ? supabase.from('reserva_descuentos_historial').select('id,reserva_id,total_anterior,total_nuevo,motivo,created_at').in('reserva_id', reservationIds).order('created_at') : Promise.resolve({ data: [], error: null }),
   ])
 
-  const secondaryError = sportsResult.error ?? customersResult.error ?? extensionsResult.error ?? paymentSummaryResult.error
+  const secondaryError = sportsResult.error ?? customersResult.error ?? extensionsResult.error ?? hourExtensionsResult.error ?? paymentSummaryResult.error ?? discountHistoryResult.error
   if (secondaryError) {
     console.error('[reservations:details]', { code: secondaryError.code, message: secondaryError.message })
     throw new Error('No se pudieron cargar los detalles de las reservas.')
@@ -139,11 +145,23 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
   const sportNames = new Map((sportsResult.data ?? []).map((sport) => [sport.id, sport.nombre]))
   const customers = new Map((customersResult.data ?? []).map((customer) => [customer.reserva_id, customer]))
   const extensionsByReservation = new Map<string, ReservationExtension[]>()
+  const hoursByReservation = new Map<string, ReservationHourExtension[]>()
   const paymentSummaryByReservation = new Map((paymentSummaryResult.data ?? []).map((summary) => [summary.reserva_id, summary]))
+  const discountHistoryByReservation = new Map<string, OwnerReservation['specialDiscountHistory']>()
+  for (const event of discountHistoryResult.data ?? []) {
+    const list = discountHistoryByReservation.get(event.reserva_id) ?? []
+    list.push({ id: event.id, oldTotal: Number(event.total_anterior), newTotal: Number(event.total_nuevo), reason: event.motivo, createdAt: event.created_at })
+    discountHistoryByReservation.set(event.reserva_id, list)
+  }
   for (const extension of extensionsResult.data ?? []) {
     const list = extensionsByReservation.get(extension.reserva_id) ?? []
     list.push({ id: extension.id, amount: Number(extension.monto_adicional), chargeStatus: extension.estado_cobro, method: extension.medio_cobro, notes: extension.notas, createdAt: extension.created_at })
     extensionsByReservation.set(extension.reserva_id, list)
+  }
+  for (const extension of hourExtensionsResult.data ?? []) {
+    const list = hoursByReservation.get(extension.reserva_id) ?? []
+    list.push({ id: extension.id, oldEnd: parseRange(extension.rango_previo).end, newEnd: parseRange(extension.rango_nuevo).end, amount: Number(extension.monto_adicional), createdAt: extension.created_at, revertedAt: extension.revertido_at })
+    hoursByReservation.set(extension.reserva_id, list)
   }
 
   const reservations = rawReservations.map((reservation): OwnerReservation => {
@@ -157,12 +175,18 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
       courtName: courtNames.get(reservation.cancha_id) ?? 'Cancha',
       sportName: sportNames.get(reservation.deporte_id) ?? 'Deporte',
       customerName: customer?.cliente_nombre || 'Cliente sin nombre',
+      publicName: reservation.nombre_publico,
+      publicNameBlocked: reservation.nombre_publico_bloqueado,
       customerPhone: customer?.cliente_telefono ?? null,
       start,
       end,
       status: reservation.estado,
       channel: reservation.canal_origen as OwnerReservation['channel'],
       totalAmount: Number(reservation.monto_total),
+      tariffAmount: Number(reservation.precio_tarifa_base),
+      specialDiscountAmount: Number(reservation.descuento_especial_monto),
+      specialDiscountReason: reservation.descuento_especial_monto > 0 ? discountHistoryByReservation.get(reservation.id)?.at(-1)?.reason ?? null : null,
+      specialDiscountHistory: discountHistoryByReservation.get(reservation.id) ?? [],
       advanceAmount: Number(reservation.monto_adelanto_requerido),
       paidAmount: Number(paymentSummary?.monto_cobrado ?? 0),
       refundedAmount: Number(paymentSummary?.monto_reembolsado ?? 0),
@@ -181,6 +205,7 @@ export async function getReservationsData(filters: ReservationsFilters = {}): Pr
       cancellationReason: reservation.motivo_cancelacion,
       refundResult: reservation.reembolso_resultado,
       extensions,
+      hourExtensions: hoursByReservation.get(reservation.id) ?? [],
       paymentMovements: parsePaymentMovements(paymentSummary?.movimientos ?? []),
     }
   })

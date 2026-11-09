@@ -9,6 +9,9 @@ export type ReservationExportRow = {
   estado: string
   canal: string
   monto_total: number
+  precio_tarifa_base: number
+  descuento_especial_monto: number
+  descuento_especial_motivo: string | null
   monto_adelanto: number
   monto_cobrado: number
   monto_reembolsado: number
@@ -25,8 +28,8 @@ export type ReservationExportRow = {
 
 export type CajaExportRow = {
   movimiento_id: string
-  reserva_id: string
-  cancha_id: string
+  reserva_id: string | null
+  cancha_id: string | null
   cancha_nombre: string
   cliente: string
   fecha: string

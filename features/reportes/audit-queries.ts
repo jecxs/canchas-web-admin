@@ -340,7 +340,7 @@ export async function getAuditReport(input: {
       eventDate: limaDate(row.created_at),
       gameDate: rawStart ? limaDate(rawStart) : '',
       actor: 'dueno',
-      reason: row.estado_cobro === 'cobrado' ? 'Cobrada' : 'Pendiente',
+      reason: row.estado_cobro === 'cobrado' ? 'Cobrada al extender' : 'Sin cobro al extender',
       amount: Number(row.monto_adicional) || 0,
     })
   }
@@ -394,8 +394,8 @@ export async function getAuditReport(input: {
     chargeCounts.set(key, (chargeCounts.get(key) ?? 0) + 1)
   }
   const extensionsByChargeStatus: AuditBreakdownItem[] = [
-    { id: 'cobrado', label: 'Cobradas', count: chargeCounts.get('cobrado') ?? 0 },
-    { id: 'pendiente', label: 'Pendientes', count: chargeCounts.get('pendiente') ?? 0 },
+    { id: 'cobrado', label: 'Cobro inmediato', count: chargeCounts.get('cobrado') ?? 0 },
+    { id: 'pendiente', label: 'Sin cobro inmediato', count: chargeCounts.get('pendiente') ?? 0 },
   ].filter((item) => item.count > 0)
 
   return {

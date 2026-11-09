@@ -31,6 +31,15 @@ export type ReservationExtension = {
   createdAt: string
 }
 
+export type ReservationHourExtension = {
+  id: string
+  oldEnd: string
+  newEnd: string
+  amount: number
+  createdAt: string
+  revertedAt: string | null
+}
+
 export type ReservationPaymentMovement = {
   id: string
   type: string
@@ -49,12 +58,18 @@ export type OwnerReservation = {
   courtName: string
   sportName: string
   customerName: string
+  publicName: string | null
+  publicNameBlocked: boolean
   customerPhone: string | null
   start: string
   end: string
   status: ReservationStatus
   channel: ReservationChannel
   totalAmount: number
+  tariffAmount: number
+  specialDiscountAmount: number
+  specialDiscountReason: string | null
+  specialDiscountHistory: Array<{ id: string; oldTotal: number; newTotal: number; reason: string; createdAt: string }>
   advanceAmount: number
   paidAmount: number
   refundedAmount: number
@@ -73,6 +88,7 @@ export type OwnerReservation = {
   cancellationReason: string | null
   refundResult: string
   extensions: ReservationExtension[]
+  hourExtensions: ReservationHourExtension[]
   paymentMovements: ReservationPaymentMovement[]
 }
 

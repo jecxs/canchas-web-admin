@@ -2,6 +2,7 @@ import 'server-only'
 
 import ExcelJS from 'exceljs'
 import { getMercadoPagoSettlements } from '../caja/mercadopago-settlements'
+import { getExceptionalEvents } from '../caja/exceptional-entries'
 import { createClient } from '@/utils/supabase/server'
 import { formatMethodLabel, parseRange, shiftDate } from './date-utils'
 import { getOperativeReport } from './operative-queries'
@@ -232,8 +233,14 @@ async function fetchIncomeDetail(localId: string, start: string, end: string) {
   const courtNames = new Map((courtsResult.data ?? []).map((court) => [court.id, court.nombre]))
   const sportNames = new Map((sportsResult.data ?? []).map((sport) => [sport.id, sport.nombre]))
   const settlements = await getMercadoPagoSettlements(supabase, localId, start, end)
+  const exceptional = await getExceptionalEvents(supabase, localId, start, end)
+  const exceptionalCourtIds = [...new Set(exceptional.map((event) => event.courtId).filter((id): id is string => Boolean(id)))]
+  const { data: exceptionalCourts } = exceptionalCourtIds.length
+    ? await supabase.from('canchas').select('id,nombre').in('id', exceptionalCourtIds)
+    : { data: [] }
+  for (const court of exceptionalCourts ?? []) courtNames.set(court.id, court.nombre)
 
-  return rows.map<CellValue[]>((row) => [
+  const detail = rows.map<CellValue[]>((row) => [
     toDate(row.fecha),
     row.reserva_id.slice(0, 8).toUpperCase(),
     courtNames.get(row.cancha_id) ?? 'Sin nombre',
@@ -245,6 +252,19 @@ async function fetchIncomeDetail(localId: string, start: string, end: string) {
     settlements.get(row.movimiento_id)?.netoRecibido ?? null,
     row.notas ?? '',
   ])
+  detail.push(...exceptional.map<CellValue[]>((event) => [
+    toDate(event.date),
+    '',
+    event.courtId ? courtNames.get(event.courtId) ?? 'Cancha anterior' : '—',
+    '',
+    event.type === 'anulacion' ? 'Anulación' : 'Excepcional',
+    formatMethodLabel(event.method),
+    event.amount,
+    null,
+    null,
+    `${event.type === 'anulacion' ? event.voidReason : event.concept}${event.activityDate ? ` · Juego: ${event.activityDate}` : ''}`,
+  ]))
+  return detail
 }
 
 type OperativeDetailRow = {
@@ -316,12 +336,13 @@ async function fetchOperativeDetail(localId: string, start: string, end: string)
 // --- Workbooks -----------------------------------------------------------
 
 const FINANCIAL_DEFINITIONS = [
-  'Ingresos cobrados: movimientos de caja (adelanto + saldo − reembolso) agrupados por fecha de pago dentro del rango.',
+  'Ingresos cobrados: adelantos, saldos e ingresos excepcionales, menos reembolsos y anulaciones, agrupados por fecha del movimiento.',
   'Mercado Pago: bruto pagado por el cliente, deducciones y recibido informado por el proveedor.',
   'Cancelaciones: si una reserva confirmada se cancela con devolución aprobada, sus cobros no se cuentan como ingreso.',
   'Saldos por cobrar: reservas confirmadas o completadas del rango menos el cobrado acumulado de cada reserva.',
   'Reservas: reservas en estado confirmada o completada, agrupadas por su fecha de inicio.',
-  'Ticket promedio: ingresos cobrados ÷ cantidad de reservas.',
+  'Ticket promedio: cobros asociados a reservas ÷ cantidad de reservas. Excluye ingresos excepcionales.',
+  'Ingresos excepcionales: cobros sin reserva en Agenda. No se atribuyen a deporte ni a cancha en los gráficos operativos.',
   'Zona horaria: America/Lima.',
 ]
 
@@ -398,6 +419,7 @@ export async function buildIncomeWorkbook(input: ExportInput) {
       ],
       [
         { label: 'Ingresos cobrados', value: report.kpis.income.value, previous: report.kpis.income.previous, changePct: report.kpis.income.changePct, format: MONEY_FORMAT },
+        { label: 'De ellos, excepcionales', value: report.totals.exceptional, format: MONEY_FORMAT },
         { label: 'Mercado Pago · bruto', value: report.mercadoPago.bruto, format: MONEY_FORMAT },
         { label: 'Mercado Pago · deducciones', value: report.mercadoPago.deducciones ?? 'Pendiente', format: MONEY_FORMAT },
         { label: 'Mercado Pago · recibido', value: report.mercadoPago.netoRecibido ?? 'Pendiente', format: MONEY_FORMAT },
@@ -520,6 +542,9 @@ export async function buildOperativeWorkbook(input: ExportInput) {
       [
         { label: 'Total de reservas', value: report.totals.reservations, format: INTEGER_FORMAT },
         { label: 'Horas ocupadas', value: report.totals.hours, format: HOURS_FORMAT },
+        { label: 'Extensiones de +30 min', value: report.totals.extensiones, format: INTEGER_FORMAT },
+        { label: 'Ampliaciones de +1 h', value: report.totals.ampliacionesHora, format: INTEGER_FORMAT },
+        { label: 'Horas extra autorizadas', value: report.totals.extraHours, format: HOURS_FORMAT },
       ],
       OPERATIVE_DEFINITIONS,
     )

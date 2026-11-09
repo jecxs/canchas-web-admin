@@ -14,17 +14,23 @@ import { paymentMethodOptionLabel, type LocalPaymentMethod } from '@/features/pa
 import { ArrowDown01Icon, Building03Icon, Calendar03Icon, Cancel01Icon, CheckmarkCircle01Icon, Clock01Icon, Edit02Icon, FootballIcon, Layers01Icon, RulerIcon } from '@hugeicons/core-free-icons'
 import { localDateTimeToIso, minutesToTime, timeToMinutes } from './date-utils'
 import {
+  applySpecialPriceAction,
+  addHourToReservationAction,
   confirmReservationAction,
   cancelReservationAction,
   createEncasedBookingAction,
   createMaintenanceAction,
   createManualBookingAction,
   extendReservationAction,
+  quoteHourExtensionAction,
+  revertHourExtensionAction,
   markNoShowReservationAction,
   registerPaymentMovementAction,
   rejectReservationAction,
   rescheduleReservationAction,
+  updateReservationPublicNameAction,
 } from './actions'
+import type { HourExtensionQuote } from './actions'
 import { initialAgendaActionState, type AgendaActionState, type AgendaCourt } from './types'
 
 function Feedback({ state }: { state: AgendaActionState }) {
@@ -67,6 +73,25 @@ function FormSelect({ name, options, value, defaultValue, onValueChange, placeho
 
 function PaymentMethodSelect({ methods, state, label = 'Medio de cobro', required = true }: { methods: LocalPaymentMethod[]; state: AgendaActionState; label?: string; required?: boolean }) {
   return <label className="block space-y-1.5 text-sm font-semibold">{label}<FormSelect name="paymentMethodId" defaultValue={methods[0]?.id} placeholder="Selecciona un medio" options={methods.map((method) => ({ value: method.id, label: paymentMethodOptionLabel(method) }))} /><FieldError state={state} field="paymentMethodId" />{methods.length === 0 && <p className="text-xs font-normal text-destructive">Activa al menos un medio de cobro en Configuración.</p>} {!required && <span className="sr-only">Opcional</span>}</label>
+}
+
+function BookingOriginField() {
+  return <fieldset className="space-y-2">
+    <legend className="text-sm font-semibold">Origen de la reserva</legend>
+    <div className="flex gap-2">
+      {[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }].map((option) => <label key={option.value} className="min-w-0 flex-1 cursor-pointer">
+        <input type="radio" name="channel" value={option.value} defaultChecked={option.value === 'whatsapp'} required className="peer sr-only" />
+        <span className="flex h-10 items-center justify-center rounded-full border bg-background px-3 text-sm font-semibold transition-colors peer-checked:border-foreground peer-checked:bg-foreground peer-checked:text-background peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring">{option.label}</span>
+      </label>)}
+    </div>
+  </fieldset>
+}
+
+function BookingNoteField({ state }: { state: AgendaActionState }) {
+  return <details className="group rounded-xl border bg-background" open={Boolean(state.fieldErrors?.notes?.length) || undefined}>
+    <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-semibold">Añadir nota <span className="text-xs font-normal text-muted-foreground">Opcional</span></summary>
+    <div className="border-t px-3 py-3"><Textarea name="notes" aria-label="Nota de la reserva" maxLength={500} placeholder="Detalles de la reserva" className="min-h-16 rounded-xl bg-background" /><FieldError state={state} field="notes" /></div>
+  </details>
 }
 
 function formatReservationDate(date: string) {
@@ -130,10 +155,12 @@ function ManualPriceBreakdown({ quote }: { quote: ManualQuote }) {
   return <details className="group rounded-xl border bg-muted/25"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-xs font-bold"><span>Ver desglose del precio</span><span className="flex items-center gap-2 text-foreground"><span>{formatManualAmount(quote.total)}</span><HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="size-4 text-muted-foreground transition-transform group-open:rotate-180" /></span></summary><div className="space-y-2 border-t px-3 py-3">{quote.lines.map((line) => <div key={`${line.start}-${line.end}`} className="flex items-start justify-between gap-3 text-xs"><div><p className="font-bold text-foreground">{formatManualTime(line.start)}–{formatManualTime(line.end)} · {formatManualAmount(line.hourlyPrice)}/h</p><p className="mt-0.5 text-muted-foreground">{quoteLineLabel(line)}</p></div><span className="shrink-0 font-extrabold text-foreground">{formatManualAmount(line.subtotal)}</span></div>)}<div className="flex justify-between border-t pt-2 text-xs font-extrabold"><span>Total</span><span>{formatManualAmount(quote.total)}</span></div></div></details>
 }
 
-export function ManualAdvanceField({ localId, courtId, sportId, date, startTime, durationMinutes, state }: { localId: string; courtId: string; sportId: string; date: string; startTime: string; durationMinutes: number; state: AgendaActionState }) {
+export function ManualAdvanceField({ localId, courtId, sportId, date, startTime, durationMinutes, state, withoutAdvance, onWithoutAdvanceChange }: { localId: string; courtId: string; sportId: string; date: string; startTime: string; durationMinutes: number; state: AgendaActionState; withoutAdvance: boolean; onWithoutAdvanceChange: (value: boolean) => void }) {
   const [amount, setAmount] = useState('')
   const [quote, setQuote] = useState<ManualQuote | null>(null)
   const [quoteError, setQuoteError] = useState<string | null>(null)
+  const [special, setSpecial] = useState(false)
+  const [finalAmount, setFinalAmount] = useState('')
 
   useEffect(() => {
     const start = localDateTimeToIso(date, startTime)
@@ -158,11 +185,44 @@ export function ManualAdvanceField({ localId, courtId, sportId, date, startTime,
       }
       setQuote({ total, suggestedAdvance, lines: parseManualQuoteLines(result.detalle_tarifario) })
       setAmount(suggestedAdvance.toFixed(2))
+      setSpecial(false)
+      setFinalAmount('')
     })
     return () => { active = false }
   }, [courtId, date, durationMinutes, localId, sportId, startTime])
 
-  return <div className="space-y-3"><label className="block space-y-1.5 text-sm font-semibold">Adelanto recibido<div className="relative"><span className="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-sm text-muted-foreground">S/</span><Input name="advanceAmount" type="number" min="0.01" max={quote?.total} step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={quote ? quote.suggestedAdvance.toFixed(2) : 'Calculando…'} className={`${inputClass} pl-9`} required /></div>{quote ? <p className="text-xs font-normal leading-5 text-muted-foreground">Sugerido por Grassly: <strong className="text-foreground">{formatManualAmount(quote.suggestedAdvance)}</strong> de {formatManualAmount(quote.total)}. Puedes ajustarlo para este acuerdo directo.</p> : <p className="text-xs font-normal text-muted-foreground">{quoteError ?? 'Calculando el adelanto según la tarifa y reglas vigentes…'}</p>}<FieldError state={state} field="advanceAmount" /></label>{quote && <ManualPriceBreakdown quote={quote} />}</div>
+  const effectiveTotal = special && Number(finalAmount) > 0 ? Math.min(Number(finalAmount), quote?.total ?? Number(finalAmount)) : quote?.total
+  return <div className="space-y-3">
+    {quote && <ManualPriceBreakdown quote={quote} />}
+    <input type="hidden" name="quotedTotal" value={quote?.total ?? ''} />
+    <FieldError state={state} field="quotedTotal" />
+    <input type="hidden" name="withoutAdvance" value={withoutAdvance ? 'yes' : 'no'} />
+    <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={special} onChange={(event) => { setSpecial(event.target.checked); setFinalAmount('') }} disabled={!quote} />Precio especial para esta reserva</label>
+    {special && quote && <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+      <label className="block space-y-1 text-sm font-semibold">Precio final acordado<Input name="specialFinalAmount" type="number" min="0.01" max={quote.total - 0.01} step="0.01" value={finalAmount} onChange={(event) => setFinalAmount(event.target.value)} required className={inputClass} /><FieldError state={state} field="specialFinalAmount" /></label>
+      <p className="text-xs text-muted-foreground">Tarifa {formatManualAmount(quote.total)} · descuento {formatManualAmount(Math.max(0, quote.total - Number(finalAmount || quote.total)))}</p>
+      <label className="block space-y-1 text-sm font-semibold">Motivo privado<Textarea name="discountReason" minLength={3} maxLength={300} required placeholder="Ej. atención especial a cliente frecuente" className="min-h-16 rounded-xl bg-background" /><FieldError state={state} field="discountReason" /></label>
+    </div>}
+    <label className="flex items-center gap-2.5 text-sm font-semibold"><input type="checkbox" checked={withoutAdvance} onChange={(event) => onWithoutAdvanceChange(event.target.checked)} disabled={!quote} />Reservar sin adelanto</label>
+    {withoutAdvance ? <><input type="hidden" name="advanceAmount" value="0" /><div className="flex items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-xs"><span>Cobrado ahora: <strong>S/ 0.00</strong></span><span>Por cobrar: <strong>{effectiveTotal === undefined ? '—' : formatManualAmount(effectiveTotal)}</strong></span></div><FieldError state={state} field="advanceAmount" /></> : <label className="block space-y-1.5 text-sm font-semibold">Adelanto recibido<div className="relative"><span className="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-sm text-muted-foreground">S/</span><Input name="advanceAmount" type="number" min="0.01" max={effectiveTotal} step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder={quote ? quote.suggestedAdvance.toFixed(2) : 'Calculando…'} className={`${inputClass} pl-9`} required /></div>{quote ? <p className="text-xs font-normal leading-5 text-muted-foreground">Sugerido: <strong className="text-foreground">{formatManualAmount(quote.suggestedAdvance)}</strong> · puedes cambiarlo.</p> : <p className="text-xs font-normal text-muted-foreground">{quoteError ?? 'Calculando adelanto…'}</p>}<FieldError state={state} field="advanceAmount" /></label>}
+  </div>
+}
+
+export function SpecialPriceForm({ reservationId, tariffAmount, currentTotal, paidAmount, advanceAmount, onCancel, onSuccess }: { reservationId: string; tariffAmount: number; currentTotal: number; paidAmount: number; advanceAmount: number; onCancel: () => void; onSuccess: () => void }) {
+  const [state, action, pending] = useActionState(applySpecialPriceAction, initialAgendaActionState)
+  const [amount, setAmount] = useState(currentTotal.toFixed(2))
+  useAgendaFeedback(state, onSuccess)
+  const parsed = Number(amount)
+  const min = Math.max(paidAmount, advanceAmount, 0.01)
+  return <form action={action} className="space-y-4">
+    <input type="hidden" name="reservationId" value={reservationId} /><input type="hidden" name="expectedTotal" value={currentTotal} />
+    <div className="rounded-xl bg-muted p-3 text-xs leading-6">Tarifa con ofertas: <strong>{formatManualAmount(tariffAmount)}</strong><br />Ya cobrado: <strong>{formatManualAmount(paidAmount)}</strong> · adelanto acordado: <strong>{formatManualAmount(advanceAmount)}</strong></div>
+    <label className="block space-y-1.5 text-sm font-semibold">Nuevo precio final<Input name="finalAmount" type="number" min={min} max={tariffAmount} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} required className={inputClass} /><FieldError state={state} field="finalAmount" /></label>
+    {Number.isFinite(parsed) && parsed > 0 && <p className="text-xs text-muted-foreground">Descuento: {formatManualAmount(Math.max(0, tariffAmount - parsed))} · saldo luego del cambio: {formatManualAmount(Math.max(0, parsed - paidAmount))}</p>}
+    <label className="block space-y-1.5 text-sm font-semibold">Motivo privado<Textarea name="reason" minLength={3} maxLength={300} required placeholder="Ej. cumpleaños de cliente frecuente" className="min-h-20 rounded-xl bg-background" /><FieldError state={state} field="reason" /></label>
+    <p className="text-xs text-muted-foreground">El adelanto ya registrado se conserva. El descuento no crea un movimiento de caja.</p>
+    <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Guardar precio especial" disabled={parsed === currentTotal || parsed < min || parsed > tariffAmount} />
+  </form>
 }
 
 export function ManualBookingForm({
@@ -198,10 +258,11 @@ export function ManualBookingForm({
   const [editingSchedule, setEditingSchedule] = useState(false)
   const [sportId, setSportId] = useState(defaultSportId ?? court.sports[0]?.id ?? '')
   const [clientBlocked, setClientBlocked] = useState(false)
+  const [withoutAdvance, setWithoutAdvance] = useState(false)
   useAgendaFeedback(state, onSuccess)
   const endTime = minutesToTime(timeToMinutes(startTime) + blocks * 60)
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-3">
       <input type="hidden" name="localId" value={localId} /><input type="hidden" name="courtId" value={court.id} /><input type="hidden" name="date" value={date} /><input type="hidden" name="time" value={startTime} />
       <ReservationSlotSummary court={court} date={date} startTime={startTime} endTime={endTime} editingSchedule={editingSchedule} onToggleScheduleEditing={() => setEditingSchedule((value) => !value)} minDate={minDate} timeOptions={timeOptions} onScheduleChange={(selection) => onScheduleChange({ ...selection, blocks })} dateError={state.fieldErrors?.date?.[0]} timeError={state.fieldErrors?.time?.[0]} />
       <div className="grid gap-3 sm:grid-cols-2">
@@ -209,12 +270,13 @@ export function ManualBookingForm({
         <label className="space-y-1.5 text-sm font-semibold">Duración<FormSelect name="blocks" value={String(blocks)} onValueChange={(value) => onScheduleChange({ date, startTime, blocks: Number(value) })} options={[{ value: '1', label: '1 hora' }, { value: '2', label: '2 horas' }, { value: '3', label: '3 horas' }, { value: '4', label: '4 horas' }]} /><FieldError state={state} field="blocks" /></label>
       </div>
       <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} initial={initialClient} />
-      <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-${blocks}`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={blocks * 60} state={state} />
-      <PaymentMethodSelect methods={paymentMethods} state={state} label="Medio del adelanto" />
-      <label className="block space-y-1.5 text-sm font-semibold">Canal<FormSelect name="channel" defaultValue="whatsapp" options={[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }]} /></label>
-      <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-5 text-foreground">Al guardar, la reserva quedará <strong>confirmada</strong> y el adelanto se registrará en su historial de cobros.</p>
-      <label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" placeholder="Detalles de la reserva" className="min-h-20 rounded-xl bg-background" /></label>
-      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar reserva" disabled={clientBlocked || paymentMethods.length === 0} />
+      <label className="block space-y-1.5 text-sm font-semibold">Nombre visible en el horario <span className="font-normal text-muted-foreground">(opcional)</span><Input name="publicName" maxLength={40} placeholder="Equipo o apodo" className={inputClass} /><span className="block text-xs font-normal text-muted-foreground">Si queda vacío, se mostrará el primer nombre del cliente.</span><FieldError state={state} field="publicName" /></label>
+      <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-${blocks}`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={blocks * 60} state={state} withoutAdvance={withoutAdvance} onWithoutAdvanceChange={setWithoutAdvance} />
+      {!withoutAdvance && <PaymentMethodSelect methods={paymentMethods} state={state} label="Medio del adelanto" />}
+      <BookingOriginField />
+      <BookingNoteField state={state} />
+      <p className="text-xs text-muted-foreground">{withoutAdvance ? 'Se guardará confirmada. El total quedará por cobrar.' : 'Se guardará confirmada y el adelanto quedará registrado como cobro.'}</p>
+      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar reserva" disabled={clientBlocked || (!withoutAdvance && paymentMethods.length === 0)} />
     </form>
   )
 }
@@ -237,21 +299,39 @@ export function EncasedBookingForm({ localId, court, date, startTime, sportOptio
   const [state, action, pending] = useActionState(createEncasedBookingAction, initialAgendaActionState)
   const [sportId, setSportId] = useState(defaultSportId ?? sportOptions[0]?.id ?? '')
   const [clientBlocked, setClientBlocked] = useState(false)
+  const [withoutAdvance, setWithoutAdvance] = useState(false)
   useAgendaFeedback(state, onSuccess)
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-3">
       <input type="hidden" name="localId" value={localId} /><input type="hidden" name="courtId" value={court.id} /><input type="hidden" name="date" value={date} /><input type="hidden" name="time" value={startTime} />
       <div className="rounded-xl border border-secondary/30 bg-secondary/10 px-3 py-2 text-sm">Inicio excepcional: <span className="font-bold">{startTime}</span> · duración fija de 90 minutos.</div>
       <label className="block space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={sportOptions.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
       <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} />
-      <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-90`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={90} state={state} />
-      <PaymentMethodSelect methods={paymentMethods} state={state} label="Medio del adelanto" />
-      <label className="block space-y-1.5 text-sm font-semibold">Canal<FormSelect name="channel" defaultValue="whatsapp" options={[{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'presencial', label: 'Presencial' }]} /></label>
-      <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-5 text-foreground">Al guardar, la reserva quedará <strong>confirmada</strong> y el adelanto se registrará en su historial de cobros.</p>
-      <label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" placeholder="Detalles de la reserva" className="min-h-20 rounded-xl bg-background" /></label>
-      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar 90 minutos" disabled={clientBlocked || paymentMethods.length === 0} />
+      <label className="block space-y-1.5 text-sm font-semibold">Nombre visible en el horario <span className="font-normal text-muted-foreground">(opcional)</span><Input name="publicName" maxLength={40} placeholder="Equipo o apodo" className={inputClass} /><span className="block text-xs font-normal text-muted-foreground">Si lo dejas vacío se mostrará el primer nombre del cliente.</span><FieldError state={state} field="publicName" /></label>
+      <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-90`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={90} state={state} withoutAdvance={withoutAdvance} onWithoutAdvanceChange={setWithoutAdvance} />
+      {!withoutAdvance && <PaymentMethodSelect methods={paymentMethods} state={state} label="Medio del adelanto" />}
+      <BookingOriginField />
+      <BookingNoteField state={state} />
+      <p className="text-xs text-muted-foreground">{withoutAdvance ? 'Se guardará confirmada. El total quedará por cobrar.' : 'Se guardará confirmada y el adelanto quedará registrado como cobro.'}</p>
+      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar 90 minutos" disabled={clientBlocked || (!withoutAdvance && paymentMethods.length === 0)} />
     </form>
   )
+}
+
+export function PublicNameForm({ reservationId, currentName, blocked, onCancel, onSuccess }: { reservationId: string; currentName?: string | null; blocked?: boolean; onCancel: () => void; onSuccess: () => void }) {
+  const [state, action, pending] = useActionState(updateReservationPublicNameAction, initialAgendaActionState)
+  useAgendaFeedback(state, onSuccess)
+  return <form action={action} className="space-y-4">
+    <input type="hidden" name="reservationId" value={reservationId} />
+    <label className="block space-y-1.5 text-sm font-semibold">Nombre visible en el horario<Input name="publicName" defaultValue={currentName ?? ''} maxLength={40} placeholder="Primer nombre del cliente" className={inputClass} /><span className="block text-xs font-normal text-muted-foreground">Vacío muestra el primer nombre del cliente. El nombre y teléfono reales se conservan en el panel.</span><FieldError state={state} field="publicName" /></label>
+    {blocked && <p className="rounded-xl bg-warning/10 px-3 py-2 text-xs">El nombre personalizado fue retirado. Si guardas uno nuevo, el cliente podrá volver a editarlo.</p>}
+    <Feedback state={state} />
+    <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
+      <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>Volver</Button>
+      {currentName && <Button type="submit" name="blockName" value="true" variant="destructive" disabled={pending}>Retirar apodo y bloquear edición</Button>}
+      <Button type="submit" disabled={pending}>{pending && <Spinner />}Guardar nombre</Button>
+    </div>
+  </form>
 }
 
 export function ExtendReservationForm({ reservationId, paymentMethods, onCancel, onSuccess }: { reservationId: string; paymentMethods: LocalPaymentMethod[]; onCancel: () => void; onSuccess: () => void }) {
@@ -268,6 +348,54 @@ export function ExtendReservationForm({ reservationId, paymentMethods, onCancel,
       <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Autorizar +30 min" disabled={chargeStatus === 'cobrado' && paymentMethods.length === 0} />
     </form>
   )
+}
+
+function hourLabel(value: string) {
+  return new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value))
+}
+
+export function AddHourReservationForm({ reservationId, currentTotal, paymentMethods, onCancel, onSuccess }: { reservationId: string; currentTotal: number; paymentMethods: LocalPaymentMethod[]; onCancel: () => void; onSuccess: () => void }) {
+  const [state, action, pending] = useActionState(addHourToReservationAction, initialAgendaActionState)
+  const [quote, setQuote] = useState<HourExtensionQuote | null>(null)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+  const [chargeNow, setChargeNow] = useState(false)
+  useAgendaFeedback(state, onSuccess)
+  useEffect(() => {
+    let active = true
+    quoteHourExtensionAction(reservationId).then((result) => {
+      if (!active) return
+      setQuote(result.quote ?? null)
+      setQuoteError(result.message ?? null)
+    }).catch(() => { if (active) setQuoteError('No se pudo cotizar la hora adicional.') })
+    return () => { active = false }
+  }, [reservationId])
+  return <form action={action} className="space-y-4">
+    <input type="hidden" name="reservationId" value={reservationId} />
+    {quote && <><input type="hidden" name="expectedEnd" value={quote.oldEnd} /><input type="hidden" name="expectedTotal" value={currentTotal} />
+      <div className="space-y-2 rounded-xl border bg-muted/45 px-3 py-3 text-sm">
+        <p>La reserva terminará a las <strong>{hourLabel(quote.newEnd)}</strong> <span className="text-muted-foreground">(antes {hourLabel(quote.oldEnd)})</span>.</p>
+        <div className="flex justify-between gap-3"><span>Esta hora cuesta</span><strong>S/ {quote.addedAmount.toFixed(2)}</strong></div>
+        <div className="flex justify-between gap-3 border-t pt-2"><span>Nuevo total</span><strong>S/ {quote.newTotal.toFixed(2)}</strong></div>
+        <p className="text-xs text-muted-foreground">Quedará por cobrar: S/ {quote.newOutstanding.toFixed(2)}</p>
+      </div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={chargeNow} onChange={(event) => setChargeNow(event.target.checked)} />Esta hora ya está pagada</label>
+      {chargeNow && <PaymentMethodSelect methods={paymentMethods} state={state} />}
+      <p className="text-xs text-muted-foreground">Si fue un error, puedes quitarla antes de que empiece, siempre que no haya un cobro por devolver.</p>
+    </>}
+    {!quote && <p className="text-sm text-muted-foreground">{quoteError ?? 'Calculando la hora adicional…'}</p>}
+    <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Añadir 1 hora" disabled={!quote || Boolean(quoteError) || (chargeNow && paymentMethods.length === 0)} />
+  </form>
+}
+
+export function RevertHourReservationForm({ extensionId, amount, onCancel, onSuccess }: { extensionId: string; amount: number; onCancel: () => void; onSuccess: () => void }) {
+  const [state, action, pending] = useActionState(revertHourExtensionAction, initialAgendaActionState)
+  useAgendaFeedback(state, onSuccess)
+  return <form action={action} className="space-y-4">
+    <input type="hidden" name="hourExtensionId" value={extensionId} />
+    <p className="rounded-xl border bg-muted/45 px-3 py-2.5 text-sm">Se quitará la última hora y se descontarán S/ {amount.toFixed(2)} del total.</p>
+    <p className="text-xs text-muted-foreground">Si ya cobraste esa hora, primero resuelve la devolución.</p>
+    <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Quitar hora adicional" />
+  </form>
 }
 
 export function ConfirmReservationForm({ reservationId, onCancel, onSuccess }: { reservationId: string; onCancel: () => void; onSuccess: () => void }) {
@@ -325,5 +453,5 @@ export function NoShowReservationForm({ reservationId, onCancel, onSuccess }: { 
 export function PaymentMovementForm({ reservationId, outstandingAmount, paymentMethods, onCancel, onSuccess }: { reservationId: string; outstandingAmount?: number; paymentMethods: LocalPaymentMethod[]; onCancel: () => void; onSuccess: () => void }) {
   const [state, action, pending] = useActionState(registerPaymentMovementAction, initialAgendaActionState)
   useAgendaFeedback(state, onSuccess)
-  return <form action={action} className="space-y-4"><input type="hidden" name="reservationId" value={reservationId} /><p className="rounded-xl border bg-muted/45 px-3 py-2 text-sm">Este cobro se registrará como parte del <strong>saldo</strong>; el adelanto inicial ya quedó asentado al crear o confirmar la reserva. {typeof outstandingAmount === 'number' && <><br />Falta por cobrar: <strong>S/ {outstandingAmount.toFixed(2)}</strong>.</>}</p><label className="block space-y-1.5 text-sm font-semibold">Monto<Input name="amount" type="number" min="0.01" max={outstandingAmount} step="0.01" inputMode="decimal" defaultValue={typeof outstandingAmount === 'number' && outstandingAmount > 0 ? outstandingAmount.toFixed(2) : undefined} placeholder="0.00" className={inputClass} /><FieldError state={state} field="amount" /></label><PaymentMethodSelect methods={paymentMethods} state={state} /><label className="block space-y-1.5 text-sm font-semibold">N.º de operación o referencia <span className="font-normal text-muted-foreground">(opcional)</span><Input name="reference" maxLength={80} placeholder="Ej. 004812" className={inputClass} /></label><label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" maxLength={300} className="min-h-20 rounded-xl bg-background" /></label><Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar cobro" disabled={paymentMethods.length === 0 || (typeof outstandingAmount === 'number' && outstandingAmount <= 0)} /></form>
+  return <form action={action} className="space-y-4"><input type="hidden" name="reservationId" value={reservationId} /><p className="rounded-xl border bg-muted/45 px-3 py-2 text-sm">Este cobro se registrará en caja. {typeof outstandingAmount === 'number' && <>Falta por cobrar: <strong>S/ {outstandingAmount.toFixed(2)}</strong>.</>}</p><label className="block space-y-1.5 text-sm font-semibold">Monto<Input name="amount" type="number" min="0.01" max={outstandingAmount} step="0.01" inputMode="decimal" defaultValue={typeof outstandingAmount === 'number' && outstandingAmount > 0 ? outstandingAmount.toFixed(2) : undefined} placeholder="0.00" className={inputClass} /><FieldError state={state} field="amount" /></label><PaymentMethodSelect methods={paymentMethods} state={state} /><label className="block space-y-1.5 text-sm font-semibold">N.º de operación o referencia <span className="font-normal text-muted-foreground">(opcional)</span><Input name="reference" maxLength={80} placeholder="Ej. 004812" className={inputClass} /></label><label className="block space-y-1.5 text-sm font-semibold">Nota <span className="font-normal text-muted-foreground">(opcional)</span><Textarea name="notes" maxLength={300} className="min-h-20 rounded-xl bg-background" /></label><Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar cobro" disabled={paymentMethods.length === 0 || (typeof outstandingAmount === 'number' && outstandingAmount <= 0)} /></form>
 }

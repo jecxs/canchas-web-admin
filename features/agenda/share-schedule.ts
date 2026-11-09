@@ -82,7 +82,7 @@ export function buildShareSchedule({
       return range.start < start + STEP && range.end > start
     })
   }))
-  const reservationNames = reservations.map((column) => column.map((reservation) => reservation?.customerName?.trim().split(/\s+/)[0] || undefined))
+  const reservationNames = reservations.map((column) => column.map((reservation) => reservation?.publicName || reservation?.customerName?.trim().split(/\s+/)[0] || undefined))
   const reservationKeys = reservations.map((column) => column.map((reservation) => reservation ? `${reservation.reservationId ?? ''}|${reservation.start}|${reservation.end}` : undefined))
   return { mode: isWeek ? 'week' : 'day', localName: data.localName, courtName: isWeek ? selectedCourt?.name : undefined, columns, starts, cells, capturedAt, reservationNames, reservationKeys }
 }

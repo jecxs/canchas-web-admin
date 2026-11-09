@@ -114,7 +114,7 @@ export function AuditDashboard({ data }: { data: AuditReport }) {
             )}
           </div>
           <div className="rp-mini">
-            <h3 className="rp-h3">Extensiones por cobro</h3>
+            <h3 className="rp-h3">Cobro al extender</h3>
             {data.extensionsByChargeStatus.length ? (
               <Split items={data.extensionsByChargeStatus} colors={[EXT, EXT_SOFT]} />
             ) : (

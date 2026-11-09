@@ -135,7 +135,7 @@ export async function getOperativeReport(input: {
     start,
     end,
     today,
-    totals: { reservations: 0, hours: 0, extensiones: 0, extraHours: 0 },
+    totals: { reservations: 0, hours: 0, extensiones: 0, ampliacionesHora: 0, extraHours: 0 },
     insights: { busiestDay: null, quietestDay: null, peakHour: null, deadHour: null },
     byWeekday: [],
     hourly: [],
@@ -196,7 +196,19 @@ export async function getOperativeReport(input: {
     const estado = row.reservas?.estado
     return !estado || !CANCELLED_STATES.includes(estado)
   }).length
-  const extraHours = extensiones * 0.5
+  const { data: hourRows, error: hourError } = courtIds.length
+    ? await supabase
+        .from('reserva_ampliaciones_hora')
+        .select('id,revertido_at,reservas!inner(cancha_id,estado)')
+        .in('reservas.cancha_id', courtIds)
+        .gte('created_at', startIso)
+        .lt('created_at', endIso)
+    : { data: [], error: null }
+  if (hourError) throw new Error('No se pudieron cargar las ampliaciones de hora del reporte.')
+  const ampliacionesHora = (hourRows ?? []).filter((row) =>
+    !row.revertido_at && !CANCELLED_STATES.includes(row.reservas.estado),
+  ).length
+  const extraHours = extensiones * 0.5 + ampliacionesHora
 
   const weekdayCount = new Map<number, number>()
   const hourCount = new Map<number, number>()
@@ -322,7 +334,7 @@ export async function getOperativeReport(input: {
 
   return {
     ...base,
-    totals: { reservations: reservations.length, hours, extensiones, extraHours },
+    totals: { reservations: reservations.length, hours, extensiones, ampliacionesHora, extraHours },
     insights: {
       busiestDay: busiest ? { label: busiest.label, detail: `${busiest.reservations} reservas` } : null,
       quietestDay: quietest ? { label: quietest.label, detail: `${quietest.reservations} reservas` } : null,

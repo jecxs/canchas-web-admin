@@ -3,10 +3,11 @@
 import 'server-only'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { requireOperationalOwnerLocal } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { localDateTimeToIso, makeTstzRange } from './date-utils'
-import { cancelReservationSchema, encasedBookingSchema, extendReservationSchema, maintenanceSchema, manualBookingSchema, noShowReservationSchema, paymentMovementSchema, rejectReservationSchema, rescheduleReservationSchema, reservationDecisionSchema } from './schema'
+import { cancelReservationSchema, encasedBookingSchema, extendReservationSchema, hourExtensionSchema, maintenanceSchema, manualBookingSchema, noShowReservationSchema, paymentMovementSchema, rejectReservationSchema, rescheduleReservationSchema, reservationDecisionSchema, specialPriceSchema } from './schema'
 import type { AgendaActionState } from './types'
 
 const invalid = (fieldErrors?: Record<string, string[] | undefined>): AgendaActionState => ({
@@ -34,6 +35,8 @@ function finish(message: string): AgendaActionState {
   revalidatePath('/panel/agenda')
   revalidatePath('/panel/reservas')
   revalidatePath('/panel/clientes')
+  revalidatePath('/panel/caja')
+  revalidatePath('/panel/reportes')
   return { success: true, message }
 }
 
@@ -60,7 +63,12 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
     clienteId: readClienteId(formData),
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
+    publicName: formData.get('publicName') ?? '',
+    withoutAdvance: formData.get('withoutAdvance'),
     advanceAmount: formData.get('advanceAmount'),
+    specialFinalAmount: formData.get('specialFinalAmount'),
+    quotedTotal: formData.get('quotedTotal'),
+    discountReason: formData.get('discountReason') ?? '',
     paymentMethodId: formData.get('paymentMethodId'),
     channel: formData.get('channel'),
     notes: formData.get('notes') ?? '',
@@ -74,7 +82,7 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
   if (local.id !== validation.data.localId) return { success: false, message: 'No tienes permiso para realizar esta acción' }
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('crear_reserva_manual_confirmada_dueno_v2', {
+  const args = {
     p_local_id: local.id,
     p_cancha_id: validation.data.courtId,
     p_deporte_id: validation.data.sportId,
@@ -84,12 +92,43 @@ export async function createManualBookingAction(_state: AgendaActionState, formD
     p_cliente_nombre: validation.data.customerName,
     p_cliente_telefono: validation.data.customerPhone,
     p_monto_adelanto: validation.data.advanceAmount,
-    p_medio_pago_id: validation.data.paymentMethodId,
+    p_medio_pago_id: validation.data.paymentMethodId ?? null,
     p_canal: validation.data.channel,
     p_notas: validation.data.notes || undefined,
-  })
+    p_nombre_publico: validation.data.publicName || null,
+  }
+  const { error } = validation.data.specialFinalAmount === undefined
+    ? await supabase.rpc('crear_reserva_manual_confirmada_dueno_con_nombre', args)
+    : await supabase.rpc('crear_reserva_manual_confirmada_dueno_con_descuento', {
+      ...args,
+      p_cliente_id: validation.data.clienteId ?? null,
+      p_notas: validation.data.notes || null,
+      p_monto_final: validation.data.specialFinalAmount,
+      p_motivo_descuento: validation.data.discountReason,
+      p_total_cotizado: validation.data.quotedTotal!,
+    })
   if (error) return operationError('manual-booking', error)
   return finish('Reserva registrada')
+}
+
+export async function applySpecialPriceAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
+  const validation = specialPriceSchema.safeParse({
+    reservationId: formData.get('reservationId'),
+    finalAmount: formData.get('finalAmount'),
+    expectedTotal: formData.get('expectedTotal'),
+    reason: formData.get('reason'),
+  })
+  if (!validation.success) return invalid(validation.error.flatten().fieldErrors)
+  await requireOperationalOwnerLocal()
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('aplicar_precio_especial_reserva_dueno', {
+    p_reserva_id: validation.data.reservationId,
+    p_monto_final: validation.data.finalAmount,
+    p_motivo: validation.data.reason,
+    p_total_esperado: validation.data.expectedTotal,
+  })
+  if (error) return operationError('special-price', error)
+  return finish('Precio especial actualizado')
 }
 
 export async function createEncasedBookingAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
@@ -102,7 +141,10 @@ export async function createEncasedBookingAction(_state: AgendaActionState, form
     clienteId: readClienteId(formData),
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
+    publicName: formData.get('publicName') ?? '',
+    withoutAdvance: formData.get('withoutAdvance'),
     advanceAmount: formData.get('advanceAmount'),
+    quotedTotal: formData.get('quotedTotal'),
     paymentMethodId: formData.get('paymentMethodId'),
     channel: formData.get('channel'),
     notes: formData.get('notes') ?? '',
@@ -116,7 +158,7 @@ export async function createEncasedBookingAction(_state: AgendaActionState, form
   if (local.id !== validation.data.localId) return { success: false, message: 'No tienes permiso para realizar esta acción' }
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('crear_reserva_manual_encajada_confirmada_dueno_v2', {
+  const { error } = await supabase.rpc('crear_reserva_manual_encajada_confirmada_dueno_con_nombre', {
     p_local_id: local.id,
     p_cancha_id: validation.data.courtId,
     p_deporte_id: validation.data.sportId,
@@ -125,12 +167,30 @@ export async function createEncasedBookingAction(_state: AgendaActionState, form
     p_cliente_nombre: validation.data.customerName,
     p_cliente_telefono: validation.data.customerPhone,
     p_monto_adelanto: validation.data.advanceAmount,
-    p_medio_pago_id: validation.data.paymentMethodId,
+    p_medio_pago_id: validation.data.paymentMethodId ?? null,
     p_canal: validation.data.channel,
     p_notas: validation.data.notes || undefined,
+    p_nombre_publico: validation.data.publicName || null,
   })
   if (error) return operationError('encased-booking', error)
   return finish('Reserva encajada registrada')
+}
+
+export async function updateReservationPublicNameAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
+  const reservationId = formData.get('reservationId')
+  const name = formData.get('publicName')
+  const block = formData.get('blockName') === 'true'
+  if (typeof reservationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(reservationId)) return invalid({ reservationId: ['Reserva inválida.'] })
+  if (typeof name !== 'string' || name.trim().length === 1 || name.trim().length > 40 || /[\x00-\x1f\x7f]/.test(name)) return invalid({ publicName: ['Escribe entre 2 y 40 caracteres o deja el campo vacío.'] })
+  await requireOperationalOwnerLocal()
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('actualizar_nombre_publico_reserva', {
+    p_reserva_id: reservationId,
+    p_nombre_publico: block ? null : name.trim() || null,
+    p_bloquear: block,
+  })
+  if (error) return operationError('public-name', error)
+  return finish(block ? 'Nombre personalizado retirado. La reserva sigue vigente.' : 'Nombre visible actualizado')
 }
 
 export async function createMaintenanceAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
@@ -179,6 +239,60 @@ export async function extendReservationAction(_state: AgendaActionState, formDat
   })
   if (error) return operationError('extend', error)
   return finish('Extensión de 30 minutos autorizada')
+}
+
+export type HourExtensionQuote = {
+  oldEnd: string
+  newEnd: string
+  addedAmount: number
+  newTotal: number
+  newOutstanding: number
+}
+
+export async function quoteHourExtensionAction(reservationId: string): Promise<{ quote?: HourExtensionQuote; message?: string }> {
+  if (!z.uuid().safeParse(reservationId).success) return { message: 'Reserva inválida.' }
+  await requireOperationalOwnerLocal()
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('cotizar_ampliacion_hora_reserva_dueno', { p_reserva_id: reservationId })
+  if (error || !data?.[0]) return { message: error?.message ?? 'No se pudo cotizar la hora adicional.' }
+  const row = data[0]
+  return { quote: {
+    oldEnd: row.fin_anterior,
+    newEnd: row.fin_nuevo,
+    addedAmount: Number(row.monto_adicional),
+    newTotal: Number(row.total_nuevo),
+    newOutstanding: Number(row.saldo_nuevo),
+  } }
+}
+
+export async function addHourToReservationAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
+  const validation = hourExtensionSchema.safeParse({
+    reservationId: formData.get('reservationId'),
+    expectedEnd: formData.get('expectedEnd'),
+    expectedTotal: formData.get('expectedTotal'),
+    paymentMethodId: formData.get('paymentMethodId') ?? '',
+  })
+  if (!validation.success) return invalid(validation.error.flatten().fieldErrors)
+  await requireOperationalOwnerLocal()
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('ampliar_reserva_hora_dueno', {
+    p_reserva_id: validation.data.reservationId,
+    p_fin_esperado: validation.data.expectedEnd,
+    p_total_esperado: validation.data.expectedTotal,
+    p_medio_pago_id: validation.data.paymentMethodId || undefined,
+  })
+  if (error) return operationError('add-hour', error)
+  return finish('Reserva ampliada una hora')
+}
+
+export async function revertHourExtensionAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {
+  const id = z.uuid().safeParse(formData.get('hourExtensionId'))
+  if (!id.success) return invalid({ hourExtensionId: ['Ampliación inválida.'] })
+  await requireOperationalOwnerLocal()
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('revertir_ampliacion_hora_reserva_dueno', { p_ampliacion_id: id.data })
+  if (error) return operationError('revert-hour', error)
+  return finish('Hora adicional retirada')
 }
 
 export async function confirmReservationAction(_state: AgendaActionState, formData: FormData): Promise<AgendaActionState> {

@@ -39,6 +39,7 @@ export type IncomeReport = {
   today: string
   totals: {
     income: number
+    exceptional: number
     outstanding: number
     reservations: number
     averageTicket: number
@@ -115,6 +116,7 @@ export type OperativeReport = {
     reservations: number
     hours: number
     extensiones: number
+    ampliacionesHora: number
     extraHours: number
   }
   insights: {

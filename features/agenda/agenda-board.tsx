@@ -75,6 +75,7 @@ import {
 } from "./date-utils";
 import {
   CancelReservationForm,
+  AddHourReservationForm,
   ConfirmReservationForm,
   EncasedBookingForm,
   ExtendReservationForm,
@@ -82,7 +83,9 @@ import {
   ManualBookingForm,
   NoShowReservationForm,
   PaymentMovementForm,
+  PublicNameForm,
   RejectReservationForm,
+  RevertHourReservationForm,
   RescheduleReservationForm,
 } from "./operation-forms";
 import type { PickedClient } from "@/features/clients/client-picker";
@@ -105,12 +108,15 @@ type Operation =
   | "maintenance"
   | "encajada"
   | "extend"
+  | "add-hour"
+  | "revert-hour"
   | "confirm"
   | "reject"
   | "move"
   | "cancel"
   | "no-show"
-  | "payment";
+  | "payment"
+  | "name";
 type ReservationRealtimeRecord = {
   id?: unknown;
   cancha_id?: unknown;
@@ -152,6 +158,8 @@ function operationTitle(operation: Operation) {
       return "Inasistencia en curso";
     case "payment":
       return "Registro de cobro en curso";
+    case "name":
+      return "Nombre visible de la reserva";
     default:
       return "Detalle del horario";
   }
@@ -309,25 +317,6 @@ function statusDot(status?: string) {
       return "bg-primary";
     default:
       return "bg-secondary";
-  }
-}
-
-function reservationStatusBadgeTone(status?: string) {
-  switch (status) {
-    case "pendiente_validacion":
-      return "bg-warning text-warning-foreground";
-    case "pendiente_pago":
-      return "bg-info text-info-foreground";
-    case "checkout_online":
-      return "bg-info text-info-foreground";
-    case "pago_en_proceso":
-      return "bg-warning text-warning-foreground";
-    case "completada":
-      return "bg-success text-success-foreground";
-    case "confirmada":
-      return "bg-primary text-primary-foreground";
-    default:
-      return "bg-secondary text-secondary-foreground";
   }
 }
 
@@ -952,6 +941,7 @@ export function AgendaBoard({
       occupation?.type === "reserva" &&
       occupation.reservationId &&
       !occupation.isException &&
+      !occupation.hourExtensionId &&
       ["pendiente_validacion", "confirmada"].includes(
         occupation.reservationStatus ?? "",
       ) &&
@@ -1403,6 +1393,10 @@ export function AgendaBoard({
   function renderDialog() {
     if (!selectedCell) return null;
     const court = data.courts.find((item) => item.id === selectedCell.courtId);
+    if (operation === "name" && selectedOccupation?.reservationId) return <>
+      <SheetHeader><SheetTitle>Nombre visible de la reserva</SheetTitle><SheetDescription>Personaliza lo que aparece en el horario compartido sin cambiar los datos del cliente.</SheetDescription></SheetHeader>
+      <PublicNameForm reservationId={selectedOccupation.reservationId} currentName={selectedOccupation.publicName} blocked={selectedOccupation.publicNameBlocked} onCancel={() => setOperation("summary")} onSuccess={closeDialog} />
+    </>;
     if (operation === "manual" && court)
       return (
         <>
@@ -1488,6 +1482,10 @@ export function AgendaBoard({
           />
         </>
       );
+    if (operation === "add-hour" && selectedOccupation?.reservationId)
+      return <><SheetHeader><SheetTitle>Añadir 1 hora</SheetTitle><SheetDescription>{selectedCell.courtName} · {formatAgendaDate(selectedCell.date)}</SheetDescription></SheetHeader><AddHourReservationForm reservationId={selectedOccupation.reservationId} currentTotal={selectedOccupation.totalAmount ?? 0} paymentMethods={data.paymentMethods} onCancel={() => setOperation("summary")} onSuccess={closeDialog} /></>;
+    if (operation === "revert-hour" && selectedOccupation?.hourExtensionId)
+      return <><SheetHeader><SheetTitle>Quitar hora adicional</SheetTitle><SheetDescription>{selectedCell.courtName} · {formatAgendaDate(selectedCell.date)}</SheetDescription></SheetHeader><RevertHourReservationForm extensionId={selectedOccupation.hourExtensionId} amount={selectedOccupation.hourExtensionAmount ?? 0} onCancel={() => setOperation("summary")} onSuccess={closeDialog} /></>;
     if (operation === "confirm" && selectedOccupation?.reservationId)
       return (
         <>
@@ -1619,17 +1617,17 @@ export function AgendaBoard({
     return (
       <>
         <SheetHeader>
-          <SheetTitle>{selectedCell.courtName}</SheetTitle>
+          <SheetTitle className="text-2xl font-extrabold tracking-tight [font-family:var(--font-display)]">{selectedCell.courtName}</SheetTitle>
           <SheetDescription>
-            {selectedCell.date} ·{" "}
+            {formatAgendaDate(selectedCell.date)} ·{" "}
             {reservation
               ? `${isoToLocalTime(reservation.start)} – ${isoToLocalTime(reservation.end)}`
               : `${selectedStartTime} – ${selectedEndTime}`}
           </SheetDescription>
         </SheetHeader>
-        <div className="space-y-3 rounded-xl border bg-muted/25 p-4">
+        <div className="space-y-3 rounded-2xl border border-border/70 bg-card px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm font-bold">
+            <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
               <span
                 className={`size-2.5 rounded-full ${selectedOccupation?.type === "mantenimiento" ? "bg-warning" : reservation ? statusDot(status) : "bg-primary"}`}
               />
@@ -1639,37 +1637,23 @@ export function AgendaBoard({
                   ? reservationStatusLabel(status)
                   : "Bloque libre"}
             </div>
-            {reservation && (
-              <span
-                className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.08em] ${reservationStatusBadgeTone(status)}`}
-              >
-                {reservationStatusLabel(status)}
-              </span>
-            )}
           </div>
           {reservation?.customerName && (
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-bold">{reservation.customerName}</p>
-                {reservation.customerPhone && (
-                  <p className="text-xs text-muted-foreground">
-                    {reservation.customerPhone}
-                  </p>
-                )}
-              </div>
+              <p className="min-w-0 truncate text-base font-extrabold tracking-tight text-foreground">{reservation.customerName}</p>
               {phone && (
                 <div className="flex gap-2 text-xs font-bold">
                   <a
                     href={`https://wa.me/${phone}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-lg border px-2.5 py-1.5 transition-colors hover:bg-accent"
+                    className="inline-flex min-h-11 items-center rounded-full border px-3 transition-colors hover:bg-accent"
                   >
                     WhatsApp
                   </a>
                   <a
                     href={`tel:${reservation.customerPhone}`}
-                    className="rounded-lg border px-2.5 py-1.5 transition-colors hover:bg-accent"
+                    className="inline-flex min-h-11 items-center rounded-full border px-3 transition-colors hover:bg-accent"
                   >
                     Llamar
                   </a>
@@ -1677,55 +1661,39 @@ export function AgendaBoard({
               )}
             </div>
           )}
-          {reservation && (
-            <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-              <span>
-                Deporte:{" "}
-                <strong className="text-foreground">
-                  {reservation.sportName ?? "Sin especificar"}
-                </strong>
-              </span>
-              {amount && (
-                <span>
-                  Total: <strong className="text-foreground">{amount}</strong>
-                </span>
-              )}
-              {advance && (
-                <span>
-                  Adelanto requerido:{" "}
-                  <strong className="text-foreground">{advance}</strong>
-                  {advanceCovered ? (
-                    <span className="ml-1 font-semibold text-success-foreground">
-                      · cubierto
-                    </span>
-                  ) : null}
-                </span>
-              )}
-              {paid && (
-                <span>
-                  Cobrado: <strong className="text-foreground">{paid}</strong>
-                </span>
-              )}
-              {typeof reservation.refundedAmount === "number" &&
-                reservation.refundedAmount > 0 && (
-                  <span>
-                    Reembolsado:{" "}
-                    <strong className="text-foreground">{refunded}</strong>
-                  </span>
-                )}
-              {outstanding && (
-                <span>
-                  Falta cobrar:{" "}
-                  <strong className="text-foreground">{outstanding}</strong>
-                </span>
-              )}
-              <span>
-                Canal:{" "}
-                <strong className="capitalize text-foreground">
-                  {reservation.reservationChannel ?? "app"}
-                </strong>
-              </span>
+          {reservation?.reservationId && (
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="min-w-0 truncate"><span className="text-muted-foreground">En el horario: </span><strong>{reservation.publicName || reservation.customerName?.trim().split(/\s+/)[0] || 'Cliente'}</strong>{reservation.publicNameBlocked && <span className="ml-2 text-destructive">Apodo retirado</span>}</span>
+              <button type="button" onClick={() => setOperation("name")} className="min-h-11 shrink-0 rounded-full bg-primary/15 px-4 font-bold text-foreground transition-colors hover:bg-primary/25 focus-visible:outline-2 focus-visible:outline-primary" aria-label="Editar nombre en el horario">Editar</button>
             </div>
+          )}
+          {reservation && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>Deporte: <strong className="text-foreground">{reservation.sportName ?? "Sin especificar"}</strong></span>
+                <span>Canal: <strong className="capitalize text-foreground">{reservation.reservationChannel ?? "app"}</strong></span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 rounded-xl bg-foreground px-3 py-3 text-xs text-background">
+                <div><span className="block text-background/70">Total</span><strong className="block text-base tabular-nums">{amount ?? '—'}</strong></div>
+                <div><span className="block text-background/70">Cobrado</span><strong className="block text-base tabular-nums">{paid ?? '—'}</strong></div>
+                <div><span className="block text-background/70">Por cobrar</span><strong className="block text-base tabular-nums text-primary">{outstanding ?? '—'}</strong></div>
+              </div>
+              {reservation.advanceAmount === 0 && <p className="text-xs font-semibold">Sin adelanto inicial · {typeof reservation.outstandingAmount === "number" && reservation.outstandingAmount > 0 ? "saldo pendiente" : "pago completo"}</p>}
+              {typeof reservation.advanceAmount === "number" && reservation.advanceAmount > 0 && (
+                <p className="text-xs text-muted-foreground">{advanceCovered ? 'Adelanto pagado' : 'Adelanto pendiente'}: <strong className="text-foreground">{advance}</strong>{!advanceCovered && typeof reservation.paidAmount === "number" && <span> · faltan {formatAmount(Math.max(0, reservation.advanceAmount - reservation.paidAmount))}</span>}</p>
+              )}
+              {typeof reservation.refundedAmount === "number" && reservation.refundedAmount > 0 && <p className="text-xs text-muted-foreground">Reembolsado: <strong className="text-foreground">{refunded}</strong></p>}
+            </div>
+          )}
+          {reservation && (reservation.specialDiscountAmount ?? 0) > 0 && (
+            <div className="text-xs text-muted-foreground">
+              Descuento especial: −{formatAmount(reservation.specialDiscountAmount)} <span className="text-muted-foreground">sobre {formatAmount(reservation.tariffAmount)}</span>
+            </div>
+          )}
+          {reservation?.hourExtensionId && reservation.hourExtensionOldEnd && (
+            <p className="text-xs font-semibold text-foreground">
+              1 hora añadida desde las {isoToLocalTime(reservation.hourExtensionOldEnd)} · +{formatAmount(reservation.hourExtensionAmount ?? 0)}
+            </p>
           )}
           {reservation?.proofPath && (
             <div className="rounded-lg border border-warning/35 bg-warning/10 p-3">
@@ -1744,7 +1712,7 @@ export function AgendaBoard({
                   <button
                     type="button"
                     onClick={openProofLightbox}
-                    className="shrink-0 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-accent"
+                    className="inline-flex min-h-11 shrink-0 items-center rounded-lg border bg-background px-3 text-xs font-bold transition-colors hover:bg-accent"
                   >
                     Ampliar
                   </button>
@@ -1754,7 +1722,7 @@ export function AgendaBoard({
                       href={reservation.proofUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="shrink-0 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-accent"
+                      className="inline-flex min-h-11 shrink-0 items-center rounded-lg border bg-background px-3 text-xs font-bold transition-colors hover:bg-accent"
                     >
                       Abrir archivo
                     </a>
@@ -1784,15 +1752,13 @@ export function AgendaBoard({
               Este horario está bloqueado para mantenimiento o cierre operativo.
             </p>
           )}
-          {reservation && (
+          {reservation && (reservation.isException || status === "pendiente_validacion") && (
             <p className="text-sm text-muted-foreground">
               {reservation.isException
-                ? "La reserva tiene una extensión autorizada de 30 minutos."
+                ? "Se añadieron 30 minutos a esta reserva."
                 : status === "pendiente_validacion" && hasStarted
-                  ? "El horario ya comenzó: no se puede validar ni rechazar el comprobante. Registra una cancelación del local para dejar la incidencia auditada."
-                  : status === "pendiente_validacion"
-                    ? "Revisa el comprobante y decide si el pago es válido."
-                    : "Reserva activa en esta cancha."}
+                  ? "El horario ya comenzó. Si no se jugó, cancela la reserva."
+                  : "Revisa el comprobante para confirmar la reserva."}
             </p>
           )}
           {reservation?.reservationNotes && (
@@ -1801,9 +1767,9 @@ export function AgendaBoard({
             </p>
           )}
         </div>
-        <div className="flex flex-wrap justify-end gap-2 pt-2">
+        <div className="space-y-2 pt-1">
           {!selectedOccupation && court && (
-            <>
+            <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -1815,81 +1781,61 @@ export function AgendaBoard({
                 <HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Registrar
                 reserva
               </Button>
-            </>
+            </div>
           )}
           {reservation?.reservationId &&
             status === "pendiente_validacion" &&
             !hasStarted && (
-              <>
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  variant="destructive"
+                  variant="outline"
+                  className="min-h-11 whitespace-normal text-destructive hover:text-destructive"
                   onClick={() => setOperation("reject")}
                 >
                   <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} /> Rechazar
                 </Button>
-                <Button type="button" onClick={() => setOperation("confirm")}>
+                <Button type="button" className="min-h-11 whitespace-normal" onClick={() => setOperation("confirm")}>
                   <HugeiconsIcon icon={CheckmarkCircle01Icon} strokeWidth={2} />{" "}
                   Confirmar reserva
                 </Button>
-              </>
+              </div>
             )}
-          {reservation?.reservationId &&
-            ["pendiente_validacion", "confirmada", "pendiente_pago"].includes(
-              status ?? "",
-            ) && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOperation("cancel")}
-              >
-                <HugeiconsIcon icon={CalendarRemove01Icon} strokeWidth={2} />{" "}
-                Cancelar reserva
-              </Button>
-            )}
+          <div className="flex flex-wrap gap-2">
           {reservation?.reservationId &&
             status === "confirmada" &&
             isInProgress && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => setOperation("no-show")}
-              >
-                No se presentó
-              </Button>
+              <Button type="button" variant="outline" className="min-h-11 rounded-full px-4 text-destructive hover:text-destructive" onClick={() => setOperation("no-show")}>No se presentó</Button>
             )}
           {reservation?.reservationId &&
-            (status === "confirmada" || status === "completada") && (
+            (status === "confirmada" || status === "completada") && (reservation.outstandingAmount ?? 0) > 0 && (
               <Button
                 type="button"
-                variant="outline"
+                className="min-h-11 rounded-full px-5"
                 onClick={() => setOperation("payment")}
               >
                 Registrar cobro
               </Button>
             )}
-          {reservation?.reservationId &&
-            (status === "confirmada" || status === "completada") && (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOperation("extend")}
-                >
-                  <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} /> Autorizar
-                  +30 min
-                </Button>
-                {reservation.isException && (
-                  <Button
-                    type="button"
-                    onClick={() => setOperation("encajada")}
-                  >
-                    <HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Registrar
-                    encajada
-                  </Button>
-                )}
-              </>
+          {reservation?.reservationId && reservation.isException && (
+            <Button type="button" className="min-h-11 rounded-full px-5" onClick={() => setOperation("encajada")}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Registrar encajada</Button>
+          )}
+          {reservation?.hourExtensionId && reservation.hourExtensionOldEnd && new Date(reservation.hourExtensionOldEnd).getTime() > nowMs && status === "confirmada" && (
+            <Button type="button" variant="outline" className="min-h-11 rounded-full border-foreground/35 bg-background px-4 font-bold text-foreground hover:bg-accent" onClick={() => setOperation("revert-hour")}>Quitar 1 hora</Button>
+          )}
+          {reservation?.reservationId && ["pendiente_validacion", "confirmada", "pendiente_pago"].includes(status ?? "") && (
+            <Button type="button" variant="destructive" className="ml-auto min-h-11 rounded-full px-4" onClick={() => setOperation("cancel")}><HugeiconsIcon icon={CalendarRemove01Icon} strokeWidth={2} />Cancelar reserva</Button>
             )}
+          </div>
+          {reservation?.reservationId && status === "confirmada" && !reservation.isException && new Date(reservation.end).getTime() > nowMs && (
+            <details className="group border-t border-border/70 pt-2">
+              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full bg-primary/15 px-4 text-xs font-bold text-foreground transition-colors hover:bg-primary/25 marker:hidden [&::-webkit-details-marker]:hidden"><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4" />Añadir tiempo <span className="text-base leading-none group-open:rotate-90">›</span></summary>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="min-h-11 rounded-full px-4 text-xs" onClick={() => setOperation("add-hour")}>+1 hora</Button>
+                {!reservation.hourExtensionId && <Button type="button" variant="outline" className="min-h-11 rounded-full px-4 text-xs" onClick={() => setOperation("extend")}>+30 min</Button>}
+              </div>
+            </details>
+          )}
         </div>
       </>
     );
@@ -2173,9 +2119,9 @@ export function AgendaBoard({
             )}
           {contextMenu.cell.occupation?.type === "reserva" &&
             contextMenu.cell.occupation.reservationId &&
-            ["confirmada", "completada"].includes(
-              contextMenu.cell.occupation.reservationStatus ?? "",
-            ) && (
+            contextMenu.cell.occupation.reservationStatus === "confirmada" &&
+            !contextMenu.cell.occupation.isException &&
+            !contextMenu.cell.occupation.hourExtensionId && (
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent"
@@ -2192,6 +2138,12 @@ export function AgendaBoard({
                 Autorizar +30 min
               </button>
             )}
+          {contextMenu.cell.occupation?.type === "reserva" && contextMenu.cell.occupation.reservationId && contextMenu.cell.occupation.reservationStatus === "confirmada" && !contextMenu.cell.occupation.isException && new Date(contextMenu.cell.occupation.end).getTime() > nowMs && (
+            <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { openPanel(contextMenu.cell, "add-hour"); setContextMenu(null) }}><HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-4 text-muted-foreground" />Ampliar 1 hora</button>
+          )}
+          {contextMenu.cell.occupation?.reservationStatus === "confirmada" && contextMenu.cell.occupation.hourExtensionId && contextMenu.cell.occupation.hourExtensionOldEnd && new Date(contextMenu.cell.occupation.hourExtensionOldEnd).getTime() > nowMs && (
+            <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { openPanel(contextMenu.cell, "revert-hour"); setContextMenu(null) }}>Quitar última hora añadida</button>
+          )}
           {contextMenu.cell.occupation?.type === "reserva" &&
             contextMenu.cell.occupation.isException &&
             contextMenu.cell.occupation.reservationId && (
@@ -2350,7 +2302,8 @@ export function AgendaBoard({
 
               <div
                 className={cn(
-                  "relative flex flex-col gap-5 p-5 sm:p-6 [&_[data-slot=sheet-header]]:p-0 [&_[data-slot=sheet-header]]:pr-20",
+                  "relative flex flex-col [&_[data-slot=sheet-header]]:p-0 [&_[data-slot=sheet-header]]:pr-20",
+                  operation === "summary" ? "gap-3 p-4 sm:p-5" : "gap-5 p-5 sm:p-6",
                   panelMinimized && "hidden",
                 )}
               >
