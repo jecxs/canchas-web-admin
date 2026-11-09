@@ -61,8 +61,8 @@ const inputClass = 'h-10 rounded-xl bg-background'
 
 type SelectOption = { value: string; label: string }
 
-function FormSelect({ name, options, value, defaultValue, onValueChange, placeholder, triggerClassName }: { name?: string; options: SelectOption[]; value?: string; defaultValue?: string; onValueChange?: (value: string) => void; placeholder?: string; triggerClassName?: string }) {
-  return <Select name={name} value={value} defaultValue={defaultValue} onValueChange={onValueChange}><SelectTrigger className={`w-full ${triggerClassName ?? ''}`}><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent position="popper" align="start">{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
+function FormSelect({ name, options, value, defaultValue, onValueChange, open, onOpenChange, placeholder, triggerClassName }: { name?: string; options: SelectOption[]; value?: string; defaultValue?: string; onValueChange?: (value: string) => void; open?: boolean; onOpenChange?: (open: boolean) => void; placeholder?: string; triggerClassName?: string }) {
+  return <Select name={name} value={value} defaultValue={defaultValue} onValueChange={onValueChange} open={open} onOpenChange={onOpenChange}><SelectTrigger className={`w-full ${triggerClassName ?? ''}`}><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent position="popper" align="start">{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
 }
 
 function PaymentMethodSelect({ methods, state, label = 'Medio de cobro', required = true }: { methods: LocalPaymentMethod[]; state: AgendaActionState; label?: string; required?: boolean }) {
@@ -78,26 +78,22 @@ function formatReservationDate(date: string) {
 }
 
 function ReservationSlotSummary({
-                                  court,
-                                  date,
-                                  startTime,
-                                  endTime,
-                                  blocks,
-                                  editingSchedule = false,
-                                  onToggleScheduleEditing,
-                                  minDate,
-                                  timeOptions,
-                                  onScheduleChange,
-                                  dateError,
-                                  timeError,
-                                }: {
+  court,
+  date,
+  startTime,
+  endTime,
+  blocks,
+  minDate,
+  timeOptions,
+  onScheduleChange,
+  dateError,
+  timeError,
+}: {
   court: AgendaCourt
   date: string
   startTime: string
   endTime: string
   blocks: number
-  editingSchedule?: boolean
-  onToggleScheduleEditing?: () => void
   minDate?: string
   timeOptions?: SelectOption[]
   onScheduleChange?: (selection: { date: string; startTime: string; blocks?: number }) => void
@@ -106,143 +102,31 @@ function ReservationSlotSummary({
 }) {
   const dimensions = court.lengthMeters && court.widthMeters ? `${court.lengthMeters} × ${court.widthMeters} m` : null
   const dateInputRef = useRef<HTMLInputElement>(null)
+  const [editingDate, setEditingDate] = useState(false)
+  const [editingTime, setEditingTime] = useState(false)
 
-  function openDatePicker() {
-    const input = dateInputRef.current
-    if (!input) return
+  useEffect(() => {
+    if (!editingDate) return
+    const frame = window.requestAnimationFrame(() => {
+      const input = dateInputRef.current
+      if (!input) return
+      input.focus()
+      input.showPicker?.()
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [editingDate])
 
-    input.focus()
-    input.showPicker?.()
+  function toggleDateEditing() {
+    setEditingTime(false)
+    setEditingDate((value) => !value)
   }
-  const startMinutes = timeToMinutes(startTime)
-  const endTimeOptions =
-      timeOptions
-          ?.map((option) => timeToMinutes(option.value))
-          .filter((value) => value > startMinutes && value <= startMinutes + 4 * 60)
-          .map((value) => ({
-            value: minutesToTime(value),
-            label: minutesToTime(value),
-          })) ?? []
+
+  function toggleTimeEditing() {
+    setEditingDate(false)
+    setEditingTime((value) => !value)
+  }
+
   return <div className="space-y-2.5">
-    <div className="grid gap-2 sm:grid-cols-2">
-      <div
-          role={onToggleScheduleEditing && !editingSchedule ? 'button' : undefined}
-          tabIndex={onToggleScheduleEditing && !editingSchedule ? 0 : undefined}
-          onClick={!editingSchedule ? onToggleScheduleEditing : undefined}
-          onKeyDown={(event) => {
-            if (!onToggleScheduleEditing || editingSchedule) return
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              onToggleScheduleEditing()
-            }
-          }}
-          className="group rounded-xl border bg-muted/45 px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/8 hover:shadow-md hover:shadow-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45"
-      >
-        <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-[.1em] text-muted-foreground transition-colors group-hover:text-foreground">
-          <span className="flex items-center gap-2">
-            <HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} className="size-3.5 text-primary transition-transform duration-200 group-hover:scale-110" />
-            Fecha
-          </span>
-          {onToggleScheduleEditing && (
-              <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="-mr-1 -mt-1 size-7 transition-transform duration-200 group-hover:scale-105"
-                  aria-label={editingSchedule ? 'Terminar edición de fecha y horario' : 'Editar fecha y horario'}
-                  title={editingSchedule ? 'Listo' : 'Editar fecha y horario'}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onToggleScheduleEditing()
-                  }}
-              >
-                <HugeiconsIcon icon={editingSchedule ? CheckmarkCircle01Icon : Edit02Icon} strokeWidth={2} className="size-3.5" />
-              </Button>
-          )}
-        </div>
-        {editingSchedule && onScheduleChange && minDate ? (
-            <>
-              <Input
-                  type="date"
-                  value={date}
-                  min={minDate}
-                  onChange={(event) => onScheduleChange({ date: event.target.value, startTime })}
-                  onClick={(event) => event.currentTarget.showPicker?.()}
-                  className="mt-1 h-8 cursor-pointer rounded-full border-primary/25 bg-background px-3 text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/10 focus-visible:ring-2 focus-visible:ring-primary/45"
-              />
-              <FieldError state={{ success: false, fieldErrors: { date: dateError ? [dateError] : undefined } }} field="date" />
-            </>
-        ) : <p className="mt-1 capitalize text-sm font-extrabold">{formatReservationDate(date)}</p>}
-      </div>
-      <div
-          role={onToggleScheduleEditing && !editingSchedule ? 'button' : undefined}
-          tabIndex={onToggleScheduleEditing && !editingSchedule ? 0 : undefined}
-          onClick={!editingSchedule ? onToggleScheduleEditing : undefined}
-          onKeyDown={(event) => {
-            if (!onToggleScheduleEditing || editingSchedule) return
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              onToggleScheduleEditing()
-            }
-          }}
-          className="group rounded-xl bg-secondary px-3 py-2.5 text-secondary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-secondary/95 hover:shadow-md hover:shadow-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45"
-      >
-        <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-[.1em] text-secondary-foreground/65 transition-colors group-hover:text-secondary-foreground/85">
-          <span className="flex items-center gap-2">
-            <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-3.5 text-primary transition-transform duration-200 group-hover:scale-110" />
-            Horario
-          </span>
-          {onToggleScheduleEditing && (
-              <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="-mr-1 -mt-1 size-7 text-primary transition-transform duration-200 hover:bg-secondary-foreground/10 hover:text-primary group-hover:scale-105"
-                  aria-label={editingSchedule ? 'Terminar edición de fecha y horario' : 'Editar fecha y horario'}
-                  title={editingSchedule ? 'Listo' : 'Editar fecha y horario'}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onToggleScheduleEditing()
-                  }}
-              >
-                <HugeiconsIcon icon={editingSchedule ? CheckmarkCircle01Icon : Edit02Icon} strokeWidth={2} className="size-3.5 text-primary" />
-              </Button>
-          )}
-        </div>
-        {editingSchedule && onScheduleChange && timeOptions ? (
-            <>
-              <div className="mt-1 grid grid-cols-2 gap-2">
-                <div>
-                <span className="mb-1 block text-[9px] font-extrabold uppercase tracking-[.08em] text-secondary-foreground/60">
-                  Inicio
-                </span>
-                  <FormSelect
-                      value={startTime}
-                      onValueChange={(value) => onScheduleChange({ date, startTime: value, blocks })}
-                      options={timeOptions}
-                      triggerClassName="h-8 border-primary/70 bg-secondary-foreground/10 px-2 text-xs font-extrabold text-secondary-foreground hover:bg-secondary-foreground/15 [&_svg]:text-primary [&_svg]:opacity-100"
-                  />
-                </div>
-                <div>
-                <span className="mb-1 block text-[9px] font-extrabold uppercase tracking-[.08em] text-secondary-foreground/60">
-                  Fin
-                </span>
-                  <FormSelect
-                      value={endTime}
-                      onValueChange={(value) => {
-                        const nextBlocks = Math.max(1, Math.min(4, (timeToMinutes(value) - timeToMinutes(startTime)) / 60))
-                        onScheduleChange({ date, startTime, blocks: nextBlocks })
-                      }}
-                      options={endTimeOptions}
-                      triggerClassName="h-8 border-primary/70 bg-secondary-foreground/10 px-2 text-xs font-extrabold text-secondary-foreground hover:bg-secondary-foreground/15 [&_svg]:text-primary [&_svg]:opacity-100"
-                  />
-                </div>
-              </div>
-              <FieldError state={{ success: false, fieldErrors: { time: timeError ? [timeError] : undefined } }} field="time" />
-            </>
-        ) : <p className="mt-1 text-sm font-extrabold tabular-nums">{startTime} <span className="text-primary">—</span> {endTime}</p>}
-      </div>
-    </div>
     <details className="group rounded-xl border bg-background">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5"><span className="flex min-w-0 items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground"><HugeiconsIcon icon={Building03Icon} strokeWidth={2} className="size-4" /></span><span className="min-w-0"><span className="block text-[10px] font-extrabold uppercase tracking-[.1em] text-muted-foreground">Cancha</span><span className="block truncate text-sm font-extrabold">{court.name}</span></span></span><span className="grid size-7 shrink-0 place-items-center rounded-lg border text-muted-foreground transition-transform duration-200 group-open:rotate-180" aria-label="Mostrar información de la cancha"><HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="size-4" /></span></summary>
       <div className="grid gap-2 border-t px-3 py-3 text-xs text-muted-foreground sm:grid-cols-2">
@@ -252,6 +136,93 @@ function ReservationSlotSummary({
         {court.description && <p className="border-t pt-2 sm:col-span-2">{court.description}</p>}
       </div>
     </details>
+    <div className="grid gap-2 sm:grid-cols-2">
+      <div
+          className="rounded-xl border bg-muted/45 px-3 py-2.5"
+      >
+        <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-[.1em] text-muted-foreground">
+          <span className="flex items-center gap-2">
+            <HugeiconsIcon icon={Calendar03Icon} strokeWidth={2} className="size-3.5 text-primary" />
+            Fecha
+          </span>
+          {onScheduleChange && (
+              <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="-mr-1 -mt-1 size-8 rounded-lg border border-foreground/45 bg-background text-foreground shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/75 hover:bg-foreground/5 hover:shadow-md hover:shadow-foreground/10"
+                  aria-label={editingDate ? 'Cerrar calendario' : 'Elegir fecha en el calendario'}
+                  title={editingDate ? 'Listo' : 'Elegir fecha'}
+                  onClick={toggleDateEditing}
+              >
+                <HugeiconsIcon icon={editingDate ? CheckmarkCircle01Icon : Edit02Icon} strokeWidth={2} className="size-3.5" />
+              </Button>
+          )}
+        </div>
+        {editingDate && onScheduleChange && minDate ? (
+            <>
+              <Input
+                  ref={dateInputRef}
+                  type="date"
+                  value={date}
+                  min={minDate}
+                  onChange={(event) => {
+                    if (!event.target.value) return
+                    onScheduleChange({ date: event.target.value, startTime })
+                    setEditingDate(false)
+                  }}
+                  onClick={(event) => event.currentTarget.showPicker?.()}
+                  className="mt-1 h-8 cursor-pointer rounded-full border-primary/25 bg-background px-3 text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/10 focus-visible:ring-2 focus-visible:ring-primary/45"
+              />
+              <FieldError state={{ success: false, fieldErrors: { date: dateError ? [dateError] : undefined } }} field="date" />
+            </>
+        ) : <p className="mt-1 capitalize text-sm font-extrabold">{formatReservationDate(date)}</p>}
+      </div>
+      <div
+          className="rounded-xl bg-secondary px-3 py-2.5 text-secondary-foreground"
+      >
+        <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-[.1em] text-secondary-foreground/65">
+          <span className="flex items-center gap-2">
+            <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-3.5 text-primary" />
+            Horario
+          </span>
+          {onScheduleChange && (
+              <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-mr-1 -mt-1 size-8 rounded-lg border border-primary/60 bg-secondary-foreground/10 text-primary transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:bg-secondary-foreground/20 hover:text-primary hover:shadow-md hover:shadow-primary/20"
+                  aria-label={editingTime ? 'Cerrar lista de horas' : 'Elegir hora de inicio'}
+                  title={editingTime ? 'Listo' : 'Elegir hora de inicio'}
+                  onClick={toggleTimeEditing}
+              >
+                <HugeiconsIcon icon={editingTime ? CheckmarkCircle01Icon : Edit02Icon} strokeWidth={2} className="size-3.5 text-primary" />
+              </Button>
+          )}
+        </div>
+        {editingTime && onScheduleChange && timeOptions ? (
+            <>
+              <div className="mt-1">
+                <span className="mb-1 block text-[9px] font-extrabold uppercase tracking-[.08em] text-secondary-foreground/60">
+                  Hora de inicio
+                </span>
+                <FormSelect
+                    value={startTime}
+                    open={editingTime}
+                    onOpenChange={setEditingTime}
+                    onValueChange={(value) => {
+                      onScheduleChange({ date, startTime: value, blocks })
+                      setEditingTime(false)
+                    }}
+                    options={timeOptions}
+                    triggerClassName="h-8 w-full border-primary/70 bg-secondary-foreground/10 px-2 text-xs font-extrabold text-secondary-foreground hover:bg-secondary-foreground/15 [&_svg]:text-primary [&_svg]:opacity-100"
+                />
+              </div>
+              <FieldError state={{ success: false, fieldErrors: { time: timeError ? [timeError] : undefined } }} field="time" />
+            </>
+        ) : <p className="mt-1 text-sm font-extrabold tabular-nums">{startTime} <span className="text-primary">—</span> {endTime}</p>}
+      </div>
+    </div>
   </div>
 }
 
@@ -353,7 +324,6 @@ export function ManualBookingForm({
   onSuccess: () => void
 }) {
   const [state, action, pending] = useActionState(createManualBookingAction, initialAgendaActionState)
-  const [editingSchedule, setEditingSchedule] = useState(false)
   const [sportId, setSportId] = useState(defaultSportId ?? court.sports[0]?.id ?? '')
   const [clientBlocked, setClientBlocked] = useState(false)
   useAgendaFeedback(state, onSuccess)
@@ -361,10 +331,10 @@ export function ManualBookingForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="localId" value={localId} /><input type="hidden" name="courtId" value={court.id} /><input type="hidden" name="date" value={date} /><input type="hidden" name="time" value={startTime} />
-      <ReservationSlotSummary court={court} date={date} startTime={startTime} endTime={endTime} blocks={blocks} editingSchedule={editingSchedule} onToggleScheduleEditing={() => setEditingSchedule((value) => !value)} minDate={minDate} timeOptions={timeOptions} onScheduleChange={(selection) => onScheduleChange({ ...selection, blocks: selection.blocks ?? blocks })} dateError={state.fieldErrors?.date?.[0]} timeError={state.fieldErrors?.time?.[0]} />
+      <ReservationSlotSummary court={court} date={date} startTime={startTime} endTime={endTime} blocks={blocks} minDate={minDate} timeOptions={timeOptions} onScheduleChange={(selection) => onScheduleChange({ ...selection, blocks: selection.blocks ?? blocks })} dateError={state.fieldErrors?.date?.[0]} timeError={state.fieldErrors?.time?.[0]} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={court.sports.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
-        <label className="space-y-1.5 text-sm font-semibold">Duración<FormSelect name="blocks" value={String(blocks)} onValueChange={(value) => onScheduleChange({ date, startTime, blocks: Number(value) })} options={[{ value: '1', label: '1 hora' }, { value: '2', label: '2 horas' }, { value: '3', label: '3 horas' }, { value: '4', label: '4 horas' }]} /><FieldError state={state} field="blocks" /></label>
+        <label className="space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={court.sports.map((sport) => ({ value: sport.id, label: sport.name }))} triggerClassName="transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/10" /><FieldError state={state} field="sportId" /></label>
+        <label className="space-y-1.5 text-sm font-semibold">Duración<FormSelect name="blocks" value={String(blocks)} onValueChange={(value) => onScheduleChange({ date, startTime, blocks: Number(value) })} options={[{ value: '1', label: '1 hora' }, { value: '2', label: '2 horas' }, { value: '3', label: '3 horas' }, { value: '4', label: '4 horas' }]} triggerClassName="transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/10" /><FieldError state={state} field="blocks" /></label>
       </div>
       <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} initial={initialClient} />
       <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-${blocks}`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={blocks * 60} state={state} />
