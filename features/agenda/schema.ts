@@ -51,6 +51,7 @@ export const encasedBookingSchema = z.object({
   sportId: z.uuid(),
   date: localDate,
   time: z.string().regex(/^\d{2}:30$/, 'La reserva encajada debe iniciar a los 30 minutos.'),
+  blocks: z.coerce.number().int().min(1).max(3),
   clienteId: z.uuid().optional(),
   customerName: z.string().trim().min(2, 'Escribe el nombre del cliente.').max(120),
   customerPhone: z.string().trim().min(7, 'Escribe un teléfono válido.').max(30),

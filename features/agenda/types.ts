@@ -7,6 +7,7 @@ export type AgendaOccupation = {
   end: string
   type: 'reserva' | 'mantenimiento'
   isException: boolean
+  hasHalfHourExtension?: boolean
   reservationId?: string
   sportId?: string
   sportName?: string

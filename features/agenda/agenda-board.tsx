@@ -63,7 +63,6 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
 import {
   formatAgendaDate,
-  getLocalMinutes,
   getTodayInLima,
   getWeekStart,
   isValidAgendaDate,
@@ -91,6 +90,7 @@ import {
 import type { PickedClient } from "@/features/clients/client-picker";
 import type { AgendaCourt, AgendaData, AgendaOccupation } from "./types";
 import { ShareAgendaDialog } from "./share-agenda-dialog";
+import { getOccupationSegment } from "./occupation-segment";
 
 type Slot = { start: number; end: number; label: string };
 type SelectedCell = {
@@ -102,6 +102,23 @@ type SelectedCell = {
   blocks?: number;
 };
 type ContextMenuState = { x: number; y: number; cell: SelectedCell };
+function availableEncasedBlocks(cell: SelectedCell | null, days: AgendaData[]) {
+  const source = cell?.occupation;
+  if (!cell || !source) return [];
+  const day = days.find((item) => item.date === cell.date);
+  const startMs = new Date(source.end).getTime();
+  const closingMinutes = day?.closingTime ? timeToMinutes(day.closingTime) : 0;
+  if (!day || !Number.isFinite(startMs)) return [];
+  const startMinutes = timeToMinutes(isoToLocalTime(source.end));
+  return [1, 2, 3].filter((blocks) => {
+    const durationMinutes = blocks * 60 + 30;
+    const endMs = startMs + durationMinutes * 60_000;
+    return startMinutes + durationMinutes <= closingMinutes && !day.occupations.some((item) =>
+      item.courtId === source.courtId && item !== source &&
+      new Date(item.start).getTime() < endMs && new Date(item.end).getTime() > startMs
+    );
+  });
+}
 type Operation =
   | "summary"
   | "manual"
@@ -205,31 +222,18 @@ function buildSlots(openingTime: string | null, closingTime: string | null) {
   return slots;
 }
 
-function getOccupationSegment(
+function getOccupationAtPointer(
   occupations: AgendaOccupation[],
   courtId: string,
   slot: Slot,
+  event: { clientX: number; clientY: number; currentTarget: HTMLButtonElement },
 ) {
-  const match = occupations.find((occupation) => {
-    if (occupation.courtId !== courtId) return false;
-    const start = getLocalMinutes(occupation.start);
-    let end = getLocalMinutes(occupation.end);
-    if (end <= start) end += 24 * 60;
-    return end > slot.start && start < slot.end;
-  });
-  if (!match) return undefined;
-  const occupationStart = getLocalMinutes(match.start);
-  let occupationEnd = getLocalMinutes(match.end);
-  if (occupationEnd <= occupationStart) occupationEnd += 24 * 60;
-  const overlapStart = Math.max(slot.start, occupationStart);
-  return {
-    occupation: match,
-    top: ((overlapStart - slot.start) / 60) * 100,
-    // Solo la celda donde empieza la ocupación dibuja la tarjeta. Su altura
-    // cruza las siguientes filas para comunicar una única reserva continua.
-    isAnchor: occupationStart >= slot.start && occupationStart < slot.end,
-    durationMinutes: occupationEnd - occupationStart,
-  };
+  if (event.clientX === 0 && event.clientY === 0) return getOccupationSegment(occupations, courtId, slot);
+  const { top, height } = event.currentTarget.getBoundingClientRect();
+  const atMinute = height > 0
+    ? slot.start + Math.min(59.999, Math.max(0, (event.clientY - top) / height * 60))
+    : undefined;
+  return getOccupationSegment(occupations, courtId, slot, atMinute);
 }
 
 function occupationLabel(occupation?: AgendaOccupation) {
@@ -387,6 +391,7 @@ export function AgendaBoard({
     y: 0,
   });
   const [operation, setOperation] = useState<Operation>("summary");
+  const [encasedBlocks, setEncasedBlocks] = useState(1);
   const [panelMinimized, setPanelMinimized] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -439,6 +444,7 @@ export function AgendaBoard({
   const encasedStartTime = selectedOccupation
     ? isoToLocalTime(selectedOccupation.end)
     : "00:30";
+  const encasedAvailableBlocks = availableEncasedBlocks(selectedCell, days);
   const periodLabel = isWeek
     ? data.date === getTodayInLima()
       ? "Próximos 7 días"
@@ -606,6 +612,7 @@ export function AgendaBoard({
     setSelectedCells([]);
     setSelectionReady(false);
     setOperation("summary");
+    setEncasedBlocks(1);
     setPanelMinimized(false);
     openingLightbox.current = false;
     setLightboxOpen(false);
@@ -615,6 +622,7 @@ export function AgendaBoard({
     setPanelMinimized(false);
     setSelectedCell(cell);
     setOperation(nextOperation);
+    if (nextOperation === "encajada") setEncasedBlocks(1);
   }
 
   function openProofLightbox() {
@@ -639,7 +647,7 @@ export function AgendaBoard({
       suppressCellClickRef.current = false;
       return;
     }
-    const segment = getOccupationSegment(day.occupations, court.id, slot);
+    const segment = getOccupationAtPointer(day.occupations, court.id, slot, event);
     const cell = {
       date: day.date,
       courtId: court.id,
@@ -1042,7 +1050,11 @@ export function AgendaBoard({
     const segment = getOccupationSegment(day.occupations, court.id, slot);
     // selectedCell conserva blocks al abrir el formulario; así el rango sigue
     // visible y no aparenta reducirse al primer bloque seleccionado.
-    const selected = isWithinSelectedRange(selectedCell, day, court, slot);
+    const selected = operation !== "encajada" && isWithinSelectedRange(selectedCell, day, court, slot);
+    const encasedStartMinutes = timeToMinutes(encasedStartTime);
+    const encasedPreview = operation === "encajada" && selectedCell?.date === day.date &&
+      selectedCell.courtId === court.id && encasedAvailableBlocks.includes(encasedBlocks) &&
+      slot.start <= encasedStartMinutes && encasedStartMinutes < slot.end;
     const selectedByRange = selectedCells.some(
       (item) =>
         item.date === day.date &&
@@ -1084,7 +1096,7 @@ export function AgendaBoard({
         disabled={past}
         draggable={isDraggable}
         onPointerDown={(event) =>
-          startSelectionDrag(event, day, court, slot, segment?.occupation)
+          startSelectionDrag(event, day, court, slot, getOccupationAtPointer(day.occupations, court.id, slot, event)?.occupation)
         }
         onDragStart={(event) => {
           if (segment?.occupation)
@@ -1117,6 +1129,7 @@ export function AgendaBoard({
         onContextMenu={(event) => {
           if (past) return;
           event.preventDefault();
+          const pointedSegment = getOccupationAtPointer(day.occupations, court.id, slot, event);
           setSelectedCells([]);
           setSelectionReady(false);
           setContextMenu({
@@ -1127,7 +1140,7 @@ export function AgendaBoard({
               courtId: court.id,
               courtName: court.name,
               slot,
-              occupation: segment?.occupation,
+              occupation: pointedSegment?.occupation,
             },
           });
         }}
@@ -1135,6 +1148,15 @@ export function AgendaBoard({
         <span
           className={`pointer-events-none absolute inset-1 rounded-lg border transition-colors duration-300 ${isDragPreview ? (dragPreviewAllowed ? "border-primary" : "border-destructive") : selected || selectedByRange ? "border-primary/75 bg-primary/8" : "border-transparent group-hover:border-primary/30"}`}
         />
+        {encasedPreview && <span
+          data-encased-preview
+          aria-hidden="true"
+          className="pointer-events-none absolute z-[5] inset-x-1 overflow-hidden rounded-lg border border-primary/80 bg-primary/30 px-2 py-1.5 text-[11px] font-bold text-foreground shadow-sm"
+          style={{
+            top: `calc(${((encasedStartMinutes - slot.start) / 60) * 100}% + 0.375rem)`,
+            height: `calc(${(encasedBlocks * 60 + 30) / 15}rem - 0.75rem)`,
+          }}
+        ><span className="block">Nueva reserva</span><span className="block tabular-nums opacity-75">{encasedStartTime}–{minutesToTime(encasedStartMinutes + encasedBlocks * 60 + 30)}</span></span>}
         {segment?.isAnchor ? (
           <span
             data-reservation-id={segment.occupation.reservationId}
@@ -1196,12 +1218,6 @@ export function AgendaBoard({
               canMove(segment.occupation) && (
                 <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">
                   Arrastra para mover
-                </span>
-              )}
-            {segment.occupation.type === "reserva" &&
-              segment.occupation.isException && (
-                <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-75">
-                  +30 min
                 </span>
               )}
             {segment.occupation.type === "reserva" &&
@@ -1447,9 +1463,9 @@ export function AgendaBoard({
       return (
         <>
           <SheetHeader>
-            <SheetTitle>Registrar reserva encajada</SheetTitle>
+            <SheetTitle>Nueva reserva desde las {encasedStartTime}</SheetTitle>
             <SheetDescription>
-              Usa los 30 minutos restantes y la siguiente hora completa.
+              Reserva la media hora libre y elige cuántas horas seguir jugando.
             </SheetDescription>
           </SheetHeader>
           <EncasedBookingForm
@@ -1457,6 +1473,9 @@ export function AgendaBoard({
             court={court}
             date={selectedCell.date}
             startTime={encasedStartTime}
+            blocks={encasedBlocks}
+            onBlocksChange={setEncasedBlocks}
+            availableBlocks={encasedAvailableBlocks}
             sportOptions={court.sports}
             defaultSportId={selectedOccupation.sportId}
             paymentMethods={data.paymentMethods}
@@ -1817,8 +1836,8 @@ export function AgendaBoard({
                 Registrar cobro
               </Button>
             )}
-          {reservation?.reservationId && reservation.isException && (
-            <Button type="button" className="min-h-11 rounded-full px-5" onClick={() => setOperation("encajada")}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Registrar encajada</Button>
+          {reservation?.reservationId && reservation.hasHalfHourExtension && status === "confirmada" && new Date(reservation.end).getTime() > nowMs && encasedAvailableBlocks.length > 0 && (
+            <Button type="button" className="min-h-11 rounded-full px-5" onClick={() => { setEncasedBlocks(1); setOperation("encajada") }}><HugeiconsIcon icon={Add01Icon} strokeWidth={2} /> Reservar desde las {encasedStartTime}</Button>
           )}
           {reservation?.hourExtensionId && reservation.hourExtensionOldEnd && new Date(reservation.hourExtensionOldEnd).getTime() > nowMs && status === "confirmada" && (
             <Button type="button" variant="outline" className="min-h-11 rounded-full border-foreground/35 bg-background px-4 font-bold text-foreground hover:bg-accent" onClick={() => setOperation("revert-hour")}>Quitar 1 hora</Button>
@@ -2145,7 +2164,10 @@ export function AgendaBoard({
             <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors hover:bg-accent" onClick={() => { openPanel(contextMenu.cell, "revert-hour"); setContextMenu(null) }}>Quitar última hora añadida</button>
           )}
           {contextMenu.cell.occupation?.type === "reserva" &&
-            contextMenu.cell.occupation.isException &&
+            contextMenu.cell.occupation.hasHalfHourExtension &&
+            contextMenu.cell.occupation.reservationStatus === "confirmada" &&
+            new Date(contextMenu.cell.occupation.end).getTime() > nowMs &&
+            availableEncasedBlocks(contextMenu.cell, days).length > 0 &&
             contextMenu.cell.occupation.reservationId && (
               <button
                 type="button"
@@ -2160,7 +2182,7 @@ export function AgendaBoard({
                   strokeWidth={2}
                   className="size-4"
                 />{" "}
-                Registrar encajada
+                Reservar desde las {isoToLocalTime(contextMenu.cell.occupation.end)}
               </button>
             )}
         </div>

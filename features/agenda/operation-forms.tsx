@@ -423,25 +423,30 @@ export function MaintenanceForm({ localId, date, court, startTime, endTime, onCa
   )
 }
 
-export function EncasedBookingForm({ localId, court, date, startTime, sportOptions, defaultSportId, paymentMethods, onCancel, onSuccess }: { localId: string; court: AgendaCourt; date: string; startTime: string; sportOptions: Array<{ id: string; name: string }>; defaultSportId?: string; paymentMethods: LocalPaymentMethod[]; onCancel: () => void; onSuccess: () => void }) {
+export function EncasedBookingForm({ localId, court, date, startTime, blocks, onBlocksChange, availableBlocks, sportOptions, defaultSportId, paymentMethods, onCancel, onSuccess }: { localId: string; court: AgendaCourt; date: string; startTime: string; blocks: number; onBlocksChange: (blocks: number) => void; availableBlocks: number[]; sportOptions: Array<{ id: string; name: string }>; defaultSportId?: string; paymentMethods: LocalPaymentMethod[]; onCancel: () => void; onSuccess: () => void }) {
   const [state, action, pending] = useActionState(createEncasedBookingAction, initialAgendaActionState)
   const [sportId, setSportId] = useState(defaultSportId ?? sportOptions[0]?.id ?? '')
   const [clientBlocked, setClientBlocked] = useState(false)
   const [withoutAdvance, setWithoutAdvance] = useState(false)
   useAgendaFeedback(state, onSuccess)
+  const endTime = minutesToTime(timeToMinutes(startTime) + blocks * 60 + 30)
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="localId" value={localId} /><input type="hidden" name="courtId" value={court.id} /><input type="hidden" name="date" value={date} /><input type="hidden" name="time" value={startTime} />
-      <div className="rounded-xl border border-secondary/30 bg-secondary/10 px-3 py-2 text-sm">Inicio excepcional: <span className="font-bold">{startTime}</span> · duración fija de 90 minutos.</div>
-      <label className="block space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={sportOptions.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
+      <div className="flex items-center justify-between gap-3 rounded-2xl bg-foreground px-4 py-3 text-background"><div><p className="text-[11px] font-bold uppercase tracking-widest text-background/65">Media hora liberada</p><p className="mt-1 text-sm font-semibold">{court.name} · {date}</p></div><span className="shrink-0 text-base font-extrabold tabular-nums">{startTime}–{endTime}</span></div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block space-y-1.5 text-sm font-semibold">Deporte<FormSelect name="sportId" value={sportId} onValueChange={setSportId} options={sportOptions.map((sport) => ({ value: sport.id, label: sport.name }))} /><FieldError state={state} field="sportId" /></label>
+        <label className="block space-y-1.5 text-sm font-semibold">Tiempo después de la media hora<FormSelect name="blocks" value={String(blocks)} onValueChange={(value) => onBlocksChange(Number(value))} options={availableBlocks.map((value) => ({ value: String(value), label: `+ ${value} ${value === 1 ? 'hora' : 'horas'} · ${value} h 30 min en total` }))} /><FieldError state={state} field="blocks" /></label>
+      </div>
+      {availableBlocks.length === 0 && <p role="status" className="rounded-xl bg-muted px-3 py-2 text-sm">No queda una hora completa libre después de esa media hora.</p>}
       <ClientPicker localId={localId} state={state} onBlockedChange={setClientBlocked} />
       <label className="block space-y-1.5 text-sm font-semibold">Nombre visible en el horario <span className="font-normal text-muted-foreground">(opcional)</span><Input name="publicName" maxLength={40} placeholder="Equipo o apodo" className={inputClass} /><span className="block text-xs font-normal text-muted-foreground">Si lo dejas vacío se mostrará el primer nombre del cliente.</span><FieldError state={state} field="publicName" /></label>
-      <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-90`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={90} state={state} withoutAdvance={withoutAdvance} onWithoutAdvanceChange={setWithoutAdvance} />
+      <ManualAdvanceField key={`${court.id}-${sportId}-${date}-${startTime}-${blocks}`} localId={localId} courtId={court.id} sportId={sportId} date={date} startTime={startTime} durationMinutes={blocks * 60 + 30} state={state} withoutAdvance={withoutAdvance} onWithoutAdvanceChange={setWithoutAdvance} />
       {!withoutAdvance && <PaymentMethodSelect methods={paymentMethods} state={state} label="Medio del adelanto" />}
       <BookingOriginField />
       <BookingNoteField state={state} />
       <p className="text-xs text-muted-foreground">{withoutAdvance ? 'Se guardará confirmada. El total quedará por cobrar.' : 'Se guardará confirmada y el adelanto quedará registrado como cobro.'}</p>
-      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar 90 minutos" disabled={clientBlocked || (!withoutAdvance && paymentMethods.length === 0)} />
+      <Feedback state={state} /><FormActions pending={pending} onCancel={onCancel} label="Registrar reserva" disabled={availableBlocks.length === 0 || clientBlocked || (!withoutAdvance && paymentMethods.length === 0)} />
     </form>
   )
 }

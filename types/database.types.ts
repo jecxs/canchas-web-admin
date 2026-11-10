@@ -2936,6 +2936,10 @@ export type Database = {
         Args: Omit<Database["public"]["Functions"]["crear_reserva_manual_encajada_confirmada_dueno_v2"]["Args"], "p_medio_pago_id"> & { p_medio_pago_id: string | null; p_nombre_publico?: string | null }
         Returns: Database["public"]["Functions"]["crear_reserva_manual_encajada_confirmada_dueno_v2"]["Returns"]
       }
+      crear_reserva_manual_encajada_bloques_dueno: {
+        Args: Database["public"]["Functions"]["crear_reserva_manual_encajada_confirmada_dueno_con_nombre"]["Args"] & { p_bloques: number }
+        Returns: Database["public"]["Functions"]["crear_reserva_manual_encajada_confirmada_dueno_con_nombre"]["Returns"]
+      }
       crear_sede_adicional: {
         Args: {
           p_descripcion: string

@@ -82,16 +82,20 @@ export async function getAgendaData(date: string): Promise<AgendaData> {
   }
 
   const reservationIds = (reservationRows ?? []).map((reservation) => reservation.reserva_id)
-  const [{ data: publicNames, error: publicNamesError }, { data: hourExtensions, error: hourExtensionsError }] = await Promise.all([
+  const [{ data: publicNames, error: publicNamesError }, { data: hourExtensions, error: hourExtensionsError }, { data: halfHourExtensions, error: halfHourExtensionsError }] = await Promise.all([
     reservationIds.length
       ? supabase.from('reservas').select('id,nombre_publico,nombre_publico_bloqueado,precio_tarifa_base,descuento_especial_monto').in('id', reservationIds)
       : Promise.resolve({ data: [], error: null }),
     reservationIds.length
       ? supabase.from('reserva_ampliaciones_hora').select('id,reserva_id,rango_previo,rango_nuevo,monto_adicional,created_at').in('reserva_id', reservationIds).is('revertido_at', null).order('created_at', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
+    reservationIds.length
+      ? supabase.from('reserva_extensiones').select('reserva_id').in('reserva_id', reservationIds)
+      : Promise.resolve({ data: [], error: null }),
   ])
-  if (publicNamesError || hourExtensionsError) throw new Error('No se pudieron cargar los detalles de las reservas.')
+  if (publicNamesError || hourExtensionsError || halfHourExtensionsError) throw new Error('No se pudieron cargar los detalles de las reservas.')
   const publicNamesById = new Map((publicNames ?? []).map((reservation) => [reservation.id, reservation]))
+  const halfHourExtensionIds = new Set((halfHourExtensions ?? []).map((extension) => extension.reserva_id))
   const hourExtensionsByReservation = new Map<string, NonNullable<typeof hourExtensions>[number]>()
   for (const extension of hourExtensions ?? []) if (!hourExtensionsByReservation.has(extension.reserva_id)) hourExtensionsByReservation.set(extension.reserva_id, extension)
   const rangeEnd = (range: unknown) => String(range ?? '').match(/,([^\]\)]+)[\]\)]/)?.[1]?.replace(/^"|"$/g, '') ?? null
@@ -147,6 +151,7 @@ export async function getAgendaData(date: string): Promise<AgendaData> {
       end: reservation.fin,
       type: 'reserva' as const,
       isException: reservation.es_excepcion_horaria,
+      hasHalfHourExtension: halfHourExtensionIds.has(reservation.reserva_id),
       reservationId: reservation.reserva_id,
       sportId: reservation.deporte_id,
       sportName: sportNames.get(reservation.deporte_id),
