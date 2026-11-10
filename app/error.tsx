@@ -11,7 +11,7 @@ export default function RootError({
 }) {
   return (
     <main className="grid min-h-screen place-items-center bg-background p-5">
-      <ErrorState error={error} retry={retry} className="w-full max-w-2xl" />
+      <ErrorState error={error} retry={retry} signOut className="w-full max-w-2xl" />
     </main>
   )
 }

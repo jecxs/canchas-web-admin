@@ -1,13 +1,15 @@
 'use client'
 
 import { useActionState, useEffect } from 'react'
+import { SignOutButton } from '@/components/auth/sign-out-button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { notify } from '@/lib/notifications/notify'
+import { cn } from '@/lib/utils'
 import { submitOwnerApplication } from './actions'
 import { ownerApplicationMessages } from './messages'
 import { initialOwnerApplicationState, type OwnerApplicationFields } from './types'
@@ -146,6 +148,15 @@ export function OwnerApplicationForm({ defaultValues = {} }: OwnerApplicationFor
             </Button>
           </FieldGroup>
         </form>
+        <div className="mt-6 space-y-2 border-t pt-4">
+          <SignOutButton
+            withIcon
+            className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'w-full')}
+          />
+          <p className="text-center text-xs leading-5 text-muted-foreground">
+            Puedes cerrar sesión y volver más tarde para enviar tu solicitud.
+          </p>
+        </div>
       </CardContent>
     </Card>
   )
