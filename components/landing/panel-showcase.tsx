@@ -2,25 +2,36 @@
 
 import Image from 'next/image'
 import {useEffect, useRef, useState} from 'react'
+import gsap from 'gsap'
+import {ScrollTrigger} from 'gsap/ScrollTrigger'
+import {useGSAP} from '@gsap/react'
+
+gsap.registerPlugin(ScrollTrigger, useGSAP)
 
 const slides = [
     {
-        url: 'grassly.app/canchas',
         src: '/landing/capCanchas.png',
         alt: 'Canchas de Grassly con sus deportes y su precio por hora',
         caption: 'Una cancha puede tener fútbol, vóley y básquet, cada uno con su precio por hora.',
+        aspectRatio: 16 / 10,
     },
     {
-        url: 'grassly.app/tarifas',
-        src: '/landing/capTarifas.png',
+        src: '/landing/capTarifas.png?v=20261112-2',
         alt: 'Tarifas de Grassly con precios por hora y por cancha',
         caption: 'Un precio por deporte y por cancha, con tarifas distintas de noche o en un día especial.',
+        aspectRatio: 4320 / 2486,
     },
     {
-        url: 'grassly.app/reportes',
-        src: '/landing/capReportesFinanciero.png',
+        src: '/landing/capClientes.png?v=20261112',
+        alt: 'Base de clientes de Grassly con historial y reservas',
+        caption: 'Consulta quién reserva, su historial y cuánto juega en cada cancha.',
+        aspectRatio: 4305 / 2076,
+    },
+    {
+        src: '/landing/capReportesFinanciero.png?v=20261112',
         alt: 'Reporte financiero de Grassly con cobros por día',
         caption: 'Cuánto cobraste y cuánto te falta cobrar, día a día.',
+        aspectRatio: 4587 / 2259,
     },
 ]
 
@@ -81,28 +92,21 @@ function SectionHeader() {
 
 function SlideFrame({slide}: {slide: (typeof slides)[number]}) {
     return (
-        <>
-            <div className="flex items-center gap-2 bg-sidebar px-3 py-2">
-                <span aria-hidden="true" className="flex gap-1">
-                    <span className="size-1.5 rounded-full bg-sidebar-foreground/30"/>
-                    <span className="size-1.5 rounded-full bg-sidebar-foreground/30"/>
-                    <span className="size-1.5 rounded-full bg-sidebar-foreground/30"/>
-                </span>
-                <span className="truncate font-mono text-[10px] text-sidebar-foreground/70">{slide.url}</span>
-            </div>
-            <div className="relative aspect-[16/10]">
-                <Image src={slide.src} alt={slide.alt} fill
-                       sizes="(min-width:1024px) 680px, 80vw"
-                       className="object-cover object-top"/>
-            </div>
-        </>
+        <div className="relative" style={{aspectRatio: slide.aspectRatio}}>
+            <Image src={slide.src} alt={slide.alt} fill
+                   sizes="(min-width:1024px) 680px, 80vw"
+                   quality={90}
+                   className="object-contain"/>
+        </div>
     )
 }
 
 export function PanelShowcase() {
     const sectionRef = useRef<HTMLElement>(null)
-    const [progress, setProgress] = useState(0)
+    const slideRefs = useRef<Array<HTMLDivElement | null>>([])
+    const veilRefs = useRef<Array<HTMLSpanElement | null>>([])
     const [reduced, setReduced] = useState(false)
+    const [active, setActive] = useState(0)
 
     useEffect(() => {
         const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -112,39 +116,59 @@ export function PanelShowcase() {
         return () => motion.removeEventListener('change', sync)
     }, [])
 
-    useEffect(() => {
+    useGSAP(() => {
         if (reduced) return
+
         const section = sectionRef.current
         if (!section) return
 
-        let frame = 0
-        const update = () => {
-            frame = 0
-            const perImagePx = (window.innerHeight * PER_IMAGE) / 100
-            if (!perImagePx) return
-            const offset = -section.getBoundingClientRect().top / perImagePx
-            const raw = clamp(offset, 0, slides.length - 1)
-            const index = Math.floor(raw)
-            const fraction = raw - index
-            const t = clamp((fraction - 0.3) / 0.4, 0, 1)
-            const next = index + t * t * (3 - 2 * t)
-            setProgress((previous) => (Math.abs(previous - next) > 0.001 ? next : previous))
-        }
-        const onScroll = () => {
-            if (!frame) frame = window.requestAnimationFrame(update)
+        const cards = slideRefs.current.filter((slide): slide is HTMLDivElement => slide !== null)
+        const veils = veilRefs.current.filter((veil): veil is HTMLSpanElement => veil !== null)
+        if (cards.length !== slides.length || veils.length !== slides.length) return
+
+        const setX = cards.map((card) => gsap.quickSetter(card, 'xPercent'))
+        const setScale = cards.map((card) => gsap.quickSetter(card, 'scale'))
+        const setVeilOpacity = veils.map((veil) => gsap.quickSetter(veil, 'opacity'))
+        const lastZIndexes = cards.map(() => -1)
+        let currentActive = -1
+
+        const renderProgress = (progress: number) => {
+            const bounded = clamp(progress, 0, slides.length - 1)
+            const nextActive = Math.round(bounded)
+
+            if (nextActive !== currentActive) {
+                currentActive = nextActive
+                setActive(nextActive)
+            }
+
+            cards.forEach((_, index) => {
+                const distance = index - bounded
+                const {x, scale, veil} = positionAt(distance)
+                const zIndex = 100 - Math.round(Math.abs(distance) * 10)
+                if (lastZIndexes[index] !== zIndex) {
+                    cards[index].style.zIndex = String(zIndex)
+                    lastZIndexes[index] = zIndex
+                }
+                setX[index](-50 + Math.sign(distance) * x)
+                setScale[index](scale)
+                setVeilOpacity[index](veil)
+            })
         }
 
-        frame = window.requestAnimationFrame(update)
-        window.addEventListener('scroll', onScroll, {passive: true})
-        window.addEventListener('resize', onScroll)
-        return () => {
-            window.removeEventListener('scroll', onScroll)
-            window.removeEventListener('resize', onScroll)
-            if (frame) window.cancelAnimationFrame(frame)
-        }
-    }, [reduced])
+        cards.forEach((card) => {
+            gsap.set(card, {xPercent: -50, yPercent: -50, willChange: 'transform'})
+        })
 
-    const active = Math.round(progress)
+        const trigger = ScrollTrigger.create({
+            trigger: section,
+            start: 'top top',
+            end: 'bottom bottom',
+            onUpdate: (self) => renderProgress(self.progress * (slides.length - 1)),
+            onRefresh: (self) => renderProgress(self.progress * (slides.length - 1)),
+        })
+
+        renderProgress(trigger.progress * (slides.length - 1))
+    }, {scope: sectionRef, dependencies: [reduced], revertOnUpdate: true})
 
     return (
         <section id="panel" ref={sectionRef} className="relative bg-surface"
@@ -176,21 +200,14 @@ export function PanelShowcase() {
                         <div role="region" aria-roledescription="carrusel" aria-label="Capturas del panel de Grassly"
                              className="relative mt-6 min-h-0 flex-1" style={{containerType: 'size'}}>
                             {slides.map((slide, index) => {
-                                const distance = index - progress
-                                const {x, scale, veil} = positionAt(distance)
-                                const translateX = Math.sign(distance) * x
-
                                 return (
                                     <div key={slide.src}
-                                         className={`absolute left-1/2 top-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-floating ${CARD_WIDTH}`}
-                                         style={{
-                                             zIndex: 100 - Math.round(Math.abs(distance) * 10),
-                                             transform: `translate(-50%, -50%) translateX(${translateX}%) scale(${scale})`,
-                                             willChange: 'transform',
-                                         }}>
+                                         ref={(element) => { slideRefs.current[index] = element }}
+                                         className={`absolute left-1/2 top-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-floating ${CARD_WIDTH}`}>
                                         <SlideFrame slide={slide}/>
-                                        <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-foreground"
-                                              style={{opacity: veil}}/>
+                                        <span ref={(element) => { veilRefs.current[index] = element }}
+                                              aria-hidden="true"
+                                              className="pointer-events-none absolute inset-0 bg-foreground"/>
                                     </div>
                                 )
                             })}
