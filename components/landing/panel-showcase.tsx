@@ -13,16 +13,25 @@ const slides = [
         src: '/landing/capCanchas.png',
         alt: 'Canchas de Grassly con sus deportes y su precio por hora',
         caption: 'Una cancha puede tener fútbol, vóley y básquet, cada uno con su precio por hora.',
+        aspectRatio: 16 / 10,
     },
     {
-        src: '/landing/capTarifas.png',
+        src: '/landing/capTarifas.png?v=20261112-2',
         alt: 'Tarifas de Grassly con precios por hora y por cancha',
         caption: 'Un precio por deporte y por cancha, con tarifas distintas de noche o en un día especial.',
+        aspectRatio: 4320 / 2486,
     },
     {
-        src: '/landing/capReportesFinanciero.png',
+        src: '/landing/capClientes.png?v=20261112',
+        alt: 'Base de clientes de Grassly con historial y reservas',
+        caption: 'Consulta quién reserva, su historial y cuánto juega en cada cancha.',
+        aspectRatio: 4305 / 2076,
+    },
+    {
+        src: '/landing/capReportesFinanciero.png?v=20261112',
         alt: 'Reporte financiero de Grassly con cobros por día',
         caption: 'Cuánto cobraste y cuánto te falta cobrar, día a día.',
+        aspectRatio: 4587 / 2259,
     },
 ]
 
@@ -83,11 +92,11 @@ function SectionHeader() {
 
 function SlideFrame({slide}: {slide: (typeof slides)[number]}) {
     return (
-        <div className="relative aspect-[16/10]">
+        <div className="relative" style={{aspectRatio: slide.aspectRatio}}>
             <Image src={slide.src} alt={slide.alt} fill
                    sizes="(min-width:1024px) 680px, 80vw"
                    quality={90}
-                   className="object-cover object-top"/>
+                   className="object-contain"/>
         </div>
     )
 }

@@ -6,14 +6,13 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useGSAP } from '@gsap/react'
 import { AppShowcase } from '@/components/landing/app-showcase'
-import { PanelShowcase } from '@/components/landing/panel-showcase'
 import { PaymentsFlow } from '@/components/landing/payments-flow'
 import { RegistrationSteps } from '@/components/landing/registration-steps'
 import { Footer } from '@/components/landing/footer'
-import { FeaturesBento } from '@/components/landing/features-bento'
 import { LandingManifesto } from '@/components/landing/landing-manifesto'
 import { MagazineHero } from '@/components/landing/magazine-hero'
 import { Navbar } from '@/components/landing/navbar'
+import { PlatformShowcase } from '@/components/landing/platform-showcase'
 import { FAQSection } from '@/components/landing/faq-section'
 import { Preloader } from '@/components/landing/preloader'
 
@@ -79,12 +78,11 @@ export default function LandingPage() {
 
     return <main className="site-shell overflow-x-clip bg-background text-foreground">
         <Preloader onComplete={() => setIsHeroReady(true)}/>
-        <Navbar/>
+        <Navbar isReady={isHeroReady}/>
         <MagazineHero isReady={isHeroReady}/>
         <LandingManifesto/>
-        <FeaturesBento/>
+        <PlatformShowcase/>
         <PaymentsFlow/>
-        <PanelShowcase/>
         <AppShowcase/>
         <RegistrationSteps/>
         <section ref={priceSectionRef} id="precio" className="scroll-mt-24 bg-[#151C16] px-6 py-24 text-white md:px-16 md:py-32">

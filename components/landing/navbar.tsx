@@ -3,19 +3,73 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useRef} from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon, Menu01Icon } from '@hugeicons/core-free-icons'
 import { FlashTransitionLink } from '@/components/flashTransitionLink'
+import gsap from 'gsap'
+import { useGSAP } from '@gsap/react'
 
 const navigation = [
-  { label: 'BENEFICIOS', href: '/#beneficios' },
-  { label: 'EL SISTEMA', href: '/#panel' },
+  { label: 'PLATAFORMA', href: '/#plataforma' },
   { label: 'APP MÓVIL', href: '/app-detalles' },
   { label: 'PRECIO', href: '/#precio' },
 ]
 
-export function Navbar() {
+function BrandLogo({ isReady }: { isReady: boolean }) {
+  const containerRef = useRef<HTMLSpanElement>(null)
+  const brandText = "GRASSLY".split("")
+
+  const pathname = usePathname()
+
+  useGSAP(() => {
+    if (!isReady) return
+
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
+
+    tl.fromTo('.logo-icon',
+      { scale: 0, opacity: 0, rotate: -15 },
+      { scale: 1, opacity: 1, rotate: 0, duration: 0.6, ease: 'back.out(1.7)' }
+    )
+
+    tl.fromTo('.logo-letter',
+      { y: 20, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.4, stagger: 0.05 },
+      "-=0.4"
+    )
+  }, { scope: containerRef,
+    dependencies: [pathname, isReady],
+    revertOnUpdate: true })
+
+  return (
+    <span ref={containerRef} className="group inline-flex cursor-pointer items-center gap-3">
+      <span className="logo-icon relative flex items-center justify-center size-12 shrink-0 sm:size-14 rounded-2xl bg-[#2A2A2A] transition-transform duration-300 ease-out group-hover:scale-105">
+        <span className="relative block size-[85%]">
+          <Image
+            src="/iconGrasslysinFondo.png"
+            alt="Grassly Logo"
+            fill
+            sizes="(min-width: 640px) 48px, 40px"
+            quality={100}
+            priority
+            className="object-contain"
+          />
+        </span>
+      </span>
+
+      <span className="flex overflow-hidden font-display text-2xl font-black uppercase tracking-tight text-[#2A2A2A] sm:text-3xl">
+        {brandText.map((letter, i) => (
+          <span key={i} className="logo-letter inline-block">
+            {letter}
+          </span>
+        ))}
+      </span>
+    </span>
+  )
+}
+
+
+export function Navbar({ isReady = true }: { isReady?: boolean }) {
   const pathname = usePathname()
   const isFocusMode = pathname === '/app-detalles'
   const [menuOpen, setMenuOpen] = useState(false)
@@ -29,32 +83,15 @@ export function Navbar() {
             isReverse={true}
             aria-label="Grassly, inicio"
             className="inline-flex min-h-11 items-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#6E4BFF]">
-            <span className="relative block h-10 w-[134px] shrink-0 overflow-hidden sm:h-11 sm:w-[147px]">
-              <Image
-                src="/logo.png"
-                alt="Grassly"
-                fill
-                sizes="(min-width: 640px) 147px, 134px"
-                quality={100}
-                priority
-                className="object-cover object-center"/>
-            </span>
+            <BrandLogo isReady={isReady} />
           </FlashTransitionLink>
         ) : (
           <Link
             href="/"
             aria-label="Grassly, inicio"
             className="inline-flex min-h-11 items-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#6E4BFF]">
-            <span className="relative block h-10 w-[134px] shrink-0 overflow-hidden sm:h-11 sm:w-[147px]">
-              <Image
-                src="/logo.png"
-                alt="Grassly"
-                fill
-                sizes="(min-width: 640px) 147px, 134px"
-                quality={100}
-                priority
-                className="object-cover object-center"/>
-            </span>
+            {/* Y AQUÍ */}
+            <BrandLogo isReady={isReady} />
           </Link>
         )}
       </div>

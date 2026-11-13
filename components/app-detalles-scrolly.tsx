@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -90,7 +90,9 @@ export function AppDetallesScrolly() {
   const imagesRef = useRef<(HTMLDivElement | null)[]>([]);
   const textRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    window.scrollTo({top: 0, left: 0, behavior: "instant"});
+
     const ctx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: containerRef.current,
