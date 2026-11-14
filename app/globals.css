@@ -535,3 +535,23 @@
     scroll-behavior: auto !important;
   }
 }
+
+::view-transition-group(app-hero-image) {
+  animation-duration: 1.5s;
+  
+  animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+  
+  z-index: 9999;
+}
+
+::view-transition-old(app-hero-image),
+::view-transition-new(app-hero-image) {
+  animation-duration: 1.5s;
+  animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+  height: 100%;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.8s;
+}
