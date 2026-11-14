@@ -14,7 +14,7 @@ export type SubscriptionSummary = Pick<
   | 'sedes_extra_contratadas'
   | 'estado_facturacion'
   | 'gracia_hasta'
->
+> & { acceso_pagado_vigente?: boolean }
 
 export type LocalModeration = {
   id: string
@@ -111,6 +111,7 @@ export function canOperateLocal(
   }
   if (local.estado !== 'activo' && local.estado !== 'en_gracia') return false
   if (subscription?.estado_facturacion === 'activa') return true
+  if (subscription?.estado_facturacion === 'cancelada') return subscription.acceso_pagado_vigente === true
   return subscription?.estado_facturacion === 'en_gracia'
     && Boolean(subscription.gracia_hasta && Date.parse(subscription.gracia_hasta) > Date.now())
 }

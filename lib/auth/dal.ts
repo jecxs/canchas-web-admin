@@ -43,6 +43,7 @@ export const getAccessContext = cache(
       { data: locals, error: localsError },
       { data: subscription, error: subscriptionError },
       { data: moderations, error: moderationsError },
+      { data: paidAccess, error: paidAccessError },
     ] =
       await Promise.all([
         supabase
@@ -63,6 +64,7 @@ export const getAccessContext = cache(
           .eq('dueno_id', userId)
           .maybeSingle(),
         supabase.rpc('moderacion_listar_activas_propietario'),
+        supabase.rpc('billing_acceso_propio_vigente'),
       ])
 
     if (profileError) {
@@ -84,6 +86,10 @@ export const getAccessContext = cache(
     if (moderationsError) {
       console.error('[auth-dal:moderations]', { code: moderationsError.code })
       throw new Error('No se pudo cargar el estado administrativo de los locales.')
+    }
+    if (paidAccessError) {
+      console.error('[auth-dal:paid-access]', { code: paidAccessError.code })
+      throw new Error('No se pudo comprobar el acceso de la cuenta.')
     }
 
     if (!profile) {
@@ -113,7 +119,7 @@ export const getAccessContext = cache(
             : null,
         }
       }),
-      subscription,
+      subscription: subscription ? { ...subscription, acceso_pagado_vigente: paidAccess === true } : null,
     }
   },
 )

@@ -108,6 +108,17 @@ describe('resolvePostLoginDestination', () => {
     expect(resolvePostLoginDestination(owner)).toBe('/panel/suscripcion')
   })
 
+  it('mantiene el panel operativo tras cancelar durante el período pagado', () => {
+    const owner = context('dueno', ['activo'])
+    owner.subscription = {
+      ...owner.subscription!, estado: 'cancelada', estado_facturacion: 'cancelada',
+      acceso_pagado_vigente: true,
+    }
+    expect(resolvePostLoginDestination(owner)).toBe('/panel')
+    owner.subscription.acceso_pagado_vigente = false
+    expect(resolvePostLoginDestination(owner)).toBe('/panel/suscripcion')
+  })
+
   it('maneja una cuenta dueña heredada sin locales sin crear un bucle', () => {
     expect(resolvePostLoginDestination(context('dueno'))).toBe(
       '/panel/sin-local',

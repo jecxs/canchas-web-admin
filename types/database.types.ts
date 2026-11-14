@@ -2450,6 +2450,7 @@ export type Database = {
         Args: { p_dueno_id: string }
         Returns: boolean
       }
+      billing_acceso_propio_vigente: { Args: never; Returns: boolean }
       billing_establecer_gracia_propietario: {
         Args: { p_dias_gracia?: number; p_dueno_id: string }
         Returns: undefined
