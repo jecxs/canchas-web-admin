@@ -142,6 +142,7 @@ export function AppShowcase() {
 
           <Link
             href="/app-detalles"
+            scroll={true}
             className="mt-6 inline-flex w-fit items-center justify-center rounded-full bg-[#D7FF38] px-8 py-3 text-sm font-extrabold text-[#151c16] transition duration-300 hover:scale-[1.02] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D7FF38] focus-visible:ring-offset-4 focus-visible:ring-offset-[#151c16] sm:px-6"
           >
             Descubrir la App

@@ -75,7 +75,7 @@ export function Navbar({ isReady = true }: { isReady?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <header className={`fixed top-0 left-0 z-[100] grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-3 border-b-[6px] border-[#2A2A2A] bg-[#EDEDED] px-4 py-3 shadow-[0px_8px_0px_#2A2A2A] sm:px-8 lg:py-4 ${isFocusMode ? 'lg:grid-cols-[1fr_auto]' : 'lg:grid-cols-[auto_1fr_auto]'}`}>
+    <header className="fixed top-0 left-0 z-[100] grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-3 border-b-[6px] border-[#2A2A2A] bg-[#EDEDED] px-4 py-3 shadow-[0px_8px_0px_#2A2A2A] sm:px-8 lg:grid-cols-[auto_1fr_auto] lg:py-4">
       <div className="inline-flex min-h-11 items-center">
         {isFocusMode ? (
           <FlashTransitionLink
@@ -96,25 +96,23 @@ export function Navbar({ isReady = true }: { isReady?: boolean }) {
         )}
       </div>
 
-      {!isFocusMode && (
-        <nav aria-label="Navegación principal" className="hidden items-center justify-center gap-5 lg:flex xl:gap-8">
-          {navigation.map((item) => {
-            if (item.href === '/app-detalles') {
-              return (
-                <FlashTransitionLink
-                  key={item.href}
-                  href={item.href}
-                  className="group relative inline-flex min-h-11 items-center text-sm font-black uppercase tracking-wider text-gray-800 transition-all duration-300 hover:text-[#6E4BFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6E4BFF]"
-                >
-                  <span className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-105">
-                    {item.label}
-                  </span>
-                  <span className="absolute bottom-2 left-0 h-[2px] w-0 bg-[#6E4BFF] transition-all duration-300 group-hover:w-full" />
-                </FlashTransitionLink>
-              )
-            }
+      <nav aria-label="Navegación principal" className="hidden items-center justify-center gap-5 lg:flex xl:gap-8">
+        {navigation.map((item) => {
+          if (item.href === '/app-detalles' && isFocusMode) {
             return (
-              <Link
+              <span
+                key={item.href}
+                aria-current="page"
+                className="relative inline-flex min-h-11 items-center text-sm font-black uppercase tracking-wider text-[#6E4BFF]"
+              >
+                {item.label}
+                <span className="absolute bottom-2 left-0 h-[2px] w-full bg-[#6E4BFF]" />
+              </span>
+            )
+          }
+          if (item.href === '/app-detalles') {
+            return (
+              <FlashTransitionLink
                 key={item.href}
                 href={item.href}
                 className="group relative inline-flex min-h-11 items-center text-sm font-black uppercase tracking-wider text-gray-800 transition-all duration-300 hover:text-[#6E4BFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6E4BFF]"
@@ -123,23 +121,33 @@ export function Navbar({ isReady = true }: { isReady?: boolean }) {
                   {item.label}
                 </span>
                 <span className="absolute bottom-2 left-0 h-[2px] w-0 bg-[#6E4BFF] transition-all duration-300 group-hover:w-full" />
-              </Link>
+              </FlashTransitionLink>
             )
-          })}
-        </nav>
-      )}
+          }
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group relative inline-flex min-h-11 items-center text-sm font-black uppercase tracking-wider text-gray-800 transition-all duration-300 hover:text-[#6E4BFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6E4BFF]"
+            >
+              <span className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-105">
+                {item.label}
+              </span>
+              <span className="absolute bottom-2 left-0 h-[2px] w-0 bg-[#6E4BFF] transition-all duration-300 group-hover:w-full" />
+            </Link>
+          )
+        })}
+      </nav>
 
-      {!isFocusMode && (
-        <button
-          type="button"
-          onClick={() => setMenuOpen((open) => !open)}
-          aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
-          aria-expanded={menuOpen}
-          className="grid size-11 place-items-center border-2 border-[#2A2A2A] transition-colors hover:bg-[#6BFF2E] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#6E4BFF] lg:hidden"
-        >
-          <HugeiconsIcon icon={menuOpen ? Cancel01Icon : Menu01Icon} strokeWidth={2} className="size-5" />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setMenuOpen((open) => !open)}
+        aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+        aria-expanded={menuOpen}
+        className="grid size-11 place-items-center border-2 border-[#2A2A2A] transition-colors hover:bg-[#6BFF2E] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#6E4BFF] lg:hidden"
+      >
+        <HugeiconsIcon icon={menuOpen ? Cancel01Icon : Menu01Icon} strokeWidth={2} className="size-5" />
+      </button>
 
       <div className="col-span-2 grid grid-cols-2 gap-2 sm:col-span-1 sm:flex sm:justify-end lg:col-span-1">
         <Link
@@ -160,10 +168,21 @@ export function Navbar({ isReady = true }: { isReady?: boolean }) {
         </Link>
       </div>
 
-      {!isFocusMode && menuOpen && (
+      {menuOpen && (
         <nav
         aria-label="Navegación móvil" className="absolute left-0 right-0 top-full z-[60] grid gap-1 border-[3px] border-[#2A2A2A] bg-[#EDEDED] p-3 shadow-[8px_8px_0px_#2A2A2A] lg:hidden">
         {navigation.map((item) => {
+          if (item.href === '/app-detalles' && isFocusMode) {
+            return (
+              <span
+                key={item.href}
+                aria-current="page"
+                className="inline-flex min-h-11 items-center border-l-4 border-[#6E4BFF] px-3 text-sm font-black uppercase tracking-wider text-[#6E4BFF]"
+              >
+                {item.label}
+              </span>
+            )
+          }
           if (item.href === '/app-detalles') {
             return (
               <FlashTransitionLink

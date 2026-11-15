@@ -91,8 +91,6 @@ export function AppDetallesScrolly() {
   const textRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useLayoutEffect(() => {
-    window.scrollTo({top: 0, left: 0, behavior: "instant"});
-
     const ctx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: containerRef.current,
