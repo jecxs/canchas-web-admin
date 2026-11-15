@@ -88,6 +88,7 @@ export function AppDetallesScrolly() {
   const containerRef = useRef<HTMLDivElement>(null);
   const stepsFooterRef = useRef<HTMLElement>(null);
   const imagesRef = useRef<(HTMLDivElement | null)[]>([]);
+  const introImageRefs = useRef<(HTMLImageElement | null)[]>([]);
   const textRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useLayoutEffect(() => {
@@ -101,18 +102,24 @@ export function AppDetallesScrolly() {
         onLeaveBack: () => gsap.to(stepsFooterRef.current, { autoAlpha: 1, duration: 0.2, overwrite: true }),
       });
 
+      const introImages = introImageRefs.current.filter(
+        (image): image is HTMLImageElement => image !== null,
+      );
+
+      if (reduceMotion) {
+        gsap.set(introImages, { scale: 1, y: 0, opacity: 1, filter: "blur(0px)" });
+      } else {
+        gsap.fromTo(
+          introImages,
+          { scale: 0.96, y: 24, opacity: 0, filter: "blur(10px)" },
+          { scale: 1, y: 0, opacity: 1, filter: "blur(0px)", duration: 0.9, ease: "power3.out", clearProps: "filter" },
+        );
+      }
+
       imagesRef.current.forEach((img, i) => {
         if (!img) return;
         if (i === 0) {
-          if (reduceMotion) {
-            gsap.set(img, { scale: 1, x: 0, y: 0, rotation: 0, opacity: 1, filter: "blur(0px)", zIndex: 50 });
-          } else {
-            gsap.fromTo(
-              img,
-              { scale: 0.96, x: 0, y: 28, rotation: 0, opacity: 0, filter: "blur(10px)", zIndex: 50 },
-              { scale: 1, x: 0, y: 0, rotation: 0, opacity: 1, filter: "blur(0px)", duration: 0.9, ease: "power3.out", clearProps: "filter" },
-            );
-          }
+          gsap.set(img, { scale: 1, x: 0, y: 0, rotation: 0, opacity: 1, filter: "blur(0px)", zIndex: 50 });
         } else {
           const backdrop = backdropPositions[(i - 1) % backdropPositions.length];
           gsap.set(img, {
@@ -251,7 +258,14 @@ export function AppDetallesScrolly() {
 
               <div className="relative mx-auto mt-12 w-[min(75vw,300px)] lg:hidden">
                 <div className="relative aspect-9/16 overflow-hidden rounded-[2.5rem] bg-[#0B0D0B] shadow-2xl ring-1 ring-white/10">
-                  <Image src={section.image} alt={section.alt} fill sizes="(min-width: 640px) 320px, 280px" className="object-contain" />
+                  <Image
+                    ref={index === 0 ? (image) => { introImageRefs.current[0] = image; } : undefined}
+                    src={section.image}
+                    alt={section.alt}
+                    fill
+                    sizes="(min-width: 640px) 320px, 280px"
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </section>
@@ -274,6 +288,7 @@ export function AppDetallesScrolly() {
                   }}
                 >
                   <Image
+                    ref={index === 0 ? (image) => { introImageRefs.current[1] = image; } : undefined}
                     src={section.image}
                     alt={section.alt}
                     fill
