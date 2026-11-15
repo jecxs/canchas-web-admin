@@ -91,6 +91,8 @@ export function AppDetallesScrolly() {
   const textRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useLayoutEffect(() => {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     const ctx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: containerRef.current,
@@ -102,7 +104,15 @@ export function AppDetallesScrolly() {
       imagesRef.current.forEach((img, i) => {
         if (!img) return;
         if (i === 0) {
-          gsap.set(img, { scale: 1, x: 0, y: 0, rotation: 0, opacity: 1, filter: "blur(0px)", zIndex: 50 });
+          if (reduceMotion) {
+            gsap.set(img, { scale: 1, x: 0, y: 0, rotation: 0, opacity: 1, filter: "blur(0px)", zIndex: 50 });
+          } else {
+            gsap.fromTo(
+              img,
+              { scale: 0.96, x: 0, y: 28, rotation: 0, opacity: 0, filter: "blur(10px)", zIndex: 50 },
+              { scale: 1, x: 0, y: 0, rotation: 0, opacity: 1, filter: "blur(0px)", duration: 0.9, ease: "power3.out", clearProps: "filter" },
+            );
+          }
         } else {
           const backdrop = backdropPositions[(i - 1) % backdropPositions.length];
           gsap.set(img, {
@@ -261,7 +271,6 @@ export function AppDetallesScrolly() {
                   className="absolute inset-0 flex items-center justify-center will-change-transform"
                   style={{
                     opacity: index === 0 ? 1 : 0, 
-                    viewTransitionName: index === 0 ? "app-hero-image" : "none",
                   }}
                 >
                   <Image

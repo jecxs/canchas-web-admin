@@ -2,7 +2,6 @@
 
 import { useRef } from "react";
 import Image from "next/image";
-import { Link } from "next-view-transitions";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -11,6 +10,7 @@ import {
   HistoryIcon,
   Location03Icon,
 } from "@hugeicons/core-free-icons";
+import { FlashTransitionLink } from "@/components/flashTransitionLink";
 
 gsap.registerPlugin(useGSAP);
 
@@ -72,8 +72,6 @@ function MockupColumn({ images, direction, speed }: MockupColumnProps) {
         className="flex flex-col gap-3 pb-3 sm:gap-4 sm:pb-4 will-change-transform"
       >
         {[...images, ...images].map((src, index) => {
-          const isLoginImage = src.includes("phone-loginGrassly.png");
-
           return (
             <div
               key={`${src}-${index}`}
@@ -87,12 +85,6 @@ function MockupColumn({ images, direction, speed }: MockupColumnProps) {
                 priority
                 sizes="(min-width: 1024px) 18vw, 36vw"
                 className="w-full h-auto object-contain shadow-2xl rounded-[15%]"
-                style={{
-                  viewTransitionName:
-                    src.includes("loginGrassly") && index < images.length
-                      ? "app-hero-image"
-                      : "none",
-                }}
               />
             </div>
           );
@@ -140,13 +132,12 @@ export function AppShowcase() {
             ))}
           </div>
 
-          <Link
+          <FlashTransitionLink
             href="/app-detalles"
-            scroll={true}
             className="mt-6 inline-flex w-fit items-center justify-center rounded-full bg-[#D7FF38] px-8 py-3 text-sm font-extrabold text-[#151c16] transition duration-300 hover:scale-[1.02] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D7FF38] focus-visible:ring-offset-4 focus-visible:ring-offset-[#151c16] sm:px-6"
           >
             Descubrir la App
-          </Link>
+          </FlashTransitionLink>
         </div>
 
         <div
