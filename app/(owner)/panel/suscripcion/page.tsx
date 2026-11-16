@@ -35,7 +35,7 @@ export default async function SubscriptionPage() {
   const { subscription, invoices } = await getBillingOverview()
   const canStart = (!subscription || subscription.estado_facturacion === 'pendiente_alta')
     ? context.locals.some((local) => isSubscribableLocalState(local.estado) && !canOperateLocal(local, subscription))
-    : subscription.estado_facturacion === 'cancelada'
+    : subscription.estado_facturacion === 'cancelada' && !context.subscription?.acceso_pagado_vigente
       && context.locals.some((local) => isSubscribableLocalState(local.estado) || local.suspendido_por_facturacion)
   const offer = canStart ? await getBillingCheckoutOffer() : null
   const plan = subscription?.mercadopago_preapproval_id ? await getBillingPlan() : null

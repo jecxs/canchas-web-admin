@@ -2,16 +2,18 @@ import { UnsavedChangesProvider } from '@/components/dashboard/unsaved-changes'
 import { SubscriptionPricingCard } from '@/features/admin-billing/subscription-pricing-card'
 import { getSubscriptionPriceVersions } from '@/features/admin-billing/queries'
 import { PlatformParameterField } from '@/features/admin-platform/platform-parameter-field'
-import { getAdvancePercentageValues, getPlatformParameters } from '@/features/admin-platform/queries'
+import { AndroidAppUpdateCard } from '@/features/admin-platform/android-app-update-card'
+import { getAdvancePercentageValues, getAndroidAppUpdatePolicy, getPlatformParameters } from '@/features/admin-platform/queries'
 import { PLATFORM_PARAMETERS } from '@/features/admin-platform/types'
 import { requireAdmin } from '@/lib/auth/dal'
 
 export default async function AdminPlatformSettingsPage() {
   await requireAdmin()
-  const [rows, advancePercentages, subscriptionPrices] = await Promise.all([
+  const [rows, advancePercentages, subscriptionPrices, appUpdatePolicy] = await Promise.all([
     getPlatformParameters(),
     getAdvancePercentageValues(),
     getSubscriptionPriceVersions(),
+    getAndroidAppUpdatePolicy(),
   ])
 
   return (
@@ -24,6 +26,10 @@ export default async function AdminPlatformSettingsPage() {
         despliegan sus consideraciones y cada modificación se confirma antes de guardar y queda registrada en la
         auditoría.
       </p>
+
+      <div className="mt-7">
+        <AndroidAppUpdateCard policy={appUpdatePolicy} />
+      </div>
 
       <UnsavedChangesProvider>
         <div className="mt-7">

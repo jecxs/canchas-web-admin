@@ -3,7 +3,7 @@ import 'server-only'
 import { requireAdmin } from '@/lib/auth/dal'
 import { createClient } from '@/utils/supabase/server'
 import { PLATFORM_PARAMETER_KEYS } from './types'
-import type { PlatformParameterKey, PlatformParameterRow } from './types'
+import type { AndroidAppUpdatePolicy, PlatformParameterKey, PlatformParameterRow } from './types'
 
 function readValue(raw: unknown): number | string[] | null {
   if (typeof raw === 'number') return raw
@@ -42,6 +42,21 @@ export async function getPlatformParameters(): Promise<PlatformParameterRow[]> {
   }
 
   return PLATFORM_PARAMETER_KEYS.map((key) => rows.get(key)!).filter(Boolean)
+}
+
+export async function getAndroidAppUpdatePolicy(): Promise<AndroidAppUpdatePolicy> {
+  await requireAdmin()
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('obtener_politica_actualizacion_android')
+
+  if (error) {
+    console.error('[admin-platform:app-update-policy]', { code: error.code })
+    throw new Error('No se pudo cargar el control de versiones de la app.')
+  }
+
+  const policy = data?.[0]
+  if (!policy) throw new Error('No se encontró la política de versiones de Android.')
+  return policy
 }
 
 // Porcentajes de adelanto ya configurados por los locales. Permite calcular en

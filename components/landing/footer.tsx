@@ -1,11 +1,20 @@
+"use client";
+
+import { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
+import { AnimatedLink } from "./animated-link";
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const productLinks = [
   { href: "/registro", label: "Registrar mi local" },
   { href: "/#precio", label: "Precios y Planes" },
   { href: "/registro", label: "Iniciar Sesión" },
-  { href: "/#app", label: "App para Jugadores" },
+  { href: "/#app-movil", label: "App para Jugadores" },
 ];
 
 const legalLinks = [
@@ -91,21 +100,102 @@ function ContactIcon({ kind }: { kind: "email" | "chat" | "book" }) {
 }
 
 export function Footer() {
+  const footerRef = useRef<HTMLElement>(null);
+
+  useGSAP(
+    () => {
+      const footer = footerRef.current;
+      if (!footer) return;
+
+      const reels = footer.querySelectorAll<HTMLElement>("[data-logo-reel]");
+      const media = gsap.matchMedia();
+
+      media.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.fromTo(
+          reels,
+          { yPercent: -75 },
+          {
+            yPercent: 0,
+            duration: 1.2,
+            stagger: 0.15,
+            ease: "back.out(1.7)",
+            scrollTrigger: {
+              trigger: footer,
+              start: "top 90%",
+              toggleActions: "play none none reverse",
+            },
+          },
+        );
+      });
+
+      return () => media.revert();
+    },
+    { scope: footerRef },
+  );
+
   return (
-    <footer className="border-t-4 border-[#D7FF38] bg-[#151c16] px-5 pt-16 pb-8 text-gray-300 lg:px-8">
+    <footer
+      ref={footerRef}
+      className="border-t-4 border-[#D7FF38] bg-[#151c16] px-5 pt-16 pb-8 text-gray-300 lg:px-8"
+    >
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 md:grid-cols-3">
         <div>
           <Link href="/" aria-label="Grassly, inicio" className="inline-block">
-            {/* Aumentamos el gap y el tamaño general */}
-            <div className="flex items-center gap-4 mb-6">
-              <img
+            <div className="mb-6 flex items-center">
+              <Image
                 src="/iconGrasslysinFondo.png"
                 alt="Grassly Logo"
-                className="h-16 w-16 object-contain"
+                width={64}
+                height={64}
+                className="h-16 w-16 object-contain relative z-10"
               />
-              <span className="text-4xl font-black text-white tracking-tight">
-                Grassly
-              </span>
+              <div className="-ml-1 relative z-0 flex items-baseline whitespace-nowrap text-white font-bold text-4xl">
+                <span>G</span>
+                <span>r</span>
+                <span
+                  className="inline-flex flex-col h-[1em] overflow-hidden leading-none"
+                  style={{ width: "0.56em" }}
+                >
+                  <span
+                    data-logo-reel
+                    aria-hidden="true"
+                    className="flex flex-col leading-none"
+                  >
+                    {["a", "@", "X", "7"].map((character, index) => (
+                      <span
+                        key={index}
+                        className="flex h-[1em] w-full shrink-0 items-center justify-center leading-[1em]"
+                      >
+                        {character}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="sr-only">a</span>
+                </span>
+                <span>s</span>
+                <span>s</span>
+                <span
+                  className="inline-flex flex-col h-[1em] overflow-hidden leading-none"
+                  style={{ width: "0.28em" }}
+                >
+                  <span
+                    data-logo-reel
+                    aria-hidden="true"
+                    className="flex flex-col leading-none"
+                  >
+                    {["l", "#", "Z", "8"].map((character, index) => (
+                      <span
+                        key={index}
+                        className="flex h-[1em] w-full shrink-0 items-center justify-center leading-[1em]"
+                      >
+                        {character}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="sr-only">l</span>
+                </span>
+                <span>y</span>
+              </div>
             </div>
           </Link>
 
@@ -114,19 +204,25 @@ export function Footer() {
             los ingresos de tus complejos deportivos de césped sintético.
           </p>
 
-          {/* Agregamos items-start para forzar la alineación a la izquierda */}
           <div className="mt-8 flex flex-col items-start gap-2">
             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
               Desarrollado por:
             </span>
-            <Image
-              src="/lexovateBlanco.png"
-              alt="Lexovate"
-              width={200}
-              height={40}
-              /* Se agrega h-8 para hacerlo un poco más grande y object-left para evitar el centrado automático */
-              className="h-8 w-auto object-contain object-left opacity-75 hover:opacity-100 transition-opacity duration-300"
-            />
+            <a
+              href="https://lexovate.com.pe"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Visitar Lexovate (abre en una pestaña nueva)"
+              className="group inline-flex cursor-pointer items-center gap-2 opacity-80 transition-opacity hover:opacity-100"
+            >
+              <Image
+                src="/lexovateBlanco.png"
+                alt="Lexovate"
+                width={200}
+                height={40}
+                className="h-8 w-auto object-contain object-left transition-transform duration-300 group-hover:scale-[1.03]"
+              />
+            </a>
           </div>
         </div>
 
@@ -137,12 +233,7 @@ export function Footer() {
           <ul className="mt-5 space-y-3 text-sm">
             {productLinks.map((item) => (
               <li key={item.label}>
-                <Link
-                  href={item.href}
-                  className="transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:underline"
-                >
-                  {item.label}
-                </Link>
+                <AnimatedLink href={item.href} label={item.label} />
               </li>
             ))}
           </ul>
@@ -188,12 +279,7 @@ export function Footer() {
           <ul className="flex flex-wrap gap-x-6 gap-y-3 text-xs text-gray-400">
             {legalLinks.map((item) => (
               <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:underline"
-                >
-                  {item.label}
-                </Link>
+                <AnimatedLink href={item.href} label={item.label} />
               </li>
             ))}
             <li>
