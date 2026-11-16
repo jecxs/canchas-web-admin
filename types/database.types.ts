@@ -3675,6 +3675,44 @@ export type Database = {
           valor: Json
         }[]
       }
+      obtener_version_minima_android: { Args: never; Returns: number }
+      obtener_politica_actualizacion_android: {
+        Args: never
+        Returns: {
+          version_codigo_candidata: number | null
+          version_nombre_candidata: string | null
+          eas_build_id: string | null
+          eas_app_identifier: string | null
+          eas_perfil: string | null
+          eas_distribucion: string | null
+          candidata_registrada_at: string | null
+          version_codigo_minima: number
+          minimo_activado_at: string | null
+        }[]
+      }
+      activar_version_candidata_android: {
+        Args: {
+          p_version_codigo_confirmada: number
+          p_eas_build_id_confirmado: string
+        }
+        Returns: {
+          version_codigo_minima: number
+          version_nombre_candidata: string | null
+          minimo_activado_at: string
+        }[]
+      }
+      desactivar_version_minima_android: { Args: Record<PropertyKey, never>; Returns: number }
+      registrar_candidata_version_android: {
+        Args: {
+          p_version_codigo: number
+          p_version_nombre: string
+          p_eas_build_id: string
+          p_eas_app_identifier: string
+          p_eas_perfil: string
+          p_eas_distribucion: string
+        }
+        Returns: boolean
+      }
       obtener_proximos_turnos_locales_publicos: {
         Args: {
           p_fecha?: string

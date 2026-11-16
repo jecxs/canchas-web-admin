@@ -110,6 +110,25 @@ export type PlatformParameterState = {
   affectedLocals?: number
 }
 
+export type AndroidAppUpdatePolicy = {
+  version_codigo_candidata: number | null
+  version_nombre_candidata: string | null
+  eas_build_id: string | null
+  eas_app_identifier: string | null
+  eas_perfil: string | null
+  eas_distribucion: string | null
+  candidata_registrada_at: string | null
+  version_codigo_minima: number
+  minimo_activado_at: string | null
+}
+
+export type AppUpdateActionState = {
+  success: boolean
+  message?: string
+}
+
+export const initialAppUpdateActionState: AppUpdateActionState = { success: false }
+
 export const initialPlatformParameterState: PlatformParameterState = { success: false }
 
 export function formatPlatformValue(value: number | string[] | null, unit: string | null) {
