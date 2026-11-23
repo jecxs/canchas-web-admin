@@ -255,18 +255,18 @@ export function Footer() {
             </li>
             <li>
               <a
-                href="https://wa.me/51999999999?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20Grassly."
+                href="https://wa.me/51994965373"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-3 transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:underline"
               >
                 <ContactIcon kind="chat" />
-                WhatsApp Ventas
+                WhatsApp Soporte
               </a>
             </li>
           </ul>
           <p className="mt-5 text-xs leading-5 text-gray-400">
-            Atención: Lunes a Sábado | 9:00 AM - 7:00 PM
+            Atención: Lunes a Sábado | 8:00 AM - 6:00 PM
           </p>
         </div>
       </div>
